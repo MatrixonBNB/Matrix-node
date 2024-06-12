@@ -1,0 +1,18 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  username:
+  password:
+
+development:
+  <<: *default
+  database: evm_facet_development
+
+test:
+  <<: *default
+  database: evm_facet_test
+
+production:
+  <<: *default
+  database: evm_facet_production
