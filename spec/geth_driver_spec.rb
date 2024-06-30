@@ -35,7 +35,7 @@ RSpec.describe GethDriver do
       transactions = [deposit_tx.encoded.bytes_to_hex]
       
       start_block = client.call("eth_getBlockByNumber", ["latest", true])
-      engine_api.propose_block(transactions)
+      engine_api.propose_block(transactions, EthBlock.new(parent_beacon_block_root: "0x" + "0" * 64))
       
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
       expect(latest_block).not_to be_nil
@@ -111,7 +111,7 @@ RSpec.describe GethDriver do
       transactions = [increment_tx.encoded.bytes_to_hex]
 
       # Propose a new block with the increment transaction
-      engine_api.propose_block(transactions)
+      engine_api.propose_block(transactions, EthBlock.new(parent_beacon_block_root: "0x" + "0" * 64))
 
       # Verify the new block and the increment transaction
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
@@ -155,7 +155,7 @@ RSpec.describe GethDriver do
       start_block = client.call("eth_getBlockByNumber", ["latest", true])
       
       # Step 3: Propose a block
-      engine_api.propose_block(transactions)
+      engine_api.propose_block(transactions, EthBlock.new(parent_beacon_block_root: "0x" + "0" * 64))
 
       # Step 4: Verify the block was created with the correct properties
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])

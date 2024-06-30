@@ -30,20 +30,11 @@ module FacetBlockImporter
           )
         ).bytes_to_hex
         
-        computed_from = call.call_index == 0 ?
-          call.from_address :
-          Eth::Tx::Deposit.alias_address(call.from_address)
-        
-        FacetTransaction.new(
+        facet_tx.assign_attributes(
           eth_transaction_hash: tx.tx_hash,
           eth_call_index: call.call_index,
           source_hash: source_hash,
-          value: facet_tx.amount,
-          to_address: normalize_hex(facet_tx.destination),
-          gas_limit: facet_tx.gas_limit,
-          max_fee_per_gas: facet_tx.max_fee_per_gas,
-          input: facet_tx.payload.bytes_to_hex,
-          from_address: computed_from,
+          from_address: call.from_address,
           mint: mint_amount,
         )
       end
@@ -76,6 +67,7 @@ module FacetBlockImporter
         parent_beacon_block_root: eth_block.parent_beacon_block_root,
         size: geth_block['size'].to_i(16),
         transactions_root: geth_block['transactionsRoot'],
+        # sent_to_geth_at: Time.current,
       )
 
       facet_block.save!
@@ -126,9 +118,13 @@ module FacetBlockImporter
   end
   
   def facet_tx_to_payload(facet_tx)
+    computed_from = facet_tx.eth_call_index == 0 ?
+      facet_tx.from_address :
+      Eth::Tx::Deposit.alias_address(facet_tx.from_address)
+    
     Eth::Tx::Deposit.new(
       source_hash: facet_tx.source_hash,
-      from: facet_tx.from_address,
+      from: computed_from,
       to: facet_tx.to_address,
       mint: facet_tx.mint,
       value: facet_tx.value,
@@ -145,7 +141,7 @@ module FacetBlockImporter
   end
   
   def get_inner_tx(eth_call)
-    Eth::Tx::Eip1559.decode(eth_call.input)
+    FacetTransaction.from_tx_payload(eth_call.input)
   rescue *tx_decode_errors
     nil
   end

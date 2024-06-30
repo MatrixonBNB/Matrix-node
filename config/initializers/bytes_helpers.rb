@@ -17,7 +17,11 @@ class String
   end
   
   def bytes_to_hex
-    "0x" + self.unpack1('H*')
+    "0x" + bytes_to_unprefixed_hex
+  end
+  
+  def bytes_to_unprefixed_hex
+    self.unpack1('H*')
   end
   
   def hex_to_bytes

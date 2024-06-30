@@ -20,7 +20,7 @@ module EthBlockImporter
   end
   
   def genesis_block
-    ENV.fetch('TESTNET_START_BLOCK', 6157242).to_i
+    ENV.fetch('TESTNET_START_BLOCK', 6164072).to_i
   end
   
   def blocks_behind
@@ -180,7 +180,7 @@ module EthBlockImporter
         process_trace(trace, eth_block, order_counter)
       end
       
-      EthCall.import!(traces.flatten)
+      EthCall.import!(traces.flatten.sort_by(&:call_index))
       
       FacetBlockImporter.from_eth_block(eth_block)
 
