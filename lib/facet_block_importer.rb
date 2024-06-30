@@ -37,6 +37,8 @@ module FacetBlockImporter
           from_address: call.from_address,
           mint: mint_amount,
         )
+        
+        facet_tx
       end
     end.flatten.compact
     
