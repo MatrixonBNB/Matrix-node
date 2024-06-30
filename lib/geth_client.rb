@@ -31,7 +31,7 @@ class GethClient
     response = HTTParty.post(@node_url, options)
     
     unless response.code == 200
-      raise ClientError, response.parsed_response['error']
+      raise ClientError, response
     end
     
     raise ClientError.new(response.parsed_response['error']) if response.parsed_response['error']

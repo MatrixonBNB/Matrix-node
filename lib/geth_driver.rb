@@ -18,18 +18,19 @@ class GethDriver
   end
   
   def propose_block(transactions, l1_origin_block, timestamp = Time.now.to_i)
+    # TODO: make sure that the geth node's latest block is the same as the ruby's
     latest_block = client.call("eth_getBlockByNumber", ["latest", false])
+    # latest_our_block = FacetBlock.where.not(sent_to_geth_at: nil).order(number: :desc).first
+    
+    # if latest_our_block&.block_number != latest_block['number'].to_i(16) &&
+    #   latest_our_block&.block_hash != latest_block['hash']
+    #   raise "Latest block on geth is not the same as the latest block on the database"
+    # end
     
     payload_attributes = {
       timestamp: "0x" + (latest_block['timestamp'].to_i(16) + 12).to_s(16),
-      
-      # In Ecotone it MUST be set to the parentBeaconBlockRoot from the L1 Origin block of the L2 block.
-      parentBeaconBlockRoot: '0x0000000000000000000000000000000000000000000000000000000000000000',
-      # Need to set genesis block to a real L1 block for this to work
-      # parentBeaconBlockRoot: l1_origin_block.parent_beacon_block_root,
-      
+      parentBeaconBlockRoot: l1_origin_block.parent_beacon_block_root,
       prevRandao: "0x" + SecureRandom.hex(32),
-      random: "0x" + SecureRandom.hex(32),
       suggestedFeeRecipient: "0x0000000000000000000000000000000000000000",
       withdrawals: [],
       noTxPool: true,
@@ -61,7 +62,11 @@ class GethDriver
     
     payload['transactions'] = transactions
 
-    new_payload_response = client.call("engine_newPayloadV3", [payload, [], '0x0000000000000000000000000000000000000000000000000000000000000000'])
+    new_payload_response = client.call("engine_newPayloadV3", [
+      payload,
+      [],
+      l1_origin_block.parent_beacon_block_root
+    ])
     
     status = new_payload_response['status']
     unless status == 'VALID'
@@ -84,6 +89,21 @@ class GethDriver
   end
   
   def self.t
+    tx = Eth::Tx.new({
+      nonce: 0,
+      chain_id: 0xFace7,
+      max_gas_fee: 69 * Eth::Unit::GWEI,
+      gas_limit: 230_420,
+      priority_fee: 0,
+      to: "0xCaA29806044A08E533963b2e573C1230A2cd9a2d",
+      value: 0,
+      data: "testing",
+      access_list: [],
+    })
+    
+    return tx.unsigned_encoded
+    
+    
     engine_api = new
     
     tx = Eth::Tx.new({
