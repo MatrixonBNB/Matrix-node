@@ -85,7 +85,9 @@ class AlchemyClient
 
     url = [base_url, api_key].join('/')
 
-    HTTParty.post(url, body: data.to_json, headers: headers).parsed_response
+    response = HTTParty.post(url, body: data.to_json, headers: headers)
+    
+    JSON.parse(response.body, max_nesting: false)
   end
 
   def headers
