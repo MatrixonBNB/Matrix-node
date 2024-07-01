@@ -18,4 +18,12 @@ class FacetTransactionsController < ApplicationController
     
     render json: res
   end
+  
+  def rpc_proxy
+    res = GethDriver.client.call(params[:method], params[:params])
+    
+    render json: { result: res }
+  rescue GethClient::ClientError => e
+    render json: { error: e.message }, status: :bad_request
+  end
 end
