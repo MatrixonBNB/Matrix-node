@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe GethDriver do
   let(:node_url) { 'http://localhost:8551' }
   let(:client) { GethClient.new(node_url) }
-  let(:engine_api) { GethDriver.new(node_url) }
+  let(:engine_api) { GethDriver }
 
   # \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json
   

@@ -58,6 +58,64 @@ module EthBlockImporter
     end
   end
   
+  def ensure_genesis_blocks
+    return if FacetBlock.exists?
+    
+    facet_genesis_block = GethDriver.client.call("eth_getBlockByNumber", ["0x0", false])
+    facet_latest_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])
+    
+    unless facet_genesis_block['hash'] == facet_latest_block['hash']
+      raise "Facet genesis block is not the same as the latest block on geth"
+    end
+    
+    genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + genesis_block.to_s(16), false])
+    block_result = genesis_eth_block['result']
+    
+    EthBlock.create!(
+      number: block_result['number'].to_i(16),
+      block_hash: block_result['hash'],
+      logs_bloom: block_result['logsBloom'],
+      total_difficulty: block_result['totalDifficulty'].to_i(16),
+      receipts_root: block_result['receiptsRoot'],
+      extra_data: block_result['extraData'],
+      withdrawals_root: block_result['withdrawalsRoot'],
+      base_fee_per_gas: block_result['baseFeePerGas'].to_i(16),
+      nonce: block_result['nonce'],
+      miner: block_result['miner'],
+      excess_blob_gas: block_result['excessBlobGas'].to_i(16),
+      difficulty: block_result['difficulty'].to_i(16),
+      gas_limit: block_result['gasLimit'].to_i(16),
+      gas_used: block_result['gasUsed'].to_i(16),
+      parent_beacon_block_root: block_result['parentBeaconBlockRoot'],
+      size: block_result['size'].to_i(16),
+      transactions_root: block_result['transactionsRoot'],
+      state_root: block_result['stateRoot'],
+      mix_hash: block_result['mixHash'],
+      parent_hash: block_result['parentHash'],
+      blob_gas_used: block_result['blobGasUsed'].to_i(16),
+      timestamp: block_result['timestamp'].to_i(16)
+    )
+    
+    FacetBlock.create!(
+      number: facet_genesis_block['number'],
+      block_hash: facet_genesis_block['hash'],
+      eth_block_hash: block_result['hash'],
+      parent_beacon_block_root: facet_genesis_block['parentBeaconBlockRoot'],
+      timestamp: facet_genesis_block['timestamp'].to_i(16),
+      prev_randao: Eth::Util.keccak256(block_result['hash'].hex_to_bytes + 'prevRandao').bytes_to_hex,
+      base_fee_per_gas: block_result['baseFeePerGas'].to_i(16),
+      gas_limit: block_result['gasLimit'].to_i(16),
+      gas_used: block_result['gasUsed'].to_i(16),
+      state_root: block_result['stateRoot'],
+      transactions_root: block_result['transactionsRoot'],
+      receipts_root: block_result['receiptsRoot'],
+      parent_hash: block_result['parentHash'],
+      extra_data: block_result['extraData'],
+      logs_bloom: block_result['logsBloom'],
+      size: block_result['size'].to_i(16),
+    )
+  end
+  
   def import_blocks(block_numbers)
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
@@ -104,18 +162,21 @@ module EthBlockImporter
       
       parent_block = EthBlock.find_by(number: block_number - 1)
       
-      if parent_block.present? && parent_block.block_hash != block_result['parentHash']
-        raise "Need good re-org handling"
-        # Airbrake.notify("
-        #   Reorg detected: #{block_number},
-        #   #{parent_block.blockhash},
-        #   #{result['parentHash']},
-        #   Deleting block(s): #{EthBlock.where("number >= ?", parent_block.number).pluck(:number).join(', ')}
-        # ")
+      if parent_block.blank?
+        raise "Parent block not found"
+      end
+      
+      if parent_block.block_hash != block_result['parentHash']
+        EthBlock.where("number >= ?", parent_block.number).delete_all
         
-        # EthBlock.where("number >= ?", parent_block.number).delete_all
+        Airbrake.notify("
+          Reorg detected: #{block_number},
+          #{parent_block.block_hash},
+          #{block_result['parentHash']},
+          Deleting block(s): #{EthBlock.where("number >= ?", parent_block.number).pluck(:number).join(', ')}
+        ")
         
-        # return OpenStruct.new(transactions_imported: 0)
+        return OpenStruct.new(transactions_imported: 0)
       end
       
       eth_block = EthBlock.new(
@@ -263,9 +324,15 @@ module EthBlockImporter
   end
   
   def next_blocks_to_import(n)
+    ensure_genesis_blocks
+    
     max_db_block = EthBlock.maximum(:number)
     
-    start_block = max_db_block ? max_db_block + 1 : genesis_block
+    unless max_db_block
+      raise "No blocks in the database"
+    end
+    
+    start_block = max_db_block + 1
     
     (start_block...(start_block + n)).to_a
   end

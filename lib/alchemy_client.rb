@@ -73,9 +73,16 @@ class AlchemyClient
     query_api(method: 'eth_blockNumber')['result'].to_i(16)
   end
 
-  private
-
-  def query_api(method:, params: [])
+  def query_api(method = nil, params = [], **kwargs)
+    if kwargs.present?
+      method = kwargs[:method]
+      params = kwargs[:params]
+    end
+    
+    unless method
+      raise "Method is required"
+    end
+    
     data = {
       id: 1,
       jsonrpc: "2.0",
@@ -90,6 +97,10 @@ class AlchemyClient
     JSON.parse(response.body, max_nesting: false)
   end
 
+  def call(method, params = [])
+    query_api(method: method, params: params)
+  end
+  
   def headers
     { 
       'Accept' => 'application/json',

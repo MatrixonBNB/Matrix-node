@@ -1,36 +1,33 @@
-class GethDriver
-  attr_reader :client, :password
+module GethDriver
+  extend self
+  attr_reader :password
   
-  def initialize(node_url = 'http://localhost:8551')
-    @client = GethClient.new(node_url)
+  def client
+    @_client ||= GethClient.new(ENV.fetch('GETH_RPC_URL'))
   end
   
-  def reorg_chain(to_block)
-    target_block = client.call("eth_getBlockByNumber", ["0x" + to_block.to_s(16), false])
+  def propose_block(transactions, new_facet_block, reorg: false)
+    # TODO: make sure that the geth node's latest block is the same as the ruby's
+    earliest = FacetBlock.order(number: :asc).first
+    
+    head_block = FacetBlock.find_by(number: new_facet_block.number - 1) || earliest
+    safe_block = FacetBlock.find_by(number: head_block.number - 32) || earliest
+    finalized_block = FacetBlock.find_by(number: head_block.number - 64) || earliest
+    
+    head_block_hash = head_block.block_hash
+    safe_block_hash = safe_block.block_hash
+    finalized_block_hash = finalized_block.block_hash
     
     fork_choice_state = {
-      headBlockHash: target_block['hash'],
-      safeBlockHash: target_block['hash'],
-      finalizedBlockHash: target_block['hash'],
+      headBlockHash: head_block_hash,
+      safeBlockHash: safe_block_hash,
+      finalizedBlockHash: finalized_block_hash,
     }
     
-    client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, nil])
-  end
-  
-  def propose_block(transactions, l1_origin_block, timestamp = Time.now.to_i)
-    # TODO: make sure that the geth node's latest block is the same as the ruby's
-    latest_block = client.call("eth_getBlockByNumber", ["latest", false])
-    # latest_our_block = FacetBlock.where.not(sent_to_geth_at: nil).order(number: :desc).first
-    
-    # if latest_our_block&.block_number != latest_block['number'].to_i(16) &&
-    #   latest_our_block&.block_hash != latest_block['hash']
-    #   raise "Latest block on geth is not the same as the latest block on the database"
-    # end
-    
     payload_attributes = {
-      timestamp: "0x" + (latest_block['timestamp'].to_i(16) + 12).to_s(16),
-      parentBeaconBlockRoot: l1_origin_block.parent_beacon_block_root,
-      prevRandao: "0x" + SecureRandom.hex(32),
+      timestamp: "0x" + new_facet_block.timestamp.to_s(16),
+      parentBeaconBlockRoot: new_facet_block.parent_beacon_block_root,
+      prevRandao: new_facet_block.prev_randao,
       suggestedFeeRecipient: "0x0000000000000000000000000000000000000000",
       withdrawals: [],
       noTxPool: true,
@@ -41,12 +38,6 @@ class GethDriver
     # Recall that a batch contains a list of transactions to be included in a specific L2 block.
 
     # A batch is encoded as batch_version ++ content, where content depends on the batch_version. Prior to the Delta upgrade, batches all have batch_version 0 and are encoded as described below.
-    
-    fork_choice_state = {
-      headBlockHash: latest_block['hash'],
-      safeBlockHash: latest_block['hash'],
-      finalizedBlockHash: latest_block['hash'],
-    }
     
     fork_choice_response = client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, payload_attributes])
     raise "Fork choice update failed: #{fork_choice_response['error']}" if fork_choice_response['error']
@@ -65,7 +56,7 @@ class GethDriver
     new_payload_response = client.call("engine_newPayloadV3", [
       payload,
       [],
-      l1_origin_block.parent_beacon_block_root
+      new_facet_block.parent_beacon_block_root
     ])
     
     status = new_payload_response['status']
@@ -73,11 +64,15 @@ class GethDriver
       raise "New payload was not valid: #{status}"
     end
 
+    new_safe_block = FacetBlock.find_by(number: head_block.number - 32) || earliest
+    new_finalized_block = FacetBlock.find_by(number: head_block.number - 63) || earliest
+    
     fork_choice_state = {
       headBlockHash: payload['blockHash'],
-      safeBlockHash: payload['blockHash'],
-      finalizedBlockHash: payload['blockHash']
+      safeBlockHash: new_safe_block.block_hash,
+      finalizedBlockHash: new_finalized_block.block_hash
     }
+    
     fork_choice_response = client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, nil])
 
     status = fork_choice_response['payloadStatus']['status']

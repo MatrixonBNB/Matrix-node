@@ -38,4 +38,22 @@ class FacetTransaction < ApplicationRecord
     tx.input = data
     tx
   end
+  
+  def to_payload
+    computed_from = eth_call_index == 0 ?
+      from_address :
+      Eth::Tx::Deposit.alias_address(from_address)
+    
+    Eth::Tx::Deposit.new(
+      source_hash: source_hash,
+      from: computed_from,
+      to: to_address,
+      mint: mint,
+      value: value,
+      gas_limit: gas_limit,
+      # max_fee_per_gas
+      is_system_tx: false,
+      data: input,
+    ).encoded.bytes_to_hex
+  end
 end

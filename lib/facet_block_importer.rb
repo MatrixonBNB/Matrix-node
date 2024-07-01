@@ -6,6 +6,10 @@ module FacetBlockImporter
     
     facet_block = FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
+      parent_beacon_block_root: eth_block.parent_beacon_block_root,
+      number: FacetBlock.maximum(:number) + 1,
+      timestamp: eth_block.timestamp,
+      prev_randao: Eth::Util.keccak256(eth_block.block_hash.hex_to_bytes + 'prevRandao').bytes_to_hex
     )
     
     facet_txs = eth_block.eth_transactions.includes(:eth_calls).flat_map do |tx|
@@ -42,9 +46,12 @@ module FacetBlockImporter
       end
     end.flatten.compact
     
-    payload = facet_txs.map { |facet_tx| facet_tx_to_payload(facet_tx) }
+    payload = facet_txs.map(&:to_payload)
     
-    response = geth_driver.propose_block(payload, eth_block)
+    response = geth_driver.propose_block(
+      payload,
+      facet_block
+    )
 
     geth_block = geth_driver.client.call("eth_getBlockByNumber", ["0x" + response['blockNumber'].to_i(16).to_s(16), true])
     update_records_from_response(response, facet_block, facet_txs, geth_block, eth_block)
@@ -53,7 +60,6 @@ module FacetBlockImporter
   def update_records_from_response(response, facet_block, facet_txs, geth_block, eth_block)
     ActiveRecord::Base.transaction do
       facet_block.assign_attributes(
-        eth_block_hash: eth_block.block_hash,
         number: response['blockNumber'].to_i(16),
         block_hash: response['blockHash'],
         parent_hash: response['parentHash'],
@@ -66,7 +72,6 @@ module FacetBlockImporter
         base_fee_per_gas: response['baseFeePerGas'].to_i(16),
         prev_randao: response['prevRandao'],
         extra_data: response['extraData'],
-        parent_beacon_block_root: eth_block.parent_beacon_block_root,
         size: geth_block['size'].to_i(16),
         transactions_root: geth_block['transactionsRoot'],
         # sent_to_geth_at: Time.current,
@@ -115,26 +120,8 @@ module FacetBlockImporter
   end
 
   
-  def geth_driver(node_url = ENV.fetch('GETH_RPC_URL', 'http://localhost:8551'))
-    @_geth_driver ||= GethDriver.new(node_url)
-  end
-  
-  def facet_tx_to_payload(facet_tx)
-    computed_from = facet_tx.eth_call_index == 0 ?
-      facet_tx.from_address :
-      Eth::Tx::Deposit.alias_address(facet_tx.from_address)
-    
-    Eth::Tx::Deposit.new(
-      source_hash: facet_tx.source_hash,
-      from: computed_from,
-      to: facet_tx.to_address,
-      mint: facet_tx.mint,
-      value: facet_tx.value,
-      gas_limit: facet_tx.gas_limit,
-      # max_fee_per_gas
-      is_system_tx: false,
-      data: facet_tx.input,
-    ).encoded.bytes_to_hex
+  def geth_driver
+    @_geth_driver ||= GethDriver
   end
   
   def normalize_hex(hex)
