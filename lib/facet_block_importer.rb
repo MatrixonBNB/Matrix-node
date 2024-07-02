@@ -40,6 +40,7 @@ module FacetBlockImporter
           source_hash: source_hash,
           from_address: call.from_address,
           mint: mint_amount,
+          eth_call: call
         )
         
         facet_tx
@@ -83,7 +84,7 @@ module FacetBlockImporter
         receipt_details = geth_driver.client.call("eth_getTransactionReceipt", [tx['hash']])
 
         facet_tx = facet_txs.detect { |facet_tx| facet_tx.source_hash == tx['sourceHash'] }
-        binding.irb unless facet_tx
+        raise unless facet_tx
 
         facet_tx.update!(
           tx_hash: tx['hash'],

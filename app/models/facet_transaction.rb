@@ -3,9 +3,27 @@ class FacetTransaction < ApplicationRecord
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash
   
-  attr_accessor :chain_id
+  attr_accessor :chain_id, :eth_call
   
   TYPE_FACET = 0x0F
+  
+  def to_tx_payload
+    # Serialize the transaction fields
+    chain_id_bin = Eth::Util.serialize_big_endian_to_int(chain_id)
+    to_bin = Eth::Util.hex_to_bin(to_address)
+    value_bin = Eth::Util.serialize_big_endian_to_int(value)
+    max_gas_fee_bin = Eth::Util.serialize_big_endian_to_int(max_fee_per_gas)
+    gas_limit_bin = Eth::Util.serialize_big_endian_to_int(gas_limit)
+    data_bin = Eth::Util.hex_to_bin(input)
+
+    # Encode the fields using RLP
+    rlp_encoded = Eth::Rlp.encode([chain_id_bin, to_bin, value_bin, max_gas_fee_bin, gas_limit_bin, data_bin])
+
+    # Add the transaction type prefix and convert to hex
+    hex_payload = Eth::Util.bin_to_hex([TYPE_FACET].pack('C') + rlp_encoded)
+
+    hex_payload
+  end
   
   def self.from_tx_payload(hex)
     hex = Eth::Util.remove_hex_prefix hex
@@ -40,7 +58,9 @@ class FacetTransaction < ApplicationRecord
   end
   
   def to_payload
-    computed_from = eth_call_index == 0 ?
+    raise unless eth_call
+    
+    computed_from = eth_call.parent_call_index.nil? ?
       from_address :
       Eth::Tx::Deposit.alias_address(from_address)
     
