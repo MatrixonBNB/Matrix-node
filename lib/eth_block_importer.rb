@@ -110,7 +110,7 @@ module EthBlockImporter
     end
     
     blocks_per_second = (block_numbers.length / (Time.current - start)).round(2)
-    puts "Imported #{res.map(&:transactions_imported).sum} transactions"
+    puts "Imported #{res.map(&:transactions_imported).flatten.count} transactions"
     puts "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
     
     block_numbers
