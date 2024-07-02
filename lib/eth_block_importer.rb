@@ -59,61 +59,25 @@ module EthBlockImporter
   end
   
   def ensure_genesis_blocks
-    return if FacetBlock.exists?
+    ActiveRecord::Base.transaction do
+      return if FacetBlock.exists?
     
-    facet_genesis_block = GethDriver.client.call("eth_getBlockByNumber", ["0x0", false])
-    facet_latest_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])
-    
-    unless facet_genesis_block['hash'] == facet_latest_block['hash']
-      raise "Facet genesis block is not the same as the latest block on geth"
+      facet_genesis_block = GethDriver.client.call("eth_getBlockByNumber", ["0x0", false])
+      facet_latest_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])
+      
+      unless facet_genesis_block['hash'] == facet_latest_block['hash']
+        raise "Facet genesis block is not the same as the latest block on geth"
+      end
+      
+      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + genesis_block.to_s(16), false])
+      
+      eth_block = EthBlock.from_rpc_result(genesis_eth_block)
+      eth_block.save!
+      
+      facet_block = FacetBlock.from_eth_block(eth_block)
+      facet_block.from_rpc_response(facet_genesis_block)
+      facet_block.save!
     end
-    
-    genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + genesis_block.to_s(16), false])
-    block_result = genesis_eth_block['result']
-    
-    EthBlock.create!(
-      number: block_result['number'].to_i(16),
-      block_hash: block_result['hash'],
-      logs_bloom: block_result['logsBloom'],
-      total_difficulty: block_result['totalDifficulty'].to_i(16),
-      receipts_root: block_result['receiptsRoot'],
-      extra_data: block_result['extraData'],
-      withdrawals_root: block_result['withdrawalsRoot'],
-      base_fee_per_gas: block_result['baseFeePerGas'].to_i(16),
-      nonce: block_result['nonce'],
-      miner: block_result['miner'],
-      excess_blob_gas: block_result['excessBlobGas'].to_i(16),
-      difficulty: block_result['difficulty'].to_i(16),
-      gas_limit: block_result['gasLimit'].to_i(16),
-      gas_used: block_result['gasUsed'].to_i(16),
-      parent_beacon_block_root: block_result['parentBeaconBlockRoot'],
-      size: block_result['size'].to_i(16),
-      transactions_root: block_result['transactionsRoot'],
-      state_root: block_result['stateRoot'],
-      mix_hash: block_result['mixHash'],
-      parent_hash: block_result['parentHash'],
-      blob_gas_used: block_result['blobGasUsed'].to_i(16),
-      timestamp: block_result['timestamp'].to_i(16)
-    )
-    
-    FacetBlock.create!(
-      number: facet_genesis_block['number'],
-      block_hash: facet_genesis_block['hash'],
-      eth_block_hash: block_result['hash'],
-      parent_beacon_block_root: facet_genesis_block['parentBeaconBlockRoot'],
-      timestamp: facet_genesis_block['timestamp'].to_i(16),
-      prev_randao: Eth::Util.keccak256(block_result['hash'].hex_to_bytes + 'prevRandao').bytes_to_hex,
-      base_fee_per_gas: block_result['baseFeePerGas'].to_i(16),
-      gas_limit: block_result['gasLimit'].to_i(16),
-      gas_used: block_result['gasUsed'].to_i(16),
-      state_root: block_result['stateRoot'],
-      transactions_root: block_result['transactionsRoot'],
-      receipts_root: block_result['receiptsRoot'],
-      parent_hash: block_result['parentHash'],
-      extra_data: block_result['extraData'],
-      logs_bloom: block_result['logsBloom'],
-      size: block_result['size'].to_i(16),
-    )
   end
   
   def import_blocks(block_numbers)
@@ -142,7 +106,7 @@ module EthBlockImporter
     
     block_by_number_responses.zip(trace_responses).each do |(block_number1, block_by_number_response), (block_number2, trace_response)|
       raise "Mismatched block numbers: #{block_number1} and #{block_number2}" unless block_number1 == block_number2
-      res << import_block(block_number1, block_by_number_response, trace_response)
+      res << import_block(block_by_number_response, trace_response)
     end
     
     blocks_per_second = (block_numbers.length / (Time.current - start)).round(2)
@@ -152,19 +116,16 @@ module EthBlockImporter
     block_numbers
   end
   
-  def import_block(block_number, block_by_number_response, trace_response)
+  def import_block(block_by_number_response, trace_response)
     ActiveRecord::Base.transaction do
       validate_ready_to_import!(block_by_number_response, trace_response)
       
       trace_result = trace_response['result']
       block_result = block_by_number_response['result']
       transactions_result = block_result['transactions']
+      block_number = block_result['number'].to_i(16)
       
-      parent_block = EthBlock.find_by(number: block_number - 1)
-      
-      if parent_block.blank?
-        raise "Parent block not found"
-      end
+      parent_block = EthBlock.find_by!(number: block_number - 1)
       
       if parent_block.block_hash != block_result['parentHash']
         EthBlock.where("number >= ?", parent_block.number).delete_all
@@ -179,71 +140,19 @@ module EthBlockImporter
         return OpenStruct.new(transactions_imported: 0)
       end
       
-      eth_block = EthBlock.new(
-        number: block_result['number'].to_i(16),
-        block_hash: block_result['hash'],
-        logs_bloom: block_result['logsBloom'],
-        total_difficulty: block_result['totalDifficulty'].to_i(16),
-        receipts_root: block_result['receiptsRoot'],
-        extra_data: block_result['extraData'],
-        withdrawals_root: block_result['withdrawalsRoot'],
-        base_fee_per_gas: block_result['baseFeePerGas'].to_i(16),
-        nonce: block_result['nonce'],
-        miner: block_result['miner'],
-        excess_blob_gas: block_result['excessBlobGas'].to_i(16),
-        difficulty: block_result['difficulty'].to_i(16),
-        gas_limit: block_result['gasLimit'].to_i(16),
-        gas_used: block_result['gasUsed'].to_i(16),
-        parent_beacon_block_root: block_result['parentBeaconBlockRoot'],
-        size: block_result['size'].to_i(16),
-        transactions_root: block_result['transactionsRoot'],
-        state_root: block_result['stateRoot'],
-        mix_hash: block_result['mixHash'],
-        parent_hash: block_result['parentHash'],
-        blob_gas_used: block_result['blobGasUsed'].to_i(16),
-        timestamp: block_result['timestamp'].to_i(16)
-      )
+      eth_block = EthBlock.from_rpc_result(block_by_number_response)
 
       eth_block.save!
 
-      eth_transactions = []
-
-      transactions_result.each do |tx|
-        eth_transactions << EthTransaction.new(
-          block_hash: block_result['hash'],
-          block_number: block_result['number'].to_i(16),
-          tx_hash: tx['hash'],
-          y_parity: tx['yParity']&.to_i(16),
-          access_list: tx['accessList'],
-          transaction_index: tx['transactionIndex'].to_i(16),
-          tx_type: tx['type'].to_i(16),
-          nonce: tx['nonce'].to_i(16),
-          input: tx['input'],
-          r: tx['r'],
-          s: tx['s'],
-          chain_id: tx['chainId']&.to_i(16),
-          v: tx['v'].to_i(16),
-          gas: tx['gas'].to_i(16),
-          max_priority_fee_per_gas: tx['maxPriorityFeePerGas']&.to_i(16),
-          from_address: tx['from'],
-          to_address: tx['to'],
-          max_fee_per_gas: tx['maxFeePerGas']&.to_i(16),
-          value: tx['value'].to_i(16),
-          gas_price: tx['gasPrice'].to_i(16)
-        )
-      end
+      eth_transactions = EthTransaction.from_rpc_result(block_by_number_response)
 
       EthTransaction.import!(eth_transactions)
-
-      order_counter = Struct.new(:count).new(0)
-
-      traces = trace_result.flat_map do |trace|
-        process_trace(trace, eth_block, order_counter)
-      end
       
-      EthCall.import!(traces.flatten.sort_by(&:call_index))
+      traces = EthCall.from_trace_result(trace_result, eth_block)
       
-      FacetBlockImporter.from_eth_block(eth_block)
+      EthCall.import!(traces)
+      
+      propose_facet_block(eth_block)
 
       OpenStruct.new(transactions_imported: eth_transactions.size)
     end
@@ -254,47 +163,6 @@ module EthBlockImporter
     else
       raise
     end
-  end
-  
-  def process_trace(trace, eth_block, order_counter, parent_traced_call = nil)
-    result = trace['result']
-    current_order = order_counter.count
-    order_counter.count += 1
-
-    traces = []
-    
-    traced_call = EthCall.new(
-      block_hash: eth_block.block_hash,
-      block_number: eth_block.number,
-      transaction_hash: trace['txHash'],
-      from_address: result['from'],
-      to_address: result['to'],
-      gas: result['gas'].to_i(16),
-      gas_used: result['gasUsed'].to_i(16),
-      input: result['input'],
-      output: result['output'],
-      value: result['value'],
-      call_type: result['type'],
-      error: result['error'],
-      revert_reason: result['revertReason'],
-      call_index: current_order,
-      parent_call_index: parent_traced_call&.call_index
-    )
-    
-    traces << traced_call
-     
-    if result['calls']
-      traces += result['calls'].map do |sub_call|
-        process_trace(
-          { 'txHash' => trace['txHash'], 'result' => sub_call },
-          eth_block,
-          order_counter,
-          traced_call
-        )
-      end
-    end
-    
-    traces
   end
   
   def validate_ready_to_import!(block_by_number_response, trace_response)
@@ -335,5 +203,98 @@ module EthBlockImporter
     start_block = max_db_block + 1
     
     (start_block...(start_block + n)).to_a
+  end
+
+  def propose_facet_block(eth_block)
+    eth_block.reload
+    
+    facet_block = FacetBlock.from_eth_block(eth_block)
+    
+    facet_txs = eth_block.eth_transactions.includes(:eth_calls).map do |tx|
+      tx.eth_calls.map do |call|
+        next if call.error.present?
+
+        facet_tx = FacetTransaction.from_eth_call_and_tx(call, tx)
+        
+        next unless facet_tx
+        next unless facet_tx.chain_id == facet_chain_id
+        
+        facet_tx
+      end
+    end.flatten.compact
+    
+    facet_txs.group_by(&:eth_transaction).each do |eth_tx, grouped_facet_txs|
+      in_tx_count = grouped_facet_txs.count
+      
+      outer_call = eth_tx.eth_calls.sort_by(&:call_index).first
+      
+      gas_used = outer_call.gas_used
+      base_fee = eth_block.base_fee_per_gas
+      total_mint_amount = gas_used * base_fee
+      mint_amount_per_tx = total_mint_amount / in_tx_count
+      
+      grouped_facet_txs.each do |facet_tx|
+        facet_tx.mint = mint_amount_per_tx
+      end
+    end
+    
+    payload = facet_txs.sort_by(&:eth_call_index).map(&:to_payload)
+    
+    response = geth_driver.propose_block(
+      payload,
+      facet_block
+    )
+
+    geth_block = geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true])
+    
+    facet_block.from_rpc_response(geth_block)
+
+    facet_block.save!
+    
+    geth_block['transactions'].each do |tx|
+      receipt_details = geth_driver.client.call("eth_getTransactionReceipt", [tx['hash']])
+
+      facet_tx = facet_txs.detect { |facet_tx| facet_tx.source_hash == tx['sourceHash'] }
+      raise unless facet_tx
+
+      facet_tx.update!(
+        tx_hash: tx['hash'],
+        block_hash: response['blockHash'],
+        block_number: response['blockNumber'].to_i(16),
+        transaction_index: receipt_details['transactionIndex'].to_i(16),
+        deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
+        gas: tx['gas'].to_i(16),
+        tx_type: tx['type']
+        # gas_limit: tx['gasLimit'].to_i(16),
+        # gas_used: receipt_details['gasUsed'].to_i(16),
+      )
+
+      FacetTransactionReceipt.create!(
+        transaction_hash: tx['hash'],
+        block_hash: response['blockHash'],
+        block_number: response['blockNumber'].to_i(16),
+        contract_address: receipt_details['contractAddress'],
+        cumulative_gas_used: receipt_details['cumulativeGasUsed'].to_i(16),
+        deposit_nonce: tx['nonce'].to_i(16),
+        deposit_receipt_version: tx['type'].to_i(16),
+        effective_gas_price: receipt_details['effectiveGasPrice'].to_i(16),
+        from_address: tx['from'],
+        gas_used: receipt_details['gasUsed'].to_i(16),
+        logs: receipt_details['logs'],
+        logs_bloom: receipt_details['logsBloom'],
+        status: receipt_details['status'].to_i(16),
+        to_address: tx['to'],
+        transaction_index: receipt_details['transactionIndex'].to_i(16),
+        tx_type: tx['type']
+      )
+    end
+  end
+  
+  def geth_driver
+    @_geth_driver ||= GethDriver
+  end
+  
+  def facet_chain_id
+    0xface7
   end
 end
