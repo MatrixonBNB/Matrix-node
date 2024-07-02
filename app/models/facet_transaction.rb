@@ -62,24 +62,27 @@ class FacetTransaction < ApplicationRecord
     ).bytes_to_hex
   end
   
-  def to_facet_payload
-    raise unless eth_call
-    
-    computed_from = eth_call.parent_call_index.nil? ?
+  def computed_from
+    eth_call.parent_call_index.nil? ?
       from_address :
-      Eth::Tx::Deposit.alias_address(from_address)
-    
-    Eth::Tx::Deposit.new(
-      source_hash: source_hash,
-      from: computed_from,
-      to: to_address,
-      mint: mint,
-      value: value,
-      gas_limit: gas_limit,
-      # max_fee_per_gas
-      is_system_tx: false,
-      data: input,
-    ).encoded.bytes_to_hex
+      FacetTransaction.alias_address(from_address)
+  end
+  
+  def to_facet_payload
+    tx_data = []
+    tx_data.push Eth::Util.serialize_int_to_big_endian chain_id
+    tx_data.push Eth::Util.hex_to_bin source_hash
+    tx_data.push Eth::Util.hex_to_bin computed_from
+    tx_data.push Eth::Util.hex_to_bin to_address.to_s
+    tx_data.push Eth::Util.serialize_int_to_big_endian mint
+    tx_data.push Eth::Util.serialize_int_to_big_endian value
+    tx_data.push Eth::Util.serialize_int_to_big_endian max_fee_per_gas
+    tx_data.push Eth::Util.serialize_int_to_big_endian gas_limit
+    tx_data.push Eth::Util.hex_to_bin input
+    tx_encoded = Eth::Rlp.encode tx_data
+
+    tx_type = Eth::Util.serialize_int_to_big_endian TYPE_FACET
+    "#{tx_type}#{tx_encoded}".bytes_to_hex
   end
   
   def self.tx_decode_errors
@@ -107,5 +110,12 @@ class FacetTransaction < ApplicationRecord
     hex_payload = Eth::Util.bin_to_prefixed_hex([TYPE_FACET].pack('C') + rlp_encoded)
 
     hex_payload
+  end
+  
+  def self.alias_address(address)
+    mask = 0x1111000000000000000000000000000000001111
+    max_uint160 = 2**160
+    aliased_address = (address.to_i(16) + mask) % max_uint160
+    "0x" + aliased_address.to_s(16).rjust(40, '0')
   end
 end

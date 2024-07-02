@@ -25,10 +25,7 @@ RSpec.describe "Uniswap" do
       res = create_and_import_block(
         facet_data: facet_data,
         to_address: nil,
-        from_address: from_address,
-        value: 0,
-        max_fee_per_gas: 100,
-        gas_limit: 1e6.to_i
+        from_address: from_address
       )
       
       weth_address = res.receipts_imported.first.contract_address
@@ -44,10 +41,7 @@ RSpec.describe "Uniswap" do
       res = create_and_import_block(
         facet_data: facet_data,
         to_address: nil,
-        from_address: from_address,
-        value: 0,
-        max_fee_per_gas: 100,
-        gas_limit: 1e6.to_i
+        from_address: from_address
       )
       
       token_address = res.receipts_imported.first.contract_address
@@ -66,9 +60,6 @@ RSpec.describe "Uniswap" do
         facet_data: facet_data,
         to_address: nil,
         from_address: from_address,
-        value: 0,
-        max_fee_per_gas: 100,
-        eth_base_fee: 1e18.to_i,
         gas_limit: 10e6.to_i
       )
       
@@ -82,10 +73,7 @@ RSpec.describe "Uniswap" do
         facet_data: facet_data,
         to_address: nil,
         from_address: from_address,
-        value: 0,
-        max_fee_per_gas: 100,
-        eth_base_fee: 1e18.to_i,
-        gas_limit: 10e6.to_i
+        gas_limit: 5_000_000
       )
       
       router_address = res.receipts_imported.first.contract_address
@@ -95,7 +83,8 @@ RSpec.describe "Uniswap" do
         address: factory_address,
         from: from_address,
         function: 'createPair',
-        args: [token_address, weth_address]
+        args: [token_address, weth_address],
+        gas_limit: 3_000_000
       )
 
       sig = "0x" + factory.parent.events.detect{|i| i.name == "PairCreated"}.signature

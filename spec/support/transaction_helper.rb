@@ -20,7 +20,9 @@ module TransactionHelper
     address:,
     from:,
     function:,
-    args:
+    args:,
+    value: 0,
+    gas_limit: 1_000_000
   )
     contract_object = get_contract(contract, address)
     
@@ -31,10 +33,8 @@ module TransactionHelper
       facet_data: data,
       to_address: address,
       from_address: from,
-      value: 0,
-      max_fee_per_gas: 100,
-      eth_base_fee: 1e18.to_i,
-      gas_limit: 10e6.to_i
+      value: value,
+      gas_limit: gas_limit
     )
   end
   
@@ -43,9 +43,9 @@ module TransactionHelper
     from_address:,
     to_address:,
     value: 0,
-    max_fee_per_gas: 100,
+    max_fee_per_gas: 10.gwei,
     gas_limit: 1_000_000,
-    eth_base_fee: 1000000000,
+    eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
     chain_id: 0xface7
   )
@@ -58,7 +58,7 @@ module TransactionHelper
         to_address: to_address,
         from_address: from_address,
         value: value,
-        max_fee_per_gas: 1,
+        max_fee_per_gas: max_fee_per_gas,
         gas_limit: gas_limit.to_i,
         input: facet_data
       ).to_eth_payload
@@ -72,7 +72,7 @@ module TransactionHelper
         'input' => eth_data,
         'nonce' => '0x0',
         'value' => '0x0',
-        'maxFeePerGas' => "0x" + max_fee_per_gas.to_s(16),
+        'maxFeePerGas' => "0x123456",
         'maxPriorityFeePerGas' => '0x3b9aca00',
         'transactionIndex' => '0x0',
         'type' => '0x2',

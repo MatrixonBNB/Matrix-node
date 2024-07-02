@@ -18,9 +18,6 @@ RSpec.describe GethDriver do
         facet_data: facet_data,
         to_address: to_address,
         from_address: from_address,
-        value: 0,
-        max_fee_per_gas: 100,
-        gas_limit: 1e6.to_i
       )
       
       expect(res.receipts_imported.map(&:status)).to eq([1])
@@ -88,9 +85,6 @@ RSpec.describe GethDriver do
         facet_data: facet_data,
         to_address: contract_address,
         from_address: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
-        value: 0,
-        max_fee_per_gas: 100,
-        gas_limit: 1e6.to_i
       )
       
       expect(res.receipts_imported.map(&:status)).to eq([1])
@@ -128,8 +122,6 @@ RSpec.describe GethDriver do
         facet_data: "0x",
         to_address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
         from_address: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
-        value: 0,
-        max_fee_per_gas: 100,
         gas_limit: 21000,
       )
       
