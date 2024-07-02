@@ -38,11 +38,30 @@ RSpec.configure do |config|
   # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, remove the following line or assign false
   # instead of true.
-  config.use_transactional_fixtures = true
+  config.use_transactional_fixtures = false
 
   Dir[Rails.root.join('spec', 'support', '**', '*.rb')].each { |f| require f }
   config.include EvmHelpers
+  config.include TransactionHelper
   config.fail_fast = true
+  
+  config.before(:suite) do
+    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
+
+    EthBlock.delete_all
+
+    system("cd #{geth_dir} && make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json")
+    
+    pid = Process.spawn("cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --networkid 1027303 --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 > geth.log 2>&1")
+    Process.detach(pid)
+    
+    sleep 1
+  end
+
+  config.after(:suite) do
+    system("pkill -f geth")
+  end
+  
   # You can uncomment this line to turn off ActiveRecord support entirely.
   # config.use_active_record = false
 

@@ -25,7 +25,7 @@ class FacetTransaction < ApplicationRecord
     end
 
     chain_id = Eth::Util.deserialize_big_endian_to_int tx[0]
-    to = Eth::Util.bin_to_hex tx[1]
+    to = tx[1].blank? ? nil : tx[1].bytes_to_hex
     value = Eth::Util.deserialize_big_endian_to_int tx[2]
     max_gas_fee = Eth::Util.deserialize_big_endian_to_int tx[3]
     gas_limit = Eth::Util.deserialize_big_endian_to_int tx[4]
@@ -33,7 +33,7 @@ class FacetTransaction < ApplicationRecord
 
     tx = new
     tx.chain_id = chain_id.to_i
-    tx.to_address = to.to_s
+    tx.to_address = to
     tx.value = value.to_i
     tx.max_fee_per_gas = max_gas_fee.to_i
     tx.gas_limit = gas_limit.to_i
@@ -62,7 +62,7 @@ class FacetTransaction < ApplicationRecord
     ).bytes_to_hex
   end
   
-  def to_payload
+  def to_facet_payload
     raise unless eth_call
     
     computed_from = eth_call.parent_call_index.nil? ?
@@ -91,21 +91,21 @@ class FacetTransaction < ApplicationRecord
     ]
   end
   
-  # def to_tx_payload
-  #   # Serialize the transaction fields
-  #   chain_id_bin = Eth::Util.serialize_big_endian_to_int(chain_id)
-  #   to_bin = Eth::Util.hex_to_bin(to_address)
-  #   value_bin = Eth::Util.serialize_big_endian_to_int(value)
-  #   max_gas_fee_bin = Eth::Util.serialize_big_endian_to_int(max_fee_per_gas)
-  #   gas_limit_bin = Eth::Util.serialize_big_endian_to_int(gas_limit)
-  #   data_bin = Eth::Util.hex_to_bin(input)
+  def to_eth_payload
+    # Serialize the transaction fields
+    chain_id_bin = Eth::Util.serialize_int_to_big_endian(chain_id)
+    to_bin = Eth::Util.hex_to_bin(to_address.to_s)
+    value_bin = Eth::Util.serialize_int_to_big_endian(value)
+    max_gas_fee_bin = Eth::Util.serialize_int_to_big_endian(max_fee_per_gas)
+    gas_limit_bin = Eth::Util.serialize_int_to_big_endian(gas_limit)
+    data_bin = Eth::Util.hex_to_bin(input)
 
-  #   # Encode the fields using RLP
-  #   rlp_encoded = Eth::Rlp.encode([chain_id_bin, to_bin, value_bin, max_gas_fee_bin, gas_limit_bin, data_bin])
+    # Encode the fields using RLP
+    rlp_encoded = Eth::Rlp.encode([chain_id_bin, to_bin, value_bin, max_gas_fee_bin, gas_limit_bin, data_bin])
 
-  #   # Add the transaction type prefix and convert to hex
-  #   hex_payload = Eth::Util.bin_to_hex([TYPE_FACET].pack('C') + rlp_encoded)
+    # Add the transaction type prefix and convert to hex
+    hex_payload = Eth::Util.bin_to_prefixed_hex([TYPE_FACET].pack('C') + rlp_encoded)
 
-  #   hex_payload
-  # end
+    hex_payload
+  end
 end

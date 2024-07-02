@@ -21,6 +21,11 @@ class CreateEthTransactions < ActiveRecord::Migration[7.1]
       t.numeric :max_fee_per_gas, precision: 78, scale: 0#, null: false
       t.numeric :value, precision: 78, scale: 0, null: false
       t.numeric :gas_price, precision: 78, scale: 0#, null: false
+      
+      t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
+      t.check_constraint "tx_hash ~ '^0x[a-f0-9]{64}$'"
+      t.check_constraint "from_address ~ '^0x[a-f0-9]{40}$'"
+      t.check_constraint "to_address ~ '^0x[a-f0-9]{40}$'"
 
       t.timestamps
     end

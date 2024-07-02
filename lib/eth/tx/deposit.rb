@@ -98,9 +98,9 @@ module Eth
         raise ParameterError, "Transaction missing fields!" if tx.size < 7
 
         # populate the payload fields
-        source_hash = Util.bin_to_hex tx[0]
-        from = Util.bin_to_hex tx[1]
-        to = Util.bin_to_hex tx[2]
+        source_hash = Util.bin_to_prefixed_hex tx[0]
+        from = Util.bin_to_prefixed_hex tx[1]
+        to = Util.bin_to_prefixed_hex tx[2]
         mint = Util.deserialize_big_endian_to_int tx[3]
         value = Util.deserialize_big_endian_to_int tx[4]
         gas_limit = Util.deserialize_big_endian_to_int tx[5]

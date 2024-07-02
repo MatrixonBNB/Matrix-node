@@ -16,6 +16,12 @@ class CreateTracedCalls < ActiveRecord::Migration[7.1]
       t.string :call_type
       t.string :error
       t.string :revert_reason
+      
+      t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
+      t.check_constraint "transaction_hash ~ '^0x[a-f0-9]{64}$'"
+      t.check_constraint "from_address ~ '^0x[a-f0-9]{40}$'"
+      t.check_constraint "to_address ~ '^0x[a-f0-9]{40}$'"
+      
       t.timestamps
     end
 

@@ -42,6 +42,8 @@ ActiveRecord::Schema[7.1].define(version: 2024_06_28_125033) do
     t.datetime "updated_at", null: false
     t.index ["block_hash"], name: "index_eth_blocks_on_block_hash", unique: true
     t.index ["number"], name: "index_eth_blocks_on_number", unique: true
+    t.check_constraint "block_hash::text ~ '^0x[a-f0-9]{64}$'::text"
+    t.check_constraint "parent_hash::text ~ '^0x[a-f0-9]{64}$'::text"
   end
 
   create_table "eth_calls", force: :cascade do |t|
@@ -67,6 +69,10 @@ ActiveRecord::Schema[7.1].define(version: 2024_06_28_125033) do
     t.index ["block_hash"], name: "index_eth_calls_on_block_hash"
     t.index ["block_number"], name: "index_eth_calls_on_block_number"
     t.index ["transaction_hash"], name: "index_eth_calls_on_transaction_hash"
+    t.check_constraint "block_hash::text ~ '^0x[a-f0-9]{64}$'::text"
+    t.check_constraint "from_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "to_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "transaction_hash::text ~ '^0x[a-f0-9]{64}$'::text"
   end
 
   create_table "eth_transactions", force: :cascade do |t|
@@ -95,6 +101,10 @@ ActiveRecord::Schema[7.1].define(version: 2024_06_28_125033) do
     t.index ["block_hash"], name: "index_eth_transactions_on_block_hash"
     t.index ["block_number"], name: "index_eth_transactions_on_block_number"
     t.index ["tx_hash"], name: "index_eth_transactions_on_tx_hash", unique: true
+    t.check_constraint "block_hash::text ~ '^0x[a-f0-9]{64}$'::text"
+    t.check_constraint "from_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "to_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "tx_hash::text ~ '^0x[a-f0-9]{64}$'::text"
   end
 
   create_table "facet_blocks", force: :cascade do |t|
@@ -119,6 +129,8 @@ ActiveRecord::Schema[7.1].define(version: 2024_06_28_125033) do
     t.index ["block_hash"], name: "index_facet_blocks_on_block_hash", unique: true
     t.index ["eth_block_hash"], name: "index_facet_blocks_on_eth_block_hash", unique: true
     t.index ["number"], name: "index_facet_blocks_on_number", unique: true
+    t.check_constraint "block_hash::text ~ '^0x[a-f0-9]{64}$'::text"
+    t.check_constraint "parent_hash::text ~ '^0x[a-f0-9]{64}$'::text"
   end
 
   create_table "facet_transaction_receipts", force: :cascade do |t|
@@ -143,6 +155,10 @@ ActiveRecord::Schema[7.1].define(version: 2024_06_28_125033) do
     t.index ["block_hash"], name: "index_facet_transaction_receipts_on_block_hash"
     t.index ["block_number"], name: "index_facet_transaction_receipts_on_block_number"
     t.index ["transaction_hash"], name: "index_facet_transaction_receipts_on_transaction_hash", unique: true
+    t.check_constraint "block_hash::text ~ '^0x[a-f0-9]{64}$'::text"
+    t.check_constraint "from_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "to_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "transaction_hash::text ~ '^0x[a-f0-9]{64}$'::text"
   end
 
   create_table "facet_transactions", force: :cascade do |t|
@@ -171,10 +187,15 @@ ActiveRecord::Schema[7.1].define(version: 2024_06_28_125033) do
     t.index ["block_number"], name: "index_facet_transactions_on_block_number"
     t.index ["eth_transaction_hash"], name: "index_facet_transactions_on_eth_transaction_hash"
     t.index ["tx_hash"], name: "index_facet_transactions_on_tx_hash", unique: true
+    t.check_constraint "block_hash::text ~ '^0x[a-f0-9]{64}$'::text"
+    t.check_constraint "eth_transaction_hash::text ~ '^0x[a-f0-9]{64}$'::text"
+    t.check_constraint "from_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "to_address::text ~ '^0x[a-f0-9]{40}$'::text"
+    t.check_constraint "tx_hash::text ~ '^0x[a-f0-9]{64}$'::text"
   end
 
-  add_foreign_key "eth_calls", "eth_blocks", column: "block_hash", primary_key: "block_hash"
-  add_foreign_key "eth_calls", "eth_transactions", column: "transaction_hash", primary_key: "tx_hash"
+  add_foreign_key "eth_calls", "eth_blocks", column: "block_hash", primary_key: "block_hash", on_delete: :cascade
+  add_foreign_key "eth_calls", "eth_transactions", column: "transaction_hash", primary_key: "tx_hash", on_delete: :cascade
   add_foreign_key "eth_transactions", "eth_blocks", column: "block_hash", primary_key: "block_hash", on_delete: :cascade
   add_foreign_key "facet_blocks", "eth_blocks", column: "eth_block_hash", primary_key: "block_hash", on_delete: :cascade
   add_foreign_key "facet_transaction_receipts", "facet_blocks", column: "block_hash", primary_key: "block_hash", on_delete: :cascade

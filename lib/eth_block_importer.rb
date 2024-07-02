@@ -118,6 +118,7 @@ module EthBlockImporter
   
   def import_block(block_by_number_response, trace_response)
     ActiveRecord::Base.transaction do
+      ensure_genesis_blocks
       validate_ready_to_import!(block_by_number_response, trace_response)
       
       trace_result = trace_response['result']
@@ -137,7 +138,11 @@ module EthBlockImporter
           Deleting block(s): #{EthBlock.where("number >= ?", parent_block.number).pluck(:number).join(', ')}
         ")
         
-        return OpenStruct.new(transactions_imported: 0)
+        OpenStruct.new(
+          block_number: block_number,
+          transactions_imported: [],
+          receipts_imported: []
+        )        
       end
       
       eth_block = EthBlock.from_rpc_result(block_by_number_response)
@@ -152,9 +157,13 @@ module EthBlockImporter
       
       EthCall.import!(traces)
       
-      propose_facet_block(eth_block)
-
-      OpenStruct.new(transactions_imported: eth_transactions.size)
+      facet_txs, facet_receipts = propose_facet_block(eth_block)
+      
+      OpenStruct.new(
+        block_number: block_number,
+        transactions_imported: facet_txs,
+        receipts_imported: facet_receipts
+      )
     end
   rescue ActiveRecord::RecordNotUnique => e
     if e.message.include?("eth_blocks") && e.message.include?("number")
@@ -238,7 +247,7 @@ module EthBlockImporter
       end
     end
     
-    payload = facet_txs.sort_by(&:eth_call_index).map(&:to_payload)
+    payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
     
     response = geth_driver.propose_block(
       payload,
@@ -250,6 +259,8 @@ module EthBlockImporter
     facet_block.from_rpc_response(geth_block)
 
     facet_block.save!
+    
+    receipts = []
     
     geth_block['transactions'].each do |tx|
       receipt_details = geth_driver.client.call("eth_getTransactionReceipt", [tx['hash']])
@@ -269,7 +280,7 @@ module EthBlockImporter
         # gas_used: receipt_details['gasUsed'].to_i(16),
       )
 
-      FacetTransactionReceipt.create!(
+      receipts << FacetTransactionReceipt.create!(
         transaction_hash: tx['hash'],
         block_hash: response['blockHash'],
         block_number: response['blockNumber'].to_i(16),
@@ -288,6 +299,8 @@ module EthBlockImporter
         tx_type: tx['type']
       )
     end
+    
+    [facet_txs, receipts]
   end
   
   def geth_driver
