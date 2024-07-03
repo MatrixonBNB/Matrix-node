@@ -1,4 +1,4 @@
-class CreateTracedCalls < ActiveRecord::Migration[7.1]
+class CreateEthCalls < ActiveRecord::Migration[7.1]
   def change
     create_table :eth_calls do |t|
       t.integer :call_index, null: false

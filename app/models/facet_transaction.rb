@@ -5,15 +5,18 @@ class FacetTransaction < ApplicationRecord
   
   attr_accessor :chain_id, :eth_call
   
-  TYPE_FACET = 0x0F
+  FACET_TX_TYPE = 0x0F
+  FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
   
   def self.from_eth_call_and_tx(eth_call, eth_tx)
+    return unless eth_call.to_address == FACET_INBOX_ADDRESS
+    
     hex = eth_call.input
     
     hex = Eth::Util.remove_hex_prefix hex
     type = hex[0, 2]
     
-    unless type.to_i(16) == TYPE_FACET
+    unless type.to_i(16) == FACET_TX_TYPE
       raise Eth::Tx::TransactionTypeError, "Invalid transaction type #{type}!"
     end
 
@@ -62,17 +65,11 @@ class FacetTransaction < ApplicationRecord
     ).bytes_to_hex
   end
   
-  def computed_from
-    eth_call.parent_call_index.nil? ?
-      from_address :
-      FacetTransaction.alias_address(from_address)
-  end
-  
   def to_facet_payload
     tx_data = []
     tx_data.push Eth::Util.serialize_int_to_big_endian chain_id
     tx_data.push Eth::Util.hex_to_bin source_hash
-    tx_data.push Eth::Util.hex_to_bin computed_from
+    tx_data.push Eth::Util.hex_to_bin from_address
     tx_data.push Eth::Util.hex_to_bin to_address.to_s
     tx_data.push Eth::Util.serialize_int_to_big_endian mint
     tx_data.push Eth::Util.serialize_int_to_big_endian value
@@ -81,7 +78,7 @@ class FacetTransaction < ApplicationRecord
     tx_data.push Eth::Util.hex_to_bin input
     tx_encoded = Eth::Rlp.encode tx_data
 
-    tx_type = Eth::Util.serialize_int_to_big_endian TYPE_FACET
+    tx_type = Eth::Util.serialize_int_to_big_endian FACET_TX_TYPE
     "#{tx_type}#{tx_encoded}".bytes_to_hex
   end
   
@@ -107,15 +104,8 @@ class FacetTransaction < ApplicationRecord
     rlp_encoded = Eth::Rlp.encode([chain_id_bin, to_bin, value_bin, max_gas_fee_bin, gas_limit_bin, data_bin])
 
     # Add the transaction type prefix and convert to hex
-    hex_payload = Eth::Util.bin_to_prefixed_hex([TYPE_FACET].pack('C') + rlp_encoded)
+    hex_payload = Eth::Util.bin_to_prefixed_hex([FACET_TX_TYPE].pack('C') + rlp_encoded)
 
     hex_payload
-  end
-  
-  def self.alias_address(address)
-    mask = 0x1111000000000000000000000000000000001111
-    max_uint160 = 2**160
-    aliased_address = (address.to_i(16) + mask) % max_uint160
-    "0x" + aliased_address.to_s(16).rjust(40, '0')
   end
 end

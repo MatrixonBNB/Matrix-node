@@ -63,10 +63,10 @@ module TransactionHelper
         input: facet_data
       ).to_eth_payload
     
-      transaction = {
+      eth_transaction = {
         'hash' => "0x" + SecureRandom.hex(32),
         'from' => from_address,
-        'to' => to_address,
+        'to' => "0x1111000000000000000000000000000000002222",
         'gas' => '0xf4240', # Gas limit in hex (1,000,000 in decimal)
         'gasPrice' => '0x3b9aca00', # Gas price in hex
         'input' => eth_data,
@@ -89,7 +89,7 @@ module TransactionHelper
           'number' => (last_block.number + 1).to_s(16),
           'hash' => "0x" + SecureRandom.hex(32),
           'parentHash' => last_block.block_hash,
-          'transactions' => [transaction],
+          'transactions' => [eth_transaction],
           'baseFeePerGas' => '0x' + eth_base_fee.to_s(16),
           'gasUsed' => '0xf4240',
           'timestamp' => (last_block.timestamp + 12).to_s(16),
@@ -115,14 +115,14 @@ module TransactionHelper
       trace_response = {
         'result' => [
           {
-            'txHash' => transaction['hash'],
+            'txHash' => eth_transaction['hash'],
             'result' => {
-              'from' => transaction['from'],
-              'to' => transaction['to'],
+              'from' => eth_transaction['from'],
+              'to' => FacetTransaction::FACET_INBOX_ADDRESS,
               'gasUsed' => "0x" + eth_gas_used.to_s(16),
-              'gas' => transaction['gas'],
+              'gas' => eth_transaction['gas'],
               'output' => '0x',
-              'input' => transaction['input']
+              'input' => eth_transaction['input']
             }
           }
         ]
