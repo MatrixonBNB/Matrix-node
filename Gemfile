@@ -96,6 +96,6 @@ gem "clockwork", "~> 3.0"
 
 gem "airbrake", "~> 13.0"
 gem "dalli", "~> 3.2"
-gem "clipboard", "~> 2.0"
+gem "clipboard", "~> 2.0", :group => :development
 gem "order_query", "~> 0.5.3"
 gem "rack-cors", "~> 2.0"
