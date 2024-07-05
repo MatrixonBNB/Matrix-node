@@ -20,7 +20,15 @@ module EthBlockImporter
   end
   
   def genesis_block
-    ENV.fetch('TESTNET_START_BLOCK', 6164072).to_i
+    ENV.fetch('START_BLOCK').to_i - 1
+  end
+  
+  def v2_fork_block
+    ENV['V2_FORK_BLOCK'].presence&.to_i
+  end
+  
+  def in_v2?(block_number)
+    v2_fork_block.blank? || block_number >= v2_fork_block
   end
   
   def blocks_behind
@@ -214,11 +222,23 @@ module EthBlockImporter
     (start_block...(start_block + n)).to_a
   end
 
-  def propose_facet_block(eth_block)
-    eth_block.reload
+  def facet_txs_from_ethscriptions_in_block(eth_block)
+    legacy_block = LegacyEthBlock.reading { LegacyEthBlock.find_by!(block_number: eth_block.number) }
+    ethscriptions = LegacyEthBlock.reading { legacy_block.ethscriptions.includes(:legacy_facet_transaction_receipt) }
+    eth_txs = eth_block.eth_transactions
     
-    facet_block = FacetBlock.from_eth_block(eth_block)
-    
+    ethscriptions.map do |ethscription|
+      eth_tx = eth_txs.detect { |tx| tx.tx_hash == ethscription.transaction_hash }
+      facet_tx = FacetTransaction.from_eth_tx_and_ethscription(eth_tx, ethscription)
+      facet_tx.mint = 500.ether
+      
+      ethscription.dup.save! if facet_tx
+      
+      facet_tx
+    end.compact
+  end
+  
+  def facet_txs_from_eth_transactions_in_block(eth_block)
     facet_txs = eth_block.eth_transactions.includes(:eth_calls).map do |tx|
       tx.eth_calls.map do |call|
         next if call.error.present?
@@ -247,6 +267,20 @@ module EthBlockImporter
       end
     end
     
+    facet_txs
+  end
+  
+  def propose_facet_block(eth_block)
+    eth_block.reload
+    
+    facet_block = FacetBlock.from_eth_block(eth_block)
+    
+    facet_txs = if in_v2?(eth_block.number)
+      facet_txs_from_eth_transactions_in_block(eth_block)
+    else
+      facet_txs_from_ethscriptions_in_block(eth_block)
+    end
+        
     payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
     
     response = geth_driver.propose_block(

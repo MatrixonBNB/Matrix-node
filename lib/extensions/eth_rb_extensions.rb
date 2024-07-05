@@ -24,6 +24,11 @@ module EthRbExtensions
   ::Eth::Contract::Function.class_eval do
     def get_call_data(*args)
       types = inputs.map(&:parsed_type)
+      
+      args = args.map do |arg|
+        arg.is_a?(String) && arg.starts_with?("0x") ? arg.hex_to_bytes : arg
+      end
+      
       encoded_str = Eth::Util.bin_to_hex(Eth::Abi.encode(types, args))
       
       if name == 'constructor'

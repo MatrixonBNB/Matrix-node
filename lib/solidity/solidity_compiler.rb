@@ -1,5 +1,9 @@
 class SolidityCompiler
   def initialize(filename_or_solidity_code)
+    # if filename_or_solidity_code.to_s.each_line.count == 1 && !File.exist?(filename_or_solidity_code)
+    #   raise "File not found: #{filename_or_solidity_code}"
+    # end
+    
     if File.exist?(filename_or_solidity_code)
       @solidity_file = filename_or_solidity_code
       @solidity_code = nil
@@ -15,15 +19,24 @@ class SolidityCompiler
     include Memery
 
     def compile(filename_or_solidity_code)
+      checksum = directory_checksum(Rails.root.join('lib', 'solidity'))
       if File.exist?(filename_or_solidity_code)
-        last_modified = File.mtime(filename_or_solidity_code).to_i
-        memoized_compile(filename_or_solidity_code, last_modified)
+        memoized_compile(filename_or_solidity_code, checksum)
       else
-        memoized_compile(filename_or_solidity_code)
+        memoized_compile(filename_or_solidity_code, checksum)
       end
     end
 
     private
+    
+    def directory_checksum(directory)
+      files = Dir.glob("#{directory}/**/*").select { |f| File.file?(f) }
+      digest = Digest::SHA256.new
+      files.each do |file|
+        digest.update(File.read(file))
+      end
+      digest.hexdigest
+    end
 
     def memoized_compile(filename_or_solidity_code, last_modified = nil)
       new(filename_or_solidity_code).get_solidity_bytecode_and_abi
@@ -67,7 +80,7 @@ class SolidityCompiler
       end
     end
 
-    raise "Pragma version not found in #{file_path}" unless pragma_version
+    raise "Pragma version not found in #{IO.read(file_path)}" unless pragma_version
 
     # Extract the version number (e.g., from "^0.8.0" to "0.8.0")
     version_match = pragma_version.match(/(\d+\.\d+\.\d+)/)
@@ -77,9 +90,12 @@ class SolidityCompiler
 
     # Set the Solidity version using solc-select
     system("solc-select use #{version}")
-
+    
+    include_path_option = version.split('.').last(2).join('.').to_f >= 8.17 ? "--include-path node_modules/ --base-path #{Rails.root.join("lib", "solidity")}" : ""
+    
     # Compile with optimizer settings
-    stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin --optimize --optimize-runs 200 #{file_path}")
+    # stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin #{include_path_option} --optimize --optimize-runs 200 --allow-paths . --base-path #{Rails.root.join("lib", "solidity")} #{file_path}")
+    stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin #{include_path_option} --optimize --optimize-runs 200  #{file_path}")
     raise "Error running solc: #{stderr}" unless status.success?
   
     # Parse the JSON output

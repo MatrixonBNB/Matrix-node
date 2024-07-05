@@ -41,7 +41,7 @@ RSpec.configure do |config|
   config.use_transactional_fixtures = false
 
   Dir[Rails.root.join('spec', 'support', '**', '*.rb')].each { |f| require f }
-  config.include EvmHelpers
+  config.include EVMHelpers
   config.include TransactionHelper
   config.fail_fast = true
   
@@ -52,7 +52,7 @@ RSpec.configure do |config|
 
     system("cd #{geth_dir} && make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json")
     
-    pid = Process.spawn("cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --networkid 1027303 --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 > geth.log 2>&1")
+    pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --networkid 1027303 --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --authrpc.port 8551 --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > geth.log 2>&1})
     Process.detach(pid)
     
     sleep 1

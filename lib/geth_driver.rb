@@ -32,7 +32,7 @@ module GethDriver
       withdrawals: [],
       noTxPool: true,
       transactions: transactions,
-      gasLimit: "0x" + 30e6.to_i.to_s(16),
+      gasLimit: "0x" + 300e6.to_i.to_s(16),
     }
     
     # Recall that a batch contains a list of transactions to be included in a specific L2 block.

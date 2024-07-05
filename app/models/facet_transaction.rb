@@ -1,12 +1,39 @@
 class FacetTransaction < ApplicationRecord
-  belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash
+  belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
-  belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash
+  belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
+  belongs_to :ethscription, primary_key: :transaction_hash, foreign_key: :eth_transaction_hash, optional: true
   
   attr_accessor :chain_id, :eth_call
   
   FACET_TX_TYPE = 0x0F
+  FACET_CHAIN_ID = 0xface7
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
+  
+  def self.from_eth_tx_and_ethscription(eth_tx, ethscription)
+    legacy_receipt = ethscription.legacy_facet_transaction_receipt
+    return unless legacy_receipt
+    
+    tx = new
+    tx.chain_id = FACET_CHAIN_ID
+    tx.to_address = legacy_receipt.to_contract_address
+    tx.value = 0
+    tx.max_fee_per_gas = 100.gwei
+    tx.gas_limit = 100e6.to_i
+    tx.input = ethscription.facet_tx_input
+    
+    tx.eth_transaction = eth_tx
+    tx.eth_transaction_hash = ethscription.transaction_hash
+    tx.eth_call_index = 0
+    tx.from_address = legacy_receipt.from_address
+    tx.eth_call = EthCall.new(
+      call_index: 0
+    )
+    
+    tx.source_hash = FacetTransaction.compute_source_hash(tx.eth_transaction, tx.eth_call)
+    
+    tx
+  end
   
   def self.from_eth_call_and_tx(eth_call, eth_tx)
     return unless eth_call.to_address == FACET_INBOX_ADDRESS

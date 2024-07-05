@@ -27,6 +27,22 @@ CREATE FUNCTION public.check_eth_block_order() RETURNS trigger
 
 
 --
+-- Name: check_ethscription_order(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_ethscription_order() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+        BEGIN
+          IF NEW.block_number < (SELECT MAX(block_number) FROM ethscriptions) OR (NEW.block_number = (SELECT MAX(block_number) FROM ethscriptions) AND NEW.transaction_index <= (SELECT MAX(transaction_index) FROM ethscriptions WHERE block_number = NEW.block_number)) THEN
+            RAISE EXCEPTION 'New ethscription must be later in order';
+          END IF;
+          RETURN NEW;
+        END;
+        $$;
+
+
+--
 -- Name: check_facet_block_order(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -218,6 +234,57 @@ ALTER SEQUENCE public.eth_transactions_id_seq OWNED BY public.eth_transactions.i
 
 
 --
+-- Name: ethscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ethscriptions (
+    id bigint NOT NULL,
+    transaction_hash character varying NOT NULL,
+    block_number bigint NOT NULL,
+    block_blockhash character varying NOT NULL,
+    transaction_index bigint NOT NULL,
+    creator character varying NOT NULL,
+    initial_owner character varying NOT NULL,
+    block_timestamp bigint NOT NULL,
+    content_uri text NOT NULL,
+    mimetype character varying NOT NULL,
+    processed_at timestamp(6) without time zone,
+    processing_state character varying NOT NULL,
+    processing_error character varying,
+    gas_price bigint,
+    gas_used bigint,
+    transaction_fee bigint,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT chk_rails_7018b50304 CHECK ((((processing_state)::text = 'pending'::text) OR (processed_at IS NOT NULL))),
+    CONSTRAINT chk_rails_788fa87594 CHECK (((block_blockhash)::text ~ '^0x[a-f0-9]{64}$'::text)),
+    CONSTRAINT chk_rails_84591e2730 CHECK (((transaction_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
+    CONSTRAINT chk_rails_b577b97822 CHECK (((creator)::text ~ '^0x[a-f0-9]{40}$'::text)),
+    CONSTRAINT chk_rails_ca0ea47752 CHECK (((processing_state)::text = ANY ((ARRAY['pending'::character varying, 'success'::character varying, 'failure'::character varying])::text[]))),
+    CONSTRAINT chk_rails_df21fdbe02 CHECK (((initial_owner)::text ~ '^0x[a-f0-9]{40}$'::text))
+);
+
+
+--
+-- Name: ethscriptions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ethscriptions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ethscriptions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ethscriptions_id_seq OWNED BY public.ethscriptions.id;
+
+
+--
 -- Name: facet_blocks; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -399,6 +466,13 @@ ALTER TABLE ONLY public.eth_transactions ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: ethscriptions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ethscriptions ALTER COLUMN id SET DEFAULT nextval('public.ethscriptions_id_seq'::regclass);
+
+
+--
 -- Name: facet_blocks id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -449,6 +523,14 @@ ALTER TABLE ONLY public.eth_calls
 
 ALTER TABLE ONLY public.eth_transactions
     ADD CONSTRAINT eth_transactions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ethscriptions ethscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ethscriptions
+    ADD CONSTRAINT ethscriptions_pkey PRIMARY KEY (id);
 
 
 --
@@ -554,6 +636,27 @@ CREATE UNIQUE INDEX index_eth_transactions_on_tx_hash ON public.eth_transactions
 
 
 --
+-- Name: index_ethscriptions_on_block_number_and_transaction_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_ethscriptions_on_block_number_and_transaction_index ON public.ethscriptions USING btree (block_number, transaction_index);
+
+
+--
+-- Name: index_ethscriptions_on_processing_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ethscriptions_on_processing_state ON public.ethscriptions USING btree (processing_state);
+
+
+--
+-- Name: index_ethscriptions_on_transaction_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_ethscriptions_on_transaction_hash ON public.ethscriptions USING btree (transaction_hash);
+
+
+--
 -- Name: index_facet_blocks_on_block_hash; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -638,10 +741,33 @@ CREATE TRIGGER trigger_check_eth_block_order BEFORE INSERT ON public.eth_blocks 
 
 
 --
+-- Name: ethscriptions trigger_check_ethscription_order; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_check_ethscription_order BEFORE INSERT ON public.ethscriptions FOR EACH ROW EXECUTE FUNCTION public.check_ethscription_order();
+
+
+--
 -- Name: facet_blocks trigger_check_facet_block_order; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trigger_check_facet_block_order BEFORE INSERT ON public.facet_blocks FOR EACH ROW EXECUTE FUNCTION public.check_facet_block_order();
+
+
+--
+-- Name: ethscriptions fk_rails_104cee2b3d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ethscriptions
+    ADD CONSTRAINT fk_rails_104cee2b3d FOREIGN KEY (block_number) REFERENCES public.eth_blocks(number) ON DELETE CASCADE;
+
+
+--
+-- Name: ethscriptions fk_rails_2accd8a448; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ethscriptions
+    ADD CONSTRAINT fk_rails_2accd8a448 FOREIGN KEY (transaction_hash) REFERENCES public.eth_transactions(tx_hash) ON DELETE CASCADE;
 
 
 --
@@ -715,6 +841,7 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20240703161720'),
 ('20240628125033'),
 ('20240627143934'),
 ('20240627143407'),

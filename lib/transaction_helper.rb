@@ -1,11 +1,16 @@
 module TransactionHelper
-  include EvmHelpers
+  include EVMHelpers
+  extend self
+  
+  def client
+    GethDriver.client
+  end
   
   def static_call(contract:, address:, function:, args:)
     contract_object = get_contract(contract, address)
     
     function_obj = contract_object.parent.function_hash[function]
-    data = function_obj.get_call_data(*args)
+    data = function_obj.get_call_data(*args) rescue binding.pry
     
     result = client.call("eth_call", [{
       to: address,
@@ -15,6 +20,17 @@ module TransactionHelper
     function_obj.parse_result(result)
   end
   
+  def get_function_calldata(
+    contract:,
+    function:,
+    args:
+  )
+    contract_object = get_contract(contract, "0x0000000000000000000000000000000000000000")
+    
+    function_obj = contract_object.parent.function_hash[function]
+    function_obj.get_call_data(*args)
+  end
+  
   def call_contract_function(
     contract:,
     address:,
@@ -22,12 +38,9 @@ module TransactionHelper
     function:,
     args:,
     value: 0,
-    gas_limit: 1_000_000
+    gas_limit: 10_000_000
   )
-    contract_object = get_contract(contract, address)
-    
-    function_obj = contract_object.parent.function_hash[function]
-    data = function_obj.get_call_data(*args)
+    data = get_function_calldata(contract: contract, function: function, args: args)
     
     create_and_import_block(
       facet_data: data,
@@ -44,7 +57,7 @@ module TransactionHelper
     to_address:,
     value: 0,
     max_fee_per_gas: 10.gwei,
-    gas_limit: 1_000_000,
+    gas_limit: 10_000_000,
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
     chain_id: 0xface7

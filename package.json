@@ -1,0 +1,16 @@
+{
+  "name": "evm-facet",
+  "version": "1.0.0",
+  "description": "A Rails project with Solidity contracts",
+  "main": "index.js",
+  "scripts": {
+    "compile": "solc --combined-json abi,bin --optimize --optimize-runs 200 --allow-paths . --include-path node_modules --base-path ./contracts contracts/**/*.sol"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "solady": "0.0.217",
+    "solidity-shell": "^0.2.4"
+  }
+}
