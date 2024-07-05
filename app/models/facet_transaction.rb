@@ -1,4 +1,6 @@
 class FacetTransaction < ApplicationRecord
+  class InvalidAddress < StandardError; end
+  
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
@@ -63,7 +65,7 @@ class FacetTransaction < ApplicationRecord
 
     tx = new
     tx.chain_id = chain_id.to_i
-    tx.to_address = to
+    tx.to_address = validated_address(to)
     tx.value = value.to_i
     tx.max_fee_per_gas = max_gas_fee.to_i
     tx.gas_limit = gas_limit.to_i
@@ -134,5 +136,15 @@ class FacetTransaction < ApplicationRecord
     hex_payload = Eth::Util.bin_to_prefixed_hex([FACET_TX_TYPE].pack('C') + rlp_encoded)
 
     hex_payload
+  end
+  
+  def self.validated_address(str)
+    return nil if str.blank?
+    
+    if str.match?(/\A0x[0-9a-f]{40}\z/)
+      str
+    else
+      raise InvalidAddress, "Invalid address #{str}!"
+    end
   end
 end

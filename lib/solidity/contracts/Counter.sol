@@ -18,4 +18,20 @@ contract Counter {
     function getCount() public view returns (uint256) {
         return count;
     }
+    
+    function createRevert(bool shouldRevert) public pure {
+        if (shouldRevert) {
+            revert("Reverted");
+        }
+    }
+    
+    function runOutOfGas() public pure {
+        uint i = 0;
+        
+        while(true) {
+            i++;
+        }
+    }
+    
+    receive() external payable {}
 }

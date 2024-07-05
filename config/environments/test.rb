@@ -25,9 +25,27 @@ Rails.application.configure do
 
   # Show full error reports and disable caching.
   config.consider_all_requests_local = true
-  config.action_controller.perform_caching = false
-  config.cache_store = :null_store
+  
+  if Rails.root.join("tmp/caching-dev.txt").exist?
+    config.cache_store = :mem_cache_store, {
+      servers: ['localhost'],
+      options: {
+        failover: true,
+        socket_timeout: 1.5,
+        socket_failure_delay: 0.2,
+        down_retry_delay: 60,
+        compress: true,
+        namespace: 'test_namespace'
+      }
+    }
+    config.public_file_server.headers = {
+      "Cache-Control" => "public, max-age=#{2.days.to_i}"
+    }
+  else
+    config.action_controller.perform_caching = false
 
+    config.cache_store = :null_store
+  end
   # Render exception templates for rescuable exceptions and raise for other exceptions.
   config.action_dispatch.show_exceptions = :rescuable
 

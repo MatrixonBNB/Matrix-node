@@ -39,7 +39,9 @@ class SolidityCompiler
     end
 
     def memoized_compile(filename_or_solidity_code, last_modified = nil)
-      new(filename_or_solidity_code).get_solidity_bytecode_and_abi
+      Rails.cache.fetch(['compile', last_modified, filename_or_solidity_code.to_s], expires_in: 1.day) do
+        new(filename_or_solidity_code).get_solidity_bytecode_and_abi
+      end
     end
     memoize :memoized_compile
   end

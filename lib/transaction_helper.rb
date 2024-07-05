@@ -38,7 +38,9 @@ module TransactionHelper
     function:,
     args:,
     value: 0,
-    gas_limit: 10_000_000
+    gas_limit: 10_000_000,
+    max_fee_per_gas: 10.gwei,
+    expect_failure: false
   )
     data = get_function_calldata(contract: contract, function: function, args: args)
     
@@ -47,7 +49,9 @@ module TransactionHelper
       to_address: address,
       from_address: from,
       value: value,
-      gas_limit: gas_limit
+      gas_limit: gas_limit,
+      max_fee_per_gas: max_fee_per_gas,
+      expect_failure: expect_failure
     )
   end
   
@@ -60,7 +64,8 @@ module TransactionHelper
     gas_limit: 10_000_000,
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
-    chain_id: 0xface7
+    chain_id: 0xface7,
+    expect_failure: false
   )
     ActiveRecord::Base.transaction do
       EthBlockImporter.ensure_genesis_blocks
@@ -185,7 +190,9 @@ module TransactionHelper
         ap trace
       end
       
-      expect(res.receipts_imported.map(&:status)).to eq([1])
+      expected = expect_failure ? [0] : [1]
+      
+      expect(res.receipts_imported.map(&:status).uniq).to eq(expected)
       res
     end
   end
