@@ -16,3 +16,7 @@ test:
 production:
   <<: *default
   database: evm_facet_production
+
+secondary:
+  <<: *default
+  url: <%= ENV['SECONDARY_DB_URL'] %>
