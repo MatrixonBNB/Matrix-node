@@ -4,6 +4,12 @@ class EthCall < ApplicationRecord
   belongs_to :eth_block, foreign_key: :block_hash, primary_key: :block_hash
   belongs_to :eth_transaction, foreign_key: :transaction_hash, primary_key: :tx_hash
   
+  before_validation :remove_null_bytes
+  
+  def remove_null_bytes
+    self.revert_reason = revert_reason.delete("\u0000") if revert_reason
+  end
+  
   def self.from_trace_result(trace_result, eth_block)
     order_counter = Struct.new(:count).new(0)
     
