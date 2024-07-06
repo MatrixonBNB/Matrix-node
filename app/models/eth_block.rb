@@ -21,17 +21,17 @@ class EthBlock < ApplicationRecord
       base_fee_per_gas: block_result['baseFeePerGas'].to_i(16),
       nonce: block_result['nonce'],
       miner: block_result['miner'],
-      excess_blob_gas: block_result['excessBlobGas'].to_i(16),
+      excess_blob_gas: block_result['excessBlobGas']&.to_i(16),
       difficulty: block_result['difficulty'].to_i(16),
       gas_limit: block_result['gasLimit'].to_i(16),
       gas_used: block_result['gasUsed'].to_i(16),
-      parent_beacon_block_root: block_result['parentBeaconBlockRoot'],
+      parent_beacon_block_root: block_result['parentBeaconBlockRoot'] || block_result['hash'],
       size: block_result['size'].to_i(16),
       transactions_root: block_result['transactionsRoot'],
       state_root: block_result['stateRoot'],
       mix_hash: block_result['mixHash'],
       parent_hash: block_result['parentHash'],
-      blob_gas_used: block_result['blobGasUsed'].to_i(16),
+      blob_gas_used: block_result['blobGasUsed']&.to_i(16),
       timestamp: block_result['timestamp'].to_i(16)
     )
   end

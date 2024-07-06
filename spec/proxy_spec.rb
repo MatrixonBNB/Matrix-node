@@ -4,6 +4,7 @@ RSpec.describe "Uniswap" do
   let(:node_url) { 'http://localhost:8551' }
   let(:client) { GethClient.new(node_url) }
   let(:engine_api) { GethDriver }
+  let(:from_address) { '0xC2172a6315c1D7f6855768F843c420EbB36eDa96'.downcase }
   let(:first_tx_receipt) {
     OpenStruct.new(JSON.parse("{\"id\":1,\"transaction_hash\":\"0x8351e2aa33080394eace1cc0700e935bdfb03747eb00d68524beb1920f4df102\",\"from_address\":\"0xc2172a6315c1d7f6855768f843c420ebb36eda97\",\"status\":\"success\",\"function\":\"constructor\",\"args\":{\"name\":\"Facet Ether\",\"symbol\":\"FETH\",\"trustedSmartContract\":\"0xbE73b799BE0b492c36b19bf7a69D4a6b41D90214\"},\"logs\":[],\"block_timestamp\":1706742600,\"error\":null,\"to_contract_address\":null,\"effective_contract_address\":\"0x1673540243e793b0e77c038d4a88448eff524dce\",\"created_contract_address\":\"0x1673540243e793b0e77c038d4a88448eff524dce\",\"block_number\":5193575,\"transaction_index\":19,\"block_blockhash\":\"0xca539d77ba96b421ead69ab8eb4954059da8f0dc997ce9cf6744e7101ff9b702\",\"return_value\":null,\"call_type\":\"create\",\"gas_price\":1596301384,\"gas_used\":112408,\"transaction_fee\":179437045972672,\"created_at\":\"2024-06-10T18:46:13.377Z\",\"updated_at\":\"2024-06-10T18:46:13.377Z\",\"gas_stats\":{\"s\":{\"count\":5,\"gas_used\":0.0025},\"address\":{\"count\":1,\"gas_used\":0.01},\"require\":{\"count\":1,\"gas_used\":0.0005},\"msg_sender\":{\"count\":1,\"gas_used\":0.01},\"StorageBaseSet\":{\"count\":5,\"gas_used\":0.1},\"TypedVariableNe\":{\"count\":1,\"gas_used\":0.01},\"ContractFunction\":{\"count\":3,\"gas_used\":1.5},\"ExternalContractCall\":{\"count\":1,\"gas_used\":0.5},\"ContractFunctionArgGet\":{\"count\":18,\"gas_used\":0.009000000000000005}},\"facet_gas_used\":2.1420000000000003,\"runtime_ms\":68.236}"))
   }
@@ -45,6 +46,39 @@ RSpec.describe "Uniswap" do
     
     expect(status).to eq(
       second_tx_receipt.status
+    )
+  end
+  
+  it 'does another one' do
+    facet_data = get_deploy_data('legacy/AirdropERC20V1', [])
+          
+    implementation_res = create_and_import_block(
+      facet_data: facet_data,
+      to_address: nil,
+      from_address: from_address
+    )
+    
+    implementation_address = implementation_res.receipts_imported.first.contract_address
+    
+    initialize_calldata = get_function_calldata(
+      contract: 'legacy/AirdropERC20V1',
+      function: 'initialize',
+      args: [
+        "ethx",          # name
+        "ethx",          # symbol
+        from_address,    # owner
+        18,              # decimals
+        21000000000000000000000000,  # maxSupply
+        1000000000000000000000,      # perMintLimit
+      ]
+    )
+    
+    proxy_res = create_and_import_block(
+      facet_data: get_deploy_data(
+        'legacy/ERC1967Proxy', [implementation_address, initialize_calldata]
+      ),
+      to_address: nil,
+      from_address: from_address
     )
   end
   

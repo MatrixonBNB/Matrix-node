@@ -39,9 +39,29 @@ module EthRbExtensions
     end
 
     def parse_result(result)
-      output_types = outputs.map(&:type)
       return nil if result == "0x"
-      Eth::Abi.decode(output_types, result)
+      
+      # output_types = outputs.map(&:type)
+      output_types = outputs.map do |i|
+        i.instance_variable_get(:@type).tap do |j|
+          comps = j.instance_variable_get(:@components)
+          
+          j.instance_variable_set(:@components, comps || [])
+        end
+      end
+      decoded_result = Eth::Abi.decode(output_types, result) rescue binding.pry
+
+      # Check if all outputs have names
+      if outputs.all? { |output| output.name }
+        # Create a hash with output names as keys
+        result_hash = {}
+        outputs.each_with_index do |output, index|
+          result_hash[output.name] = decoded_result[index]
+        end
+        result_hash
+      else
+        decoded_result
+      end
     end
   end
 end

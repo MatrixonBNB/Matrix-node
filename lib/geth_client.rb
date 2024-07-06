@@ -39,11 +39,17 @@ class GethClient
     response.parsed_response['result']
   end
 
-  def jwt
-    payload = {
-      iat: Time.now.to_i
+  def jwt_payload
+    {
+      iat: current_time.to_i
     }
-    
-    JWT.encode(payload, jwt_secret.hex_to_bytes, 'HS256')
+  end
+
+  def current_time
+    Time.zone.now
+  end
+  
+  def jwt
+    JWT.encode(jwt_payload, jwt_secret.hex_to_bytes, 'HS256')
   end
 end

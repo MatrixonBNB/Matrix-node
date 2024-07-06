@@ -97,7 +97,7 @@ class SolidityCompiler
     
     # Compile with optimizer settings
     # stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin #{include_path_option} --optimize --optimize-runs 200 --allow-paths . --base-path #{Rails.root.join("lib", "solidity")} #{file_path}")
-    stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin #{include_path_option} --optimize --optimize-runs 200  #{file_path}")
+    stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin #{include_path_option} --optimize --optimize-runs 200 --via-ir #{file_path}")
     raise "Error running solc: #{stderr}" unless status.success?
   
     # Parse the JSON output

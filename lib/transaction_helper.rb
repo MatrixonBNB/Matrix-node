@@ -2,6 +2,12 @@ module TransactionHelper
   include EVMHelpers
   extend self
   
+  @contract_addresses = {}
+  
+  class << self
+    attr_accessor :contract_addresses
+  end
+  
   def client
     GethDriver.client
   end
@@ -55,11 +61,76 @@ module TransactionHelper
     )
   end
   
+  def deploy_contract(
+    from:,
+    contract:,
+    args: [],
+    value: 0,
+    gas_limit: 10_000_000,
+    max_fee_per_gas: 10.gwei,
+    expect_failure: false
+  )
+    data = get_deploy_data(contract, args)
+    
+    res = create_and_import_block(
+      facet_data: data,
+      to_address: nil,
+      from_address: from,
+      value: value,
+      gas_limit: gas_limit,
+      max_fee_per_gas: max_fee_per_gas,
+      expect_failure: expect_failure
+    ).receipts_imported.first
+    
+    TransactionHelper.contract_addresses[res.contract_address] = contract
+    res
+  end
+  
+  def deploy_contract_with_proxy(
+    from:,
+    implementation:,
+    args: [],
+    value: 0,
+    gas_limit: 10_000_000,
+    max_fee_per_gas: 10.gwei,
+    expect_failure: false
+  )
+    implementation_address = deploy_contract(
+      from: from,
+      contract: implementation,
+      args: [],
+      value: value,
+      gas_limit: gas_limit,
+      max_fee_per_gas: max_fee_per_gas,
+      expect_failure: expect_failure
+    ).contract_address
+    
+    initialize_calldata = get_function_calldata(
+      contract: implementation,
+      function: 'initialize',
+      args: args
+    )
+    
+    res = deploy_contract(
+      from: from,
+      contract: 'legacy/ERC1967Proxy',
+      args: [implementation_address, initialize_calldata],
+      value: value,
+      gas_limit: gas_limit,
+      max_fee_per_gas: max_fee_per_gas,
+      expect_failure: expect_failure
+    )
+    
+    TransactionHelper.contract_addresses[res.contract_address] = implementation
+    res
+  end
+  
   def create_and_import_block(
     facet_data:,
     from_address:,
     to_address:,
     value: 0,
+    block_timestamp: nil,
     max_fee_per_gas: 10.gwei,
     gas_limit: 10_000_000,
     eth_base_fee: 200.gwei,
@@ -70,6 +141,10 @@ module TransactionHelper
     ActiveRecord::Base.transaction do
       EthBlockImporter.ensure_genesis_blocks
       last_block = EthBlock.order(number: :desc).first
+      
+      if block_timestamp && block_timestamp.is_a?(Time)
+        block_timestamp = block_timestamp.to_i
+      end
       
       eth_data = FacetTransaction.new(
         chain_id: chain_id,
@@ -110,7 +185,7 @@ module TransactionHelper
           'transactions' => [eth_transaction],
           'baseFeePerGas' => '0x' + eth_base_fee.to_s(16),
           'gasUsed' => '0xf4240',
-          'timestamp' => (last_block.timestamp + 12).to_s(16),
+          'timestamp' => (block_timestamp || last_block.timestamp + 12).to_s(16),
           'excessBlobGas' => "0x0",
           'blobGasUsed' => "0x0",
           'difficulty' => "0x0",
@@ -193,6 +268,105 @@ module TransactionHelper
       expected = expect_failure ? [0] : [1]
       
       expect(res.receipts_imported.map(&:status).uniq).to eq(expected)
+      res
+    end
+  end
+  
+  def trigger_contract_interaction(from:, payload:, expect_failure: false, block_timestamp: nil)
+    contract = TransactionHelper.contract_addresses.fetch(payload[:to]) rescue binding.pry
+
+    contract = get_contract(contract, payload[:to])
+    function = contract.functions.find { |f| f.name == payload[:data][:function] }
+    args = convert_args(contract, payload[:data][:function], payload[:data][:args])
+
+    # Get the call data for the function
+    call_data = function.get_call_data(*args) rescue binding.pry
+
+    # Create and import the block
+    res = create_and_import_block(
+      facet_data: call_data,
+      from_address: from,
+      to_address: payload[:to],
+      value: payload[:data][:value] || 0,
+      max_fee_per_gas: payload[:data][:max_fee_per_gas] || 10.gwei,
+      gas_limit: payload[:data][:gas_limit] || 10_000_000,
+      expect_failure: expect_failure,
+      block_timestamp: block_timestamp
+    )
+
+    res
+  rescue => e
+    binding.pry
+    raise
+  end
+
+  def trigger_contract_interaction_and_expect_success(from:, payload:, block_timestamp: nil)
+    res = trigger_contract_interaction(from: from, payload: payload, expect_failure: false, block_timestamp: block_timestamp)
+
+    # Ensure the transaction was successful
+    unless res.receipts_imported.map(&:status).uniq == [1]
+      raise "Transaction failed"
+    end
+
+    res
+  end
+
+  def trigger_contract_interaction_and_expect_error(from:, payload:, error_msg_includes: nil, block_timestamp: nil)
+    res = trigger_contract_interaction(from: from, payload: payload, expect_failure: true, block_timestamp: block_timestamp)
+
+    # Ensure the transaction failed
+    if res.receipts_imported.map(&:status).uniq == [1]
+      raise "Transaction succeeded unexpectedly"
+    end
+
+    # Check for the expected error message
+    # unless res.error_message.include?(error_msg_includes)
+    #   raise "Expected error message not found"
+    # end
+
+    res
+  end
+  
+  def convert_args(contract, function_name, args)
+    function = contract.functions.find { |f| f.name == function_name }
+    inputs = function.inputs
+
+    # If args is a string, treat it as a one-element array
+    args = [args] if args.is_a?(String) || args.is_a?(Integer)
+
+    # If args is a hash, convert it to an array based on the function inputs
+    if args.is_a?(Hash)
+      args_hash = args.with_indifferent_access
+      args = inputs.map do |input|
+        args_hash[input.name]
+      end
+    end
+
+    # Ensure proper type conversion for uint and int types
+    args = args&.each_with_index&.map do |arg_value, index|
+      input = inputs[index]
+      if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
+        arg_value = Integer(arg_value, 10)
+      end
+      arg_value
+    end
+
+    args
+  end
+  
+  def make_static_call(contract:, function_name:, function_args: {})
+    address = contract
+    contract = TransactionHelper.contract_addresses.fetch(contract) rescue binding.pry
+
+    contract_object = get_contract(contract, address)
+    args = convert_args(contract_object, function_name, function_args)
+    res = static_call(contract: contract, address: address, function: function_name, args: args)
+    
+    return unless res
+    
+    if res.length == 1
+      res.is_a?(Hash) ? res.values.first : res.first
+    else
       res
     end
   end

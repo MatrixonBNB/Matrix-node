@@ -26,7 +26,7 @@ abstract contract Upgradeable is UUPSUpgradeable, Initializable {
         emit UpgradeAdminChanged(newUpgradeAdmin);
     }
     
-    function initUpgradeAdmin(address newUpgradeAdmin) internal onlyInitializing {
+    function _initializeUpgradeAdmin(address newUpgradeAdmin) internal onlyInitializing {
         require(_upgradeStorage().upgradeAdmin == address(0), "Upgrade admin already set");
         _upgradeStorage().upgradeAdmin = newUpgradeAdmin;
         emit UpgradeAdminChanged(newUpgradeAdmin);

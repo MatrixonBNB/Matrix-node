@@ -3,12 +3,12 @@ class FacetBlock < ApplicationRecord
   has_many :facet_transactions, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   
-  def self.from_eth_block(eth_block)
+  def self.from_eth_block(eth_block, timestamp: nil)
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
       number: FacetBlock.maximum(:number).to_i + 1,
-      timestamp: eth_block.timestamp,
+      timestamp: timestamp || eth_block.timestamp,
       prev_randao: FacetBlock.calculate_prev_randao(eth_block.block_hash)
     )
   end

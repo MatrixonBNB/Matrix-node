@@ -73,6 +73,10 @@ class Ethscription < ApplicationRecord
     else
       raise "Unsupported operation: #{content.op}"
     end
+  rescue KeyError => e
+    ap content
+    binding.irb
+    raise
   end
   
   def self.convert_args(contract, function_name, args_hash)
@@ -92,12 +96,37 @@ class Ethscription < ApplicationRecord
     end
   end
   
+  def self.predeploy_to_local_map
+    {
+      "0x897d289b77c8393783829489b9ab3255c0158064": "EtherBridgeV1",
+      "0x137e368f782453e41f622fa8cf68296d04c84c88": "PublicMintERC20V1",
+      "0x9dc4e7f596baf4227f919102a7f80523834edb02": "AirdropERC20V1",
+      "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d": "EthscriptionERC20BridgeV1"
+    }.with_indifferent_access
+  end
+  
   def self.local_from_predeploy(address)
-    name = {
-      "0x897d289b77c8393783829489b9ab3255c0158064": "EtherBridgeV1"
-    }.with_indifferent_access.fetch(address.downcase)
+    name = predeploy_to_local_map.fetch(address.downcase)
     
     "legacy/#{name}"
+  end
+  
+  def self.get_code(address)
+    local = local_from_predeploy(address)
+    code = EVMHelpers.compile_contract(local)
+    code.bin
+  end
+  
+  def self.generate_alloc_for_genesis
+    predeploy_to_local_map.map do |address, alloc|
+      [
+        address,
+        {
+          "code" => "0x" + get_code(address),
+          "balance" => 0
+        }
+      ]
+    end.to_h
   end
   
   def self.sample_content

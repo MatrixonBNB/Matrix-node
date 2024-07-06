@@ -12,7 +12,7 @@ class FacetTransaction < ApplicationRecord
   FACET_CHAIN_ID = 0xface7
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
   
-  def self.from_eth_tx_and_ethscription(eth_tx, ethscription)
+  def self.from_eth_tx_and_ethscription(eth_tx, ethscription, idx)
     legacy_receipt = ethscription.legacy_facet_transaction_receipt
     return unless legacy_receipt
     
@@ -26,10 +26,10 @@ class FacetTransaction < ApplicationRecord
     
     tx.eth_transaction = eth_tx
     tx.eth_transaction_hash = ethscription.transaction_hash
-    tx.eth_call_index = 0
+    tx.eth_call_index = idx
     tx.from_address = legacy_receipt.from_address
     tx.eth_call = EthCall.new(
-      call_index: 0
+      call_index: idx
     )
     
     tx.source_hash = FacetTransaction.compute_source_hash(tx.eth_transaction, tx.eth_call)

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
-import './ERC20.sol';
+import '../legacy/FacetERC20.sol';
 
-contract MyToken is ERC20 {
+contract MyToken is FacetERC20 {
     event SayHi(string message);
-    constructor()
-        ERC20("MyToken", "MTK", 18)
-    {}
+    constructor() {
+         _initializeERC20("MyToken", "MTK", 18);
+    }
     
     function mint(address to, uint256 amount) public {
         _mint(to, amount);

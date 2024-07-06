@@ -124,7 +124,7 @@ module EthBlockImporter
     block_numbers
   end
   
-  def import_block(block_by_number_response, trace_response)
+  def import_block(block_by_number_response, trace_response, timestamp: nil)
     ActiveRecord::Base.transaction do
       ensure_genesis_blocks
       validate_ready_to_import!(block_by_number_response, trace_response)
@@ -165,7 +165,7 @@ module EthBlockImporter
       
       EthCall.import!(traces)
       
-      facet_txs, facet_receipts = propose_facet_block(eth_block)
+      facet_txs, facet_receipts = propose_facet_block(eth_block, timestamp: timestamp)
       
       OpenStruct.new(
         block_number: block_number,
@@ -227,9 +227,9 @@ module EthBlockImporter
     ethscriptions = LegacyEthBlock.reading { legacy_block.ethscriptions.includes(:legacy_facet_transaction_receipt) }
     eth_txs = eth_block.eth_transactions
     
-    ethscriptions.map do |ethscription|
+    ethscriptions.map.with_index do |ethscription, idx|
       eth_tx = eth_txs.detect { |tx| tx.tx_hash == ethscription.transaction_hash }
-      facet_tx = FacetTransaction.from_eth_tx_and_ethscription(eth_tx, ethscription)
+      facet_tx = FacetTransaction.from_eth_tx_and_ethscription(eth_tx, ethscription, idx)
       facet_tx.mint = 500.ether
       
       ethscription.dup.save! if facet_tx
@@ -270,10 +270,10 @@ module EthBlockImporter
     facet_txs
   end
   
-  def propose_facet_block(eth_block)
+  def propose_facet_block(eth_block, timestamp: nil)
     eth_block.reload
     
-    facet_block = FacetBlock.from_eth_block(eth_block)
+    facet_block = FacetBlock.from_eth_block(eth_block, timestamp: timestamp)
     
     facet_txs = if in_v2?(eth_block.number)
       facet_txs_from_eth_transactions_in_block(eth_block)
