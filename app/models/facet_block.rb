@@ -6,6 +6,7 @@ class FacetBlock < ApplicationRecord
   def self.from_eth_block(eth_block, timestamp: nil)
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
+      eth_block_number: eth_block.number,
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
       number: FacetBlock.maximum(:number).to_i + 1,
       timestamp: timestamp || eth_block.timestamp,

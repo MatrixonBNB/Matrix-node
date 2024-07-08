@@ -18,7 +18,7 @@ class EthBlock < ApplicationRecord
       receipts_root: block_result['receiptsRoot'],
       extra_data: block_result['extraData'],
       withdrawals_root: block_result['withdrawalsRoot'],
-      base_fee_per_gas: block_result['baseFeePerGas'].to_i(16),
+      base_fee_per_gas: block_result['baseFeePerGas']&.to_i(16),
       nonce: block_result['nonce'],
       miner: block_result['miner'],
       excess_blob_gas: block_result['excessBlobGas']&.to_i(16),

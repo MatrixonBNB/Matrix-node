@@ -19,7 +19,11 @@ class SolidityCompiler
     include Memery
 
     def compile(filename_or_solidity_code)
-      checksum = directory_checksum(Rails.root.join('lib', 'solidity'))
+      checksum = directory_checksum(
+        Rails.root.join('lib', 'solidity'),
+        Rails.root.join('node_modules')
+      )
+
       if File.exist?(filename_or_solidity_code)
         memoized_compile(filename_or_solidity_code, checksum)
       else
@@ -29,8 +33,8 @@ class SolidityCompiler
 
     private
     
-    def directory_checksum(directory)
-      files = Dir.glob("#{directory}/**/*").select { |f| File.file?(f) }
+    def directory_checksum(*directories)
+      files = directories.flat_map { |directory| Dir.glob("#{directory}/**/*.sol").select { |f| File.file?(f) } }
       digest = Digest::SHA256.new
       files.each do |file|
         digest.update(File.read(file))
@@ -38,8 +42,8 @@ class SolidityCompiler
       digest.hexdigest
     end
 
-    def memoized_compile(filename_or_solidity_code, last_modified = nil)
-      Rails.cache.fetch(['compile', last_modified, filename_or_solidity_code.to_s], expires_in: 1.day) do
+    def memoized_compile(filename_or_solidity_code, checksum = nil)
+      Rails.cache.fetch(['compile', checksum, filename_or_solidity_code.to_s], expires_in: 1.day) do
         new(filename_or_solidity_code).get_solidity_bytecode_and_abi
       end
     end
@@ -93,11 +97,28 @@ class SolidityCompiler
     # Set the Solidity version using solc-select
     system("solc-select use #{version}")
     
-    include_path_option = version.split('.').last(2).join('.').to_f >= 8.17 ? "--include-path node_modules/ --base-path #{Rails.root.join("lib", "solidity")}" : ""
+    legacy_solidity = version.split('.').last(2).join('.').to_f < 8.17
     
+    solc_args = [
+      "solc",
+      "--combined-json", "abi,bin,bin-runtime",
+      "--optimize",
+      "--optimize-runs", "200",
+    ]
+
+    # Append additional arguments if not legacy
+    unless legacy_solidity
+      solc_args += [
+        "--via-ir",
+        "--include-path", "node_modules/",
+        "--base-path", Rails.root.join("lib", "solidity").to_s
+      ]
+    end
+    
+    solc_args += [file_path.to_s]
+
     # Compile with optimizer settings
-    # stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin #{include_path_option} --optimize --optimize-runs 200 --allow-paths . --base-path #{Rails.root.join("lib", "solidity")} #{file_path}")
-    stdout, stderr, status = Open3.capture3("solc --combined-json abi,bin #{include_path_option} --optimize --optimize-runs 200 --via-ir #{file_path}")
+    stdout, stderr, status = Open3.capture3(*solc_args) rescue binding.pry
     raise "Error running solc: #{stderr}" unless status.success?
   
     # Parse the JSON output
@@ -109,7 +130,8 @@ class SolidityCompiler
       name = contract_name.split(':').last
       contract_data[name] = {
         'bytecode' => contract_info['bin'],
-        'abi' => contract_info['abi']
+        'abi' => contract_info['abi'],
+        'bin_runtime' => contract_info['bin-runtime']
       }
     end
   

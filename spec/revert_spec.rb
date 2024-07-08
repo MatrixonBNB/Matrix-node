@@ -19,6 +19,31 @@ RSpec.describe "Reverts" do
     res.receipts_imported.first.contract_address
   }
   
+  # TODO: test constructor reverting
+  # TODO: test invalid opcode
+  
+  it do
+    airdrop_address = deploy_contract_with_proxy(
+      implementation: 'legacy/AirdropERC20V1',
+      from: from_address,
+      args: [
+        "Facet Cards",
+        "Card",
+        from_address,
+        18,
+        100.ether,
+        1.ether
+      ]
+    ).contract_address
+    
+    create_and_import_block(
+      facet_data: "0x7b227461626c65223a7b22616d6f756e74223a22323030303030303030303030303030303039353239343538363838227d7d",
+      to_address: airdrop_address,
+      from_address: from_address,
+      expect_failure: true
+    )
+  end
+  
   it 'handles reverts' do
     call_contract_function(
       contract: 'contracts/Counter',

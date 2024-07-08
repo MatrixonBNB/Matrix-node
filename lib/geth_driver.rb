@@ -2,8 +2,44 @@ module GethDriver
   extend self
   attr_reader :password
   
+  def self.setup_rspec_geth
+    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
+
+    EthBlock.delete_all
+
+    system("cd #{geth_dir} && make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json")
+    
+    pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --networkid 1027303 --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --authrpc.port 8551 --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > geth.log 2>&1})
+    Process.detach(pid)
+    
+    sleep 1
+  end
+
+  def self.teardown_rspec_geth
+    system("pkill -f geth")
+  end
+  
   def client
     @_client ||= GethClient.new(ENV.fetch('GETH_RPC_URL'))
+  end
+  
+  def non_auth_client
+    @_non_auth_client ||= GethClient.new(non_authed_rpc_url)
+  end
+  
+  def non_authed_rpc_url
+    ENV.fetch('GETH_RPC_URL').sub("8551", "8545")
+  end
+  
+  def trace_transaction(tx_hash)
+    non_auth_client.call("debug_traceTransaction", [tx_hash, {
+      enableMemory: true,
+      disableStack: false,
+      disableStorage: false,
+      enableReturnData: true,
+      debug: true,
+      tracer: "callTracer"
+    }])
   end
   
   def propose_block(transactions, new_facet_block, reorg: false)

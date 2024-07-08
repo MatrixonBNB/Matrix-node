@@ -18,7 +18,7 @@ class FacetTransaction < ApplicationRecord
     
     tx = new
     tx.chain_id = FACET_CHAIN_ID
-    tx.to_address = legacy_receipt.to_contract_address
+    tx.to_address = ethscription.facet_tx_to
     tx.value = 0
     tx.max_fee_per_gas = 100.gwei
     tx.gas_limit = 100e6.to_i

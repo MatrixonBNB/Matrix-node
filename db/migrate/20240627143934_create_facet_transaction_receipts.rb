@@ -5,6 +5,7 @@ class CreateFacetTransactionReceipts < ActiveRecord::Migration[7.1]
       t.string :block_hash, null: false
       t.integer :block_number, null: false
       t.string :contract_address
+      t.string :legacy_contract_address
       t.bigint :cumulative_gas_used, null: false
       t.string :deposit_nonce, null: false
       t.string :deposit_receipt_version, null: false
@@ -22,13 +23,17 @@ class CreateFacetTransactionReceipts < ActiveRecord::Migration[7.1]
       t.check_constraint "transaction_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "from_address ~ '^0x[a-f0-9]{40}$'"
       t.check_constraint "to_address ~ '^0x[a-f0-9]{40}$'"
+      t.check_constraint "contract_address ~ '^0x[a-f0-9]{40}$'"
+      t.check_constraint "legacy_contract_address ~ '^0x[a-f0-9]{40}$'"
       
       t.timestamps
+      
+      t.index :transaction_hash, unique: true
+      t.index :block_hash
+      t.index :block_number
+      t.index [:block_number, :transaction_index]
     end
 
-    add_index :facet_transaction_receipts, :transaction_hash, unique: true
-    add_index :facet_transaction_receipts, :block_hash
-    add_index :facet_transaction_receipts, :block_number
     add_foreign_key :facet_transaction_receipts, :facet_transactions, column: :transaction_hash, primary_key: :tx_hash, on_delete: :cascade
     add_foreign_key :facet_transaction_receipts, :facet_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
   end

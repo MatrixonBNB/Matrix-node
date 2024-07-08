@@ -20,8 +20,13 @@ RSpec.describe "Uniswap" do
     Ethscription.new(JSON.parse("{\"id\":8,\"transaction_hash\":\"0xfbde0d201e92b07852141be00fecc4eb34b1a26f6611d07dbf812a819b9beda1\",\"block_number\":5193589,\"block_blockhash\":\"0x8b231d39255bc052dddb0565b505a1e9340d0a82781442e5d214ee8bc24a4b60\",\"transaction_index\":28,\"creator\":\"0xbe73b799be0b492c36b19bf7a69d4a6b41d90214\",\"initial_owner\":\"0x00000000000000000000000000000000000face7\",\"block_timestamp\":1706742780,\"content_uri\":\"data:application/vnd.facet.tx+json;rule=esip6,{\\\"op\\\":\\\"call\\\",\\\"data\\\":{\\\"to\\\":\\\"0x1673540243e793b0e77c038d4a88448eff524dce\\\",\\\"function\\\":\\\"bridgeIn\\\",\\\"args\\\":{\\\"to\\\":\\\"0xc2172a6315c1d7f6855768f843c420ebb36eda97\\\",\\\"amount\\\":\\\"100000000000000000\\\"}}}\",\"mimetype\":\"application/vnd.facet.tx+json\",\"processed_at\":\"2024-06-10T18:46:13.535Z\",\"processing_state\":\"success\",\"processing_error\":null,\"gas_price\":1605668904,\"gas_used\":42541,\"transaction_fee\":68306760845064,\"created_at\":\"2024-06-10T18:28:41.195Z\",\"updated_at\":\"2024-06-10T18:28:41.195Z\"}"))
   }
   
+  before(:all) do
+    GethDriver.teardown_rspec_geth
+    GethDriver.setup_rspec_geth
+  end
+  
   it 'imports old tx #1' do
-    input = Ethscription.content_to_input(first_ethscription.content)
+    input = first_ethscription.facet_tx_input
     
     proxy_res = create_and_import_block(
       facet_data: input,
@@ -33,7 +38,7 @@ RSpec.describe "Uniswap" do
       first_tx_receipt.created_contract_address
     )
     
-    input = Ethscription.content_to_input(second_ethscription.content)
+    input = second_ethscription.facet_tx_input
     
     proxy_res = create_and_import_block(
       facet_data: input,
@@ -142,6 +147,6 @@ RSpec.describe "Uniswap" do
       args: [from_address]
     )
     
-    expect(result.first).to eq(mint_amount)
+    expect(result).to eq(mint_amount)
   end
 end

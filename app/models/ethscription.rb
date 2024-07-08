@@ -1,4 +1,8 @@
 class Ethscription < ApplicationRecord
+  class FunctionMissing < StandardError; end
+  class InvalidArgValue < StandardError; end
+  class ContractMissing < StandardError; end
+  
   belongs_to :eth_block, foreign_key: :block_number, primary_key: :block_number, optional: true, autosave: false
   belongs_to :eth_transaction, foreign_key: :transaction_hash, primary_key: :tx_hash, optional: true, autosave: false
   has_one :facet_transaction, primary_key: :transaction_hash, foreign_key: :tx_hash
@@ -6,6 +10,8 @@ class Ethscription < ApplicationRecord
   
   has_one :legacy_facet_transaction, primary_key: :transaction_hash, foreign_key: :transaction_hash
   has_one :legacy_facet_transaction_receipt, primary_key: :transaction_hash, foreign_key: :transaction_hash
+  
+  delegate :get_code, :local_from_predeploy, :predeploy_to_local_map, to: :class
   
   def content
     content_uri[/.*?,(.*)/, 1]
@@ -32,18 +38,14 @@ class Ethscription < ApplicationRecord
   end
   
   def facet_tx_input
-    self.class.content_to_input(content)
-  end
-  
-  def self.content_to_input(content)
-    content = JSON.parse(content, object_class: OpenStruct)
-    data = content.data
+    content = parsed_content
+    data = content['data']
     
-    if content.op == 'create'
-      predeploy_address = "0x" + data.init_code_hash.last(40)
+    if content['op'] == 'create'
+      predeploy_address = "0x" + data['init_code_hash'].last(40)
       
       contract_name = local_from_predeploy(predeploy_address)
-      args = convert_args(contract_name, 'initialize', data.args)
+      args = convert_args(contract_name, 'initialize', data['args'])
       
       initialize_calldata = TransactionHelper.get_function_calldata(
         contract: contract_name,
@@ -54,45 +56,96 @@ class Ethscription < ApplicationRecord
       TransactionHelper.get_deploy_data(
         'legacy/ERC1967Proxy', [predeploy_address, initialize_calldata]
       )
-    elsif content.op == 'call'
-      implementation_address = TransactionHelper.static_call(
-        contract: 'legacy/ERC1967Proxy',
-        address: content.data.to,
-        function: '__getImplementation',
-        args: []
-      ).first
+    elsif content['op'] == 'call'
+      to_address = calculate_to_address(data['to'])
+      
+      implementation_address = Rails.cache.fetch([to_address, '__getImplementation'], expires_in: 10.seconds) do
+        TransactionHelper.static_call(
+          contract: 'legacy/ERC1967Proxy',
+          address: to_address,
+          function: '__getImplementation',
+          args: []
+        )
+      end
       
       contract_name = local_from_predeploy(implementation_address)
-      args = convert_args(contract_name, data.function, data.args)
-      # binding.pry
+      args = convert_args(contract_name, data['function'], data['args'])
+      
       TransactionHelper.get_function_calldata(
         contract: contract_name,
-        function: data.function,
+        function: data['function'],
         args: args
       )
     else
-      raise "Unsupported operation: #{content.op}"
+      raise "Unsupported operation: #{content['op']}"
     end
+  rescue FunctionMissing, InvalidArgValue => e
+    data['args'].to_json.bytes_to_hex
+  rescue ContractMissing => e
+    data['to']
   rescue KeyError => e
     ap content
     binding.irb
     raise
+  rescue => e
+    binding.irb
+    raise
   end
   
-  def self.convert_args(contract, function_name, args_hash)
+  def facet_tx_to
+    return if parsed_content['op'] == 'create'
+    calculate_to_address(parsed_content['data']['to'])
+  rescue ContractMissing => e
+    "0x00000000000000000000000000000000000000c5"
+  end
+  
+  def calculate_to_address(legacy_to)
+    deploy_receipt = FacetTransactionReceipt.find_by(legacy_contract_address: legacy_to)
+    
+    unless deploy_receipt
+      raise ContractMissing, "Contract #{legacy_to} not found"
+    end
+    
+    deploy_receipt.contract_address
+  end
+  
+  def self.t
+    no_ar_logging; EthBlock.delete_all; reload!; 50.times{EthBlockImporter.import_next_block;}
+  end
+  
+  def convert_args(contract, function_name, args)
     contract = EVMHelpers.compile_contract(contract)
     function = contract.functions.find { |f| f.name == function_name }
+    
+    unless function
+      raise FunctionMissing, "Function #{function_name} not found in #{contract}"
+    end
+    
     inputs = function.inputs
     
-    args = inputs.map do |input|
-      arg_name = input.name
-      arg_value = args_hash[arg_name]
-      
-      if input.type.starts_with?('uint') || input.type.starts_with?('int')
-        arg_value = Integer(arg_value, 10) if arg_value.is_a?(String)
+    args = [args] if args.is_a?(String) || args.is_a?(Integer)
+    
+    if args.is_a?(Hash)
+      args_hash = args.with_indifferent_access
+      args = inputs.map do |input|
+        args_hash[input.name]
       end
-      
+    end
+    
+    args = args&.each_with_index&.map do |arg_value, index|
+      input = inputs[index]
+      if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
+        arg_value = Integer(arg_value, 10)
+      end
       arg_value
+    end
+    
+    args
+  rescue ArgumentError => e
+    if e.message.include?("invalid value for Integer()")
+      raise InvalidArgValue, "Invalid value: #{e.message.split(':').last.strip}"
+    else
+      raise
     end
   end
   
@@ -101,7 +154,11 @@ class Ethscription < ApplicationRecord
       "0x897d289b77c8393783829489b9ab3255c0158064": "EtherBridgeV1",
       "0x137e368f782453e41f622fa8cf68296d04c84c88": "PublicMintERC20V1",
       "0x9dc4e7f596baf4227f919102a7f80523834edb02": "AirdropERC20V1",
-      "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d": "EthscriptionERC20BridgeV1"
+      "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d": "EthscriptionERC20BridgeV1",
+      "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139": "NameRegistryV1",
+      # 0xcbff88cc1073c72fd05f3ab524c4560460977121e926178325ee6d38233b767f
+      # "0x0ad9c442bd4eb506447f125b7e71b64e33583e7f": "FacetSwapV1Factory",
+      "0x00000000000000000000000000000000000000c5": "NonExistentContractShim"
     }.with_indifferent_access
   end
   
@@ -113,8 +170,9 @@ class Ethscription < ApplicationRecord
   
   def self.get_code(address)
     local = local_from_predeploy(address)
-    code = EVMHelpers.compile_contract(local)
-    code.bin
+    contract = EVMHelpers.compile_contract(local)
+    raise unless contract.parent.bin_runtime
+    contract.parent.bin_runtime
   end
   
   def self.generate_alloc_for_genesis
@@ -127,6 +185,20 @@ class Ethscription < ApplicationRecord
         }
       ]
     end.to_h
+  end
+  
+  def self.write_alloc_to_genesis
+    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
+    genesis_path = File.join(geth_dir, 'facet-chain', 'genesis3.json')
+
+    # Read the existing genesis.json file
+    genesis_data = JSON.parse(File.read(genesis_path))
+
+    # Overwrite the "alloc" key with the new allocation
+    genesis_data['alloc'] = generate_alloc_for_genesis
+
+    # Write the updated data back to the genesis.json file
+    File.write(genesis_path, JSON.pretty_generate(genesis_data))
   end
   
   def self.sample_content

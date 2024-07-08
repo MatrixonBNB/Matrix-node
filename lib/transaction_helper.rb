@@ -16,7 +16,7 @@ module TransactionHelper
     contract_object = get_contract(contract, address)
     
     function_obj = contract_object.parent.function_hash[function]
-    data = function_obj.get_call_data(*args) rescue binding.pry
+    data = function_obj.get_call_data(*args) rescue binding.irb
     
     result = client.call("eth_call", [{
       to: address,
@@ -224,7 +224,7 @@ module TransactionHelper
       res = EthBlockImporter.import_block(block_by_number_response, trace_response)
       
       unless res.receipts_imported.map(&:status) == [1]
-        trace = GethClient.new('http://localhost:8545').call("debug_traceTransaction", [res.receipts_imported.last.transaction_hash, {
+        trace = GethDriver.non_auth_client.call("debug_traceTransaction", [res.receipts_imported.last.transaction_hash, {
           enableMemory: true,
           disableStack: false,
           disableStorage: false,
@@ -233,7 +233,7 @@ module TransactionHelper
           tracer: "callTracer"
         }])
         
-        trace = GethClient.new('http://localhost:8545').call("debug_traceBlockByNumber", ["0x" + res.receipts_imported.last.block_number.to_s(16), {
+        trace = GethDriver.non_auth_client.call("debug_traceBlockByNumber", ["0x" + res.receipts_imported.last.block_number.to_s(16), {
           enableMemory: true,
           disableStack: false,
           disableStorage: false,
@@ -262,7 +262,7 @@ module TransactionHelper
           end
         end
         
-        ap trace
+        # ap trace
       end
       
       expected = expect_failure ? [0] : [1]
@@ -273,14 +273,14 @@ module TransactionHelper
   end
   
   def trigger_contract_interaction(from:, payload:, expect_failure: false, block_timestamp: nil)
-    contract = TransactionHelper.contract_addresses.fetch(payload[:to]) rescue binding.pry
+    contract = TransactionHelper.contract_addresses.fetch(payload[:to]) rescue binding.irb
 
     contract = get_contract(contract, payload[:to])
     function = contract.functions.find { |f| f.name == payload[:data][:function] }
     args = convert_args(contract, payload[:data][:function], payload[:data][:args])
 
     # Get the call data for the function
-    call_data = function.get_call_data(*args) rescue binding.pry
+    call_data = function.get_call_data(*args) rescue binding.irb
 
     # Create and import the block
     res = create_and_import_block(
@@ -356,7 +356,7 @@ module TransactionHelper
   
   def make_static_call(contract:, function_name:, function_args: {})
     address = contract
-    contract = TransactionHelper.contract_addresses.fetch(contract) rescue binding.pry
+    contract = TransactionHelper.contract_addresses.fetch(contract) rescue binding.irb
 
     contract_object = get_contract(contract, address)
     args = convert_args(contract_object, function_name, function_args)
@@ -364,10 +364,10 @@ module TransactionHelper
     
     return unless res
     
-    if res.length == 1
-      res.is_a?(Hash) ? res.values.first : res.first
-    else
+    # if res.length == 1
+    #   res.is_a?(Hash) ? res.values.first : res.first
+    # else
       res
-    end
+    # end
   end
 end

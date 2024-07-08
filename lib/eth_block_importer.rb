@@ -167,6 +167,36 @@ module EthBlockImporter
       
       facet_txs, facet_receipts = propose_facet_block(eth_block, timestamp: timestamp)
       
+      unless in_v2?(eth_block.number)
+        legacy_block = LegacyEthBlock.reading { LegacyEthBlock.find_by!(block_number: eth_block.number) }
+        legacy_tx_receipts = LegacyEthBlock.reading { legacy_block.ethscriptions.includes(:legacy_facet_transaction_receipt).select{|e| e.legacy_facet_transaction_receipt.present?}.map(&:legacy_facet_transaction_receipt) }
+        
+        unless legacy_tx_receipts.size == facet_receipts.size
+          binding.irb
+          raise "Mismatched number of legacy and facet receipts"
+        end
+        
+        legacy_tx_receipts.each_with_index do |legacy_receipt, index|
+          facet_receipt = facet_receipts[index]
+          facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
+          
+          if legacy_receipt.status != facet_status
+            binding.irb
+            raise "Status mismatch: Legacy receipt status #{legacy_status} does not match Facet receipt status #{facet_status}"
+          end
+          
+          if legacy_receipt.created_contract_address != facet_receipts[index].legacy_contract_address
+            binding.irb
+            raise "Contract address mismatch"
+          end
+          
+          if legacy_receipt.logs.present? && facet_receipt.logs.blank?
+            binding.irb
+            raise "Log mismatch: Legacy receipt has logs but Facet receipt has none"
+          end
+        end
+      end
+      
       OpenStruct.new(
         block_number: block_number,
         transactions_imported: facet_txs,
@@ -224,18 +254,23 @@ module EthBlockImporter
 
   def facet_txs_from_ethscriptions_in_block(eth_block)
     legacy_block = LegacyEthBlock.reading { LegacyEthBlock.find_by!(block_number: eth_block.number) }
-    ethscriptions = LegacyEthBlock.reading { legacy_block.ethscriptions.includes(:legacy_facet_transaction_receipt) }
+    ethscriptions = LegacyEthBlock.reading { legacy_block.ethscriptions.includes(:legacy_facet_transaction_receipt).select{|e| e.legacy_facet_transaction_receipt.present?} }
     eth_txs = eth_block.eth_transactions
     
-    ethscriptions.map.with_index do |ethscription, idx|
+    ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
       eth_tx = eth_txs.detect { |tx| tx.tx_hash == ethscription.transaction_hash }
       facet_tx = FacetTransaction.from_eth_tx_and_ethscription(eth_tx, ethscription, idx)
       facet_tx.mint = 500.ether
       
-      ethscription.dup.save! if facet_tx
+      unless facet_tx.present?
+        binding.irb
+        raise
+      end
+      
+      ethscription.dup.save!
       
       facet_tx
-    end.compact
+    end
   end
   
   def facet_txs_from_eth_transactions_in_block(eth_block)
@@ -294,12 +329,17 @@ module EthBlockImporter
 
     facet_block.save!
     
+    receipts_data = geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']])
+    receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
+    
+    facet_txs_by_source_hash = facet_txs.index_by(&:source_hash)
+    
     receipts = []
     
     geth_block['transactions'].each do |tx|
-      receipt_details = geth_driver.client.call("eth_getTransactionReceipt", [tx['hash']])
-
-      facet_tx = facet_txs.detect { |facet_tx| facet_tx.source_hash == tx['sourceHash'] }
+      receipt_details = receipts_data_by_hash[tx['hash']]
+      
+      facet_tx = facet_txs_by_source_hash[tx['sourceHash']]
       raise unless facet_tx
 
       facet_tx.update!(

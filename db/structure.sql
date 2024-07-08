@@ -88,7 +88,7 @@ CREATE TABLE public.eth_blocks (
     receipts_root character varying NOT NULL,
     extra_data character varying NOT NULL,
     withdrawals_root character varying NOT NULL,
-    base_fee_per_gas bigint NOT NULL,
+    base_fee_per_gas bigint,
     nonce character varying NOT NULL,
     miner character varying NOT NULL,
     excess_blob_gas bigint,
@@ -293,6 +293,7 @@ CREATE TABLE public.facet_blocks (
     number bigint NOT NULL,
     block_hash character varying NOT NULL,
     eth_block_hash character varying NOT NULL,
+    eth_block_number character varying NOT NULL,
     base_fee_per_gas bigint NOT NULL,
     extra_data character varying NOT NULL,
     gas_limit bigint NOT NULL,
@@ -342,6 +343,7 @@ CREATE TABLE public.facet_transaction_receipts (
     block_hash character varying NOT NULL,
     block_number integer NOT NULL,
     contract_address character varying,
+    legacy_contract_address character varying,
     cumulative_gas_used bigint NOT NULL,
     deposit_nonce character varying NOT NULL,
     deposit_receipt_version character varying NOT NULL,
@@ -357,6 +359,8 @@ CREATE TABLE public.facet_transaction_receipts (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_038b99632c CHECK (((transaction_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
+    CONSTRAINT chk_rails_13f8317911 CHECK (((contract_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
+    CONSTRAINT chk_rails_737f1f7a0a CHECK (((legacy_contract_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
     CONSTRAINT chk_rails_9f12b65d79 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_b7acdadd3b CHECK (((from_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
     CONSTRAINT chk_rails_c81a92d38b CHECK (((to_address)::text ~ '^0x[a-f0-9]{40}$'::text))
@@ -566,6 +570,13 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: idx_on_block_number_transaction_index_c73dc27dfd; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_on_block_number_transaction_index_c73dc27dfd ON public.facet_transaction_receipts USING btree (block_number, transaction_index);
+
+
+--
 -- Name: index_eth_blocks_on_block_hash; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -668,6 +679,13 @@ CREATE UNIQUE INDEX index_facet_blocks_on_block_hash ON public.facet_blocks USIN
 --
 
 CREATE UNIQUE INDEX index_facet_blocks_on_eth_block_hash ON public.facet_blocks USING btree (eth_block_hash);
+
+
+--
+-- Name: index_facet_blocks_on_eth_block_number; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_facet_blocks_on_eth_block_number ON public.facet_blocks USING btree (eth_block_number);
 
 
 --

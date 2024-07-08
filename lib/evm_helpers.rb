@@ -16,7 +16,10 @@ module EVMHelpers
     contract_compiled = SolidityCompiler.compile(contract_file)
     contract_bytecode = contract_compiled[contract_name]['bytecode']
     contract_abi = contract_compiled[contract_name]['abi']
+    contract_bin_runtime = contract_compiled[contract_name]['bin_runtime']
     contract = Eth::Contract.from_bin(name: contract_name, bin: contract_bytecode, abi: contract_abi)
+    contract.parent.bin_runtime = contract_bin_runtime
+    contract
   end
   
   def proxy_and_implementation_deploy_data(

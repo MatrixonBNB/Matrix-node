@@ -118,7 +118,7 @@ RSpec.describe "Uniswap" do
         args: [from_address, router_address]
       )
       
-      expect(result.first).to eq(mint_amount)
+      expect(result).to eq(mint_amount)
       
       result = static_call(
         contract: 'contracts/MyToken',
@@ -127,7 +127,7 @@ RSpec.describe "Uniswap" do
         args: [from_address, router_address]
       )
       
-      expect(result.first).to eq(mint_amount)
+      expect(result).to eq(mint_amount)
       
       result = static_call(
         contract: 'contracts/MyToken',
@@ -136,7 +136,7 @@ RSpec.describe "Uniswap" do
         args: [from_address]
       )
       
-      expect(result.first).to eq(mint_amount)
+      expect(result).to eq(mint_amount)
       
       result = static_call(
         contract: 'contracts/MyToken',
@@ -145,7 +145,7 @@ RSpec.describe "Uniswap" do
         args: [from_address]
       )
       
-      expect(result.first).to eq(mint_amount)
+      expect(result).to eq(mint_amount)
       
       res = call_contract_function(
         contract: 'uniswap-v2/contracts/UniswapV2Router02',

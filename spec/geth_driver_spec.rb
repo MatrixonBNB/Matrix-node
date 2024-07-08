@@ -75,7 +75,7 @@ RSpec.describe GethDriver do
         data: data
       }, "latest"])
       
-      expect(function.parse_result(result).first).to eq(initial_count)
+      expect(function.parse_result(result)).to eq(initial_count)
       
       function = contract.parent.function_hash['increment']
       
@@ -112,7 +112,7 @@ RSpec.describe GethDriver do
         data: data
       }, "latest"])
       # binding.pry
-      expect(function.parse_result(result).first).to eq(initial_count + 1)
+      expect(function.parse_result(result)).to eq(initial_count + 1)
     end
     
     it 'creates a block with the correct properties and verifies the deposit transaction' do

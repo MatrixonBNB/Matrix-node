@@ -8,7 +8,7 @@ class CreateEthBlocks < ActiveRecord::Migration[7.1]
       t.string :receipts_root, null: false
       t.string :extra_data, null: false
       t.string :withdrawals_root, null: false
-      t.bigint :base_fee_per_gas, null: false
+      t.bigint :base_fee_per_gas#, null: false
       t.string :nonce, null: false
       t.string :miner, null: false
       t.bigint :excess_blob_gas#, null: false
