@@ -95,7 +95,7 @@ class SolidityCompiler
     version = version_match[1]
 
     # Set the Solidity version using solc-select
-    system("solc-select use #{version}")
+    system("solc-select use #{version} --always-install")
     
     legacy_solidity = version.split('.').last(2).join('.').to_f < 8.17
     
