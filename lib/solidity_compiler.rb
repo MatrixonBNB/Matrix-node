@@ -118,7 +118,7 @@ class SolidityCompiler
     solc_args += [file_path.to_s]
 
     # Compile with optimizer settings
-    stdout, stderr, status = Open3.capture3(*solc_args) rescue binding.pry
+    stdout, stderr, status = Open3.capture3(*solc_args)
     raise "Error running solc: #{stderr}" unless status.success?
   
     # Parse the JSON output
