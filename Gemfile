@@ -1,9 +1,10 @@
 source "https://rubygems.org"
 
 ruby "3.3.3"
+gem 'net-pop', github: 'ruby/net-pop'
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 7.1.3", ">= 7.1.3.3"
+gem "rails", "7.1.3.4"
 
 # The original asset pipeline for Rails [https://github.com/rails/sprockets-rails]
 gem "sprockets-rails"
@@ -25,6 +26,8 @@ gem "stimulus-rails"
 
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
+
+gem 'bundler', '2.5.14'
 
 # Use Redis adapter to run Action Cable in production
 # gem "redis", ">= 4.0.1"
@@ -75,7 +78,7 @@ gem "rspec-rails", "~> 6.1"
 
 gem "awesome_print", "~> 1.9"
 
-gem "eth", git: "https://github.com/RogerPodacter/eth.rb", branch: "main"
+gem "eth"
 
 gem "dotenv-rails", "~> 3.1", :group => [:development, :test]
 
