@@ -116,6 +116,8 @@ class SolidityCompiler
     end
     
     solc_args += [file_path.to_s]
+    
+    Rails.logger.info("Running solc with arguments: #{solc_args.join(' ')}")
 
     # Compile with optimizer settings
     stdout, stderr, status = Open3.capture3(*solc_args)

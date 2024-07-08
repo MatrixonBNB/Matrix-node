@@ -11,7 +11,7 @@ import "solady/src/utils/ECDSA.sol";
 import "./Pausable.sol";
 import "./FacetERC20.sol";
 import "./FacetERC721.sol";
-import "../contracts/console.sol";
+import "../contracts/Console.sol";
 
 contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712 {
     using LibString for *;
