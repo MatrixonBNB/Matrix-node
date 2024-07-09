@@ -37,4 +37,19 @@ class EthTransaction < ApplicationRecord
       )
     end
   end
+  
+  def self.from_ethscription(ethscription)
+    EthTransaction.new(
+      block_hash: ethscription.block_blockhash,
+      block_number: ethscription.block_number,
+      tx_hash: ethscription.transaction_hash,
+      transaction_index: ethscription.transaction_index,
+      from_address: ethscription.creator,
+      to_address: ethscription.initial_owner,
+      input: ethscription.content_uri,
+      gas_price: ethscription.gas_price,
+      gas: ethscription.gas_used,
+      value: ethscription.transaction_fee,
+    )
+  end
 end

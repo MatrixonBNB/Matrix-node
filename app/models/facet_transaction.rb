@@ -9,13 +9,10 @@ class FacetTransaction < ApplicationRecord
   attr_accessor :chain_id, :eth_call
   
   FACET_TX_TYPE = 0x0F
-  FACET_CHAIN_ID = 0xface7
+  FACET_CHAIN_ID = 1
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
   
-  def self.from_eth_tx_and_ethscription(eth_tx, ethscription, idx)
-    legacy_receipt = ethscription.legacy_facet_transaction_receipt
-    return unless legacy_receipt
-    
+  def self.from_eth_tx_and_ethscription(ethscription, idx, legacy_receipt)
     tx = new
     tx.chain_id = FACET_CHAIN_ID
     tx.to_address = ethscription.facet_tx_to
@@ -24,7 +21,6 @@ class FacetTransaction < ApplicationRecord
     tx.gas_limit = 100e6.to_i
     tx.input = ethscription.facet_tx_input
     
-    tx.eth_transaction = eth_tx
     tx.eth_transaction_hash = ethscription.transaction_hash
     tx.eth_call_index = idx
     tx.from_address = legacy_receipt.from_address
@@ -32,7 +28,7 @@ class FacetTransaction < ApplicationRecord
       call_index: idx
     )
     
-    tx.source_hash = FacetTransaction.compute_source_hash(tx.eth_transaction, tx.eth_call)
+    tx.source_hash = FacetTransaction.compute_source_hash(ethscription, tx.eth_call)
     
     tx
   end
@@ -146,5 +142,9 @@ class FacetTransaction < ApplicationRecord
     else
       raise InvalidAddress, "Invalid address #{str}!"
     end
+  end
+  
+  def trace
+    GethDriver.trace_transaction(tx_hash)
   end
 end

@@ -4,7 +4,7 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       t.bigint :number, null: false
       t.string :block_hash, null: false
       t.string :eth_block_hash, null: false
-      t.string :eth_block_number, null: false
+      t.integer :eth_block_number, null: false
       t.bigint :base_fee_per_gas, null: false
       t.string :extra_data, null: false
       t.bigint :gas_limit, null: false

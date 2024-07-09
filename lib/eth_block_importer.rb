@@ -50,6 +50,12 @@ module EthBlockImporter
   end
   
   def import_blocks_until_done
+    SolidityCompiler.reset_checksum
+    
+    unless in_v2?(next_block_to_import)
+      return EthscriptionsImporter.import_blocks_until_done
+    end
+    
     loop do
       begin
         block_numbers = next_blocks_to_import(import_batch_size)
@@ -167,36 +173,6 @@ module EthBlockImporter
       
       facet_txs, facet_receipts = propose_facet_block(eth_block, timestamp: timestamp)
       
-      unless in_v2?(eth_block.number)
-        legacy_block = LegacyEthBlock.reading { LegacyEthBlock.find_by!(block_number: eth_block.number) }
-        legacy_tx_receipts = LegacyEthBlock.reading { legacy_block.ethscriptions.includes(:legacy_facet_transaction_receipt).select{|e| e.legacy_facet_transaction_receipt.present?}.map(&:legacy_facet_transaction_receipt) }
-        
-        unless legacy_tx_receipts.size == facet_receipts.size
-          binding.irb
-          raise "Mismatched number of legacy and facet receipts"
-        end
-        
-        legacy_tx_receipts.each_with_index do |legacy_receipt, index|
-          facet_receipt = facet_receipts[index]
-          facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
-          
-          if legacy_receipt.status != facet_status
-            binding.irb
-            raise "Status mismatch: Legacy receipt status #{legacy_status} does not match Facet receipt status #{facet_status}"
-          end
-          
-          if legacy_receipt.created_contract_address != facet_receipts[index].legacy_contract_address
-            binding.irb
-            raise "Contract address mismatch"
-          end
-          
-          if legacy_receipt.logs.present? && facet_receipt.logs.blank?
-            binding.irb
-            raise "Log mismatch: Legacy receipt has logs but Facet receipt has none"
-          end
-        end
-      end
-      
       OpenStruct.new(
         block_number: block_number,
         transactions_imported: facet_txs,
@@ -252,27 +228,6 @@ module EthBlockImporter
     (start_block...(start_block + n)).to_a
   end
 
-  def facet_txs_from_ethscriptions_in_block(eth_block)
-    legacy_block = LegacyEthBlock.reading { LegacyEthBlock.find_by!(block_number: eth_block.number) }
-    ethscriptions = LegacyEthBlock.reading { legacy_block.ethscriptions.includes(:legacy_facet_transaction_receipt).select{|e| e.legacy_facet_transaction_receipt.present?} }
-    eth_txs = eth_block.eth_transactions
-    
-    ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
-      eth_tx = eth_txs.detect { |tx| tx.tx_hash == ethscription.transaction_hash }
-      facet_tx = FacetTransaction.from_eth_tx_and_ethscription(eth_tx, ethscription, idx)
-      facet_tx.mint = 500.ether
-      
-      unless facet_tx.present?
-        binding.irb
-        raise
-      end
-      
-      ethscription.dup.save!
-      
-      facet_tx
-    end
-  end
-  
   def facet_txs_from_eth_transactions_in_block(eth_block)
     facet_txs = eth_block.eth_transactions.includes(:eth_calls).map do |tx|
       tx.eth_calls.map do |call|
@@ -310,11 +265,7 @@ module EthBlockImporter
     
     facet_block = FacetBlock.from_eth_block(eth_block, timestamp: timestamp)
     
-    facet_txs = if in_v2?(eth_block.number)
-      facet_txs_from_eth_transactions_in_block(eth_block)
-    else
-      facet_txs_from_ethscriptions_in_block(eth_block)
-    end
+    facet_txs = facet_txs_from_eth_transactions_in_block(eth_block)
         
     payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
     
@@ -382,6 +333,6 @@ module EthBlockImporter
   end
   
   def facet_chain_id
-    0xface7
+    FacetTransaction::FACET_CHAIN_ID
   end
 end

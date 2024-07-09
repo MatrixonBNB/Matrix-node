@@ -1,4 +1,9 @@
 class Ethscription < ApplicationRecord
+  include Memery
+  class << self
+    include Memery
+  end
+  
   class FunctionMissing < StandardError; end
   class InvalidArgValue < StandardError; end
   class ContractMissing < StandardError; end
@@ -15,6 +20,10 @@ class Ethscription < ApplicationRecord
   
   def content
     content_uri[/.*?,(.*)/, 1]
+  end
+  
+  def block_hash
+    block_blockhash
   end
   
   def parsed_content
@@ -37,6 +46,10 @@ class Ethscription < ApplicationRecord
     mimetype == self.class.transaction_mimetype
   end
   
+  def contract_transaction?
+    valid_mimetype? && valid_to? && processing_state == 'success'
+  end
+  
   def facet_tx_input
     content = parsed_content
     data = content['data']
@@ -57,7 +70,7 @@ class Ethscription < ApplicationRecord
         'legacy/ERC1967Proxy', [predeploy_address, initialize_calldata]
       )
     elsif content['op'] == 'call'
-      to_address = calculate_to_address(data['to'])
+      to_address = calculate_to_address(data['to'], block_number)
       
       implementation_address = Rails.cache.fetch([to_address, '__getImplementation'], expires_in: 10.seconds) do
         TransactionHelper.static_call(
@@ -94,20 +107,24 @@ class Ethscription < ApplicationRecord
   
   def facet_tx_to
     return if parsed_content['op'] == 'create'
-    calculate_to_address(parsed_content['data']['to'])
+    calculate_to_address(parsed_content['data']['to'], block_number)
   rescue ContractMissing => e
     "0x00000000000000000000000000000000000000c5"
   end
   
-  def calculate_to_address(legacy_to)
-    deploy_receipt = FacetTransactionReceipt.find_by(legacy_contract_address: legacy_to)
-    
-    unless deploy_receipt
-      raise ContractMissing, "Contract #{legacy_to} not found"
+  class << self
+    def calculate_to_address(legacy_to, block_number)
+      deploy_receipt = FacetTransactionReceipt.find_by(legacy_contract_address: legacy_to)
+      
+      unless deploy_receipt
+        raise ContractMissing, "Contract #{legacy_to} not found"
+      end
+      
+      deploy_receipt.contract_address
     end
-    
-    deploy_receipt.contract_address
+    memoize :calculate_to_address
   end
+  delegate :calculate_to_address, to: :class
   
   def self.t
     no_ar_logging; EthBlock.delete_all; reload!; 50.times{EthBlockImporter.import_next_block;}
@@ -132,13 +149,7 @@ class Ethscription < ApplicationRecord
       end
     end
     
-    args = args&.each_with_index&.map do |arg_value, index|
-      input = inputs[index]
-      if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
-        arg_value = Integer(arg_value, 10)
-      end
-      arg_value
-    end
+    args = normalize_args(args, inputs)
     
     args
   rescue ArgumentError => e
@@ -149,6 +160,25 @@ class Ethscription < ApplicationRecord
     end
   end
   
+  def normalize_args(args, inputs)
+    args&.each_with_index&.map do |arg_value, idx|
+      input = inputs[idx]
+      normalize_arg_value(arg_value, input)
+    end
+  end
+
+  def normalize_arg_value(arg_value, input)
+    if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
+      Integer(arg_value, 10)
+    elsif arg_value.is_a?(Array)
+      arg_value.map do |val|
+        normalize_arg_value(val, input)
+      end
+    else
+      arg_value
+    end
+  end
+  
   def self.predeploy_to_local_map
     {
       "0x897d289b77c8393783829489b9ab3255c0158064": "EtherBridgeV1",
@@ -156,8 +186,8 @@ class Ethscription < ApplicationRecord
       "0x9dc4e7f596baf4227f919102a7f80523834edb02": "AirdropERC20V1",
       "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d": "EthscriptionERC20BridgeV1",
       "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139": "NameRegistryV1",
-      # 0xcbff88cc1073c72fd05f3ab524c4560460977121e926178325ee6d38233b767f
-      # "0x0ad9c442bd4eb506447f125b7e71b64e33583e7f": "FacetSwapV1Factory",
+      "0x0ad9c442bd4eb506447f125b7e71b64e33583e7f": "FacetSwapFactoryV1",
+      "0x1f157ea244a08dd78c14ba8faa7280559232b099": "FacetSwapRouterV1",
       "0x00000000000000000000000000000000000000c5": "NonExistentContractShim"
     }.with_indifferent_access
   end
@@ -188,6 +218,8 @@ class Ethscription < ApplicationRecord
   end
   
   def self.write_alloc_to_genesis
+    SolidityCompiler.reset_checksum
+    
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
     genesis_path = File.join(geth_dir, 'facet-chain', 'genesis3.json')
 

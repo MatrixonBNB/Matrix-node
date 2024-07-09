@@ -27,9 +27,7 @@ module EthRbExtensions
     def get_call_data(*args)
       types = inputs.map(&:parsed_type)
       
-      args = args.map do |arg|
-        arg.is_a?(String) && arg.starts_with?("0x") ? arg.hex_to_bytes : arg
-      end
+      args = normalize_args(args, inputs)
       
       encoded_str = Eth::Util.bin_to_hex(Eth::Abi.encode(types, args))
       
@@ -37,6 +35,25 @@ module EthRbExtensions
         encoded_str
       else
         Eth::Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
+      end
+    rescue => e
+      binding.irb
+    end
+    
+    def normalize_args(args, inputs)
+      args.each_with_index.map do |arg, idx|
+        input = inputs[idx]
+        normalize_arg_value(arg, input)
+      end
+    end
+    
+    def normalize_arg_value(arg_value, input)
+      if arg_value.is_a?(String) && arg_value.starts_with?("0x") && !input.type.starts_with?('string')
+        arg_value.hex_to_bytes
+      elsif arg_value.is_a?(Array)
+        arg_value.map { |val| normalize_arg_value(val, input) }
+      else
+        arg_value
       end
     end
 

@@ -422,7 +422,7 @@ RSpec.describe "Name Registry" do
     
     deadline = Time.current.to_i + 1000
     
-    chainid = 0xface7
+    chainid = FacetTransaction::FACET_CHAIN_ID
     
     data = {
       types: types,

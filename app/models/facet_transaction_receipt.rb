@@ -8,6 +8,10 @@ class FacetTransactionReceipt < ApplicationRecord
     self.legacy_contract_address = calculate_legacy_contract_address
   end
   
+  def trace
+    GethDriver.trace_transaction(transaction_hash)
+  end
+  
   def decoded_legacy_logs
     logs.map do |log|
       implementation_address = TransactionHelper.static_call(

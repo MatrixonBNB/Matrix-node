@@ -7,12 +7,12 @@ RSpec.describe "Uniswap" do
   
   # \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json
   
-  # ./build/bin/geth --datadir ./datadir --networkid 1027303 --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
+  # ./build/bin/geth --datadir ./datadir --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
   
   
-  # \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --networkid 1027303 --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
+  # \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
   
-  # make geth && \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --networkid 1027303 --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
+  # make geth && \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
   
   describe 'block and deposit transaction' do
     it "deploys uniswap" do

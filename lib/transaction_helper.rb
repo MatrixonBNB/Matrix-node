@@ -135,7 +135,7 @@ module TransactionHelper
     gas_limit: 10_000_000,
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
-    chain_id: 0xface7,
+    chain_id: FacetTransaction::FACET_CHAIN_ID,
     expect_failure: false
   )
     ActiveRecord::Base.transaction do

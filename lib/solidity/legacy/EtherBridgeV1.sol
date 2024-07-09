@@ -2,9 +2,10 @@
 pragma solidity 0.8.26;
 
 import "./Upgradeable.sol";
+import "solady/src/utils/Initializable.sol";
 import "./FacetERC20.sol";
 
-contract EtherBridgeV1 is FacetERC20, Upgradeable {
+contract EtherBridgeV1 is FacetERC20, Initializable, Upgradeable {
     struct BridgeStorage {
         address trustedSmartContract;
         mapping(bytes32 => uint256) withdrawalIdAmount;

@@ -8,12 +8,13 @@ import "solady/src/utils/Base64.sol";
 import "solady/src/utils/LibString.sol";
 import "solady/src/utils/EIP712.sol";
 import "solady/src/utils/ECDSA.sol";
+import "./Upgradeable.sol";
 import "./Pausable.sol";
 import "./FacetERC20.sol";
 import "./FacetERC721.sol";
 import "../contracts/Console.sol";
 
-contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712 {
+contract NameRegistryV1 is FacetERC721, Upgradeable, Initializable, Ownable, Pausable, EIP712 {
     using LibString for *;
     using SafeTransferLib for address;
     using ECDSA for bytes32;
@@ -114,11 +115,12 @@ contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712
         string memory cardTemplate,
         address _WETH
     ) public initializer {
-        require(charCountToUsdWeiCentsPrice.length >= 4, "Must have at least 4 price points");
-        require(charCountToUsdWeiCentsPrice.length <= 10, "Must have at most 10 price points");
+        require(charCountToUsdWeiCentsPrice.length >= 4);
+        require(charCountToUsdWeiCentsPrice.length <= 10);
         _initializeERC721(name, symbol);
         _initializeOwner(owner);
         _initializePausable(true);
+        _initializeUpgradeAdmin(msg.sender);
         s().WETH = _WETH;
         s().usdWeiCentsInOneEth = usdWeiCentsInOneEth;
         s().charCountToUsdWeiCentsPrice = charCountToUsdWeiCentsPrice;
@@ -126,6 +128,7 @@ contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712
         s().gracePeriod = 90 days;
         s().minRegistrationDuration = 28 days;
         s().nextTokenId = 1;
+        s().nextStickerId = 1;
         s().maxImportBatchSize = 10;
         
         s().maxStickersPerUser = 25;
@@ -134,13 +137,13 @@ contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712
         s().bioMaxLength = 1000;
         s().displayNameMaxLength = 100;
         s().uriMaxLength = 96000;
-        require(bytes(cardTemplate).length <= s().uriMaxLength, "cardTemplate too long");
+        require(bytes(cardTemplate).length <= s().uriMaxLength, "c");
         s().cardTemplate = cardTemplate;
     }
 
     function registerNameWithPayment(address to, string memory name, uint256 durationInSeconds) public whenNotPaused {
-        require(s().preregistrationComplete, "Preregistration must be complete");
-        require(durationInSeconds >= s().minRegistrationDuration, "Duration too short");
+        require(s().preregistrationComplete, "P");
+        require(durationInSeconds >= s().minRegistrationDuration, "D");
         _registerName(to, name, durationInSeconds);
         
         // Update user's primary name token ID if necessary
@@ -405,10 +408,10 @@ contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712
     }
     
     function createSticker(string memory name, string memory description, string memory imageURI, uint256 stickerExpiry, address grantingAddress) public whenNotPaused {
-        require(bytes(name).length > 0, "Name must be non-empty");
-        require(bytes(name).length <= s().displayNameMaxLength, "Name too long");
-        require(bytes(description).length <= s().bioMaxLength, "Description too long");
-        require(bytes(imageURI).length <= s().uriMaxLength, "ImageURI too long");
+        require(bytes(name).length > 0, "NNE");
+        require(bytes(name).length <= s().displayNameMaxLength, "NTL");
+        require(bytes(description).length <= s().bioMaxLength, "DTL");
+        require(bytes(imageURI).length <= s().uriMaxLength, "ITL");
         require(grantingAddress != address(0), "Granting address must be non-zero");
 
         uint256 currentId = s().nextStickerId;
@@ -429,7 +432,10 @@ contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712
         require(!user.stickerIdsAwardedMap[stickerId], "Sticker already awarded");
         require(user.stickerAry.length < s().maxStickersPerUser, "Too many stickers");
         require(deadline > block.timestamp, "Deadline passed");
-        require(s().stickers[stickerId].expiry > block.timestamp, "Sticker expired");
+        require(
+            s().stickers[stickerId].expiry > block.timestamp,
+            "Sticker expired"
+        );
 
         bytes32 hashedMessage = _hashTypedData(keccak256(abi.encode(
             keccak256("StickerClaim(uint256 stickerId,address claimer,uint256 deadline)"),
@@ -439,7 +445,10 @@ contract NameRegistryV1 is FacetERC721, Initializable, Ownable, Pausable, EIP712
         )));
         
         address signer = hashedMessage.recoverCalldata(signature);
-        require(signer == s().stickers[stickerId].signer, "Invalid signature");
+        require(
+            signer == s().stickers[stickerId].signer,
+            "Invalid signature"
+        );
 
         user.stickerIdsAwardedMap[stickerId] = true;
         user.stickerAry.push(stickerId);

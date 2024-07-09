@@ -15,6 +15,18 @@ class SolidityCompiler
     @current_contract = nil
   end
 
+  def self.register_reloader_hook
+    ActiveSupport::Reloader.to_prepare do
+      SolidityCompiler.reset_checksum
+    end
+    @reloader_hook_registered = true
+  end
+  
+  def self.reset_checksum
+    Rails.cache.clear
+    @checksum = nil
+  end
+  
   class << self
     include Memery
 
@@ -30,10 +42,18 @@ class SolidityCompiler
         memoized_compile(filename_or_solidity_code, checksum)
       end
     end
-
-    private
     
     def directory_checksum(*directories)
+      register_reloader_hook unless @reloader_hook_registered
+      
+      if ENV['LISTEN_FOR_SOLIDITY_CHANGES']
+        calculate_checksum(directories)
+      else
+        @checksum ||= calculate_checksum(directories)
+      end
+    end
+  
+    def calculate_checksum(directories)
       files = directories.flat_map { |directory| Dir.glob("#{directory}/**/*.sol").select { |f| File.file?(f) } }
       digest = Digest::SHA256.new
       files.each do |file|
@@ -117,7 +137,7 @@ class SolidityCompiler
     
     solc_args += [file_path.to_s]
     
-    Rails.logger.info("Running solc with arguments: #{solc_args.join(' ')}")
+    # Rails.logger.info("Running solc with arguments: #{solc_args.join(' ')}")
 
     # Compile with optimizer settings
     stdout, stderr, status = Open3.capture3(*solc_args)

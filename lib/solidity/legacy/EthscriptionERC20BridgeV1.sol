@@ -3,9 +3,10 @@ pragma solidity 0.8.26;
 
 import "./FacetERC20.sol";
 import "./Upgradeable.sol";
+import "solady/src/utils/Initializable.sol";
 import "solady/src/auth/Ownable.sol";
 
-contract EthscriptionERC20BridgeV1 is FacetERC20, Upgradeable, Ownable {
+contract EthscriptionERC20BridgeV1 is FacetERC20, Initializable, Upgradeable, Ownable {
     struct EthscriptionERC20BridgeStorage {
         uint256 mintAmount;
         address trustedSmartContract;

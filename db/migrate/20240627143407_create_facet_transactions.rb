@@ -24,6 +24,7 @@ class CreateFacetTransactions < ActiveRecord::Migration[7.1]
       t.numeric :value, precision: 78, scale: 0, null: false
       t.numeric :max_fee_per_gas, precision: 78, scale: 0#, null: false
       
+      t.check_constraint "source_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "tx_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "eth_transaction_hash ~ '^0x[a-f0-9]{64}$'"
@@ -33,6 +34,7 @@ class CreateFacetTransactions < ActiveRecord::Migration[7.1]
       t.timestamps
     end
 
+    add_index :facet_transactions, :source_hash, unique: true
     add_index :facet_transactions, :block_hash
     add_index :facet_transactions, [:block_hash, :eth_call_index], unique: true
     add_index :facet_transactions, :block_number

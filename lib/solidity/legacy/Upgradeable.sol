@@ -2,9 +2,8 @@
 pragma solidity 0.8.26;
 
 import "solady/src/utils/UUPSUpgradeable.sol";
-import "solady/src/utils/Initializable.sol";
 
-abstract contract Upgradeable is UUPSUpgradeable, Initializable {
+abstract contract Upgradeable is UUPSUpgradeable {
     struct UpgradeStorage {
         address upgradeAdmin;
     }
@@ -21,12 +20,11 @@ abstract contract Upgradeable is UUPSUpgradeable, Initializable {
 
     function setUpgradeAdmin(address newUpgradeAdmin) external {
         require(msg.sender == _upgradeStorage().upgradeAdmin, "NOT_AUTHORIZED");
-        require(newUpgradeAdmin != address(0), "New admin address cannot be zero");
         _upgradeStorage().upgradeAdmin = newUpgradeAdmin;
         emit UpgradeAdminChanged(newUpgradeAdmin);
     }
     
-    function _initializeUpgradeAdmin(address newUpgradeAdmin) internal onlyInitializing {
+    function _initializeUpgradeAdmin(address newUpgradeAdmin) internal {
         require(_upgradeStorage().upgradeAdmin == address(0), "Upgrade admin already set");
         _upgradeStorage().upgradeAdmin = newUpgradeAdmin;
         emit UpgradeAdminChanged(newUpgradeAdmin);

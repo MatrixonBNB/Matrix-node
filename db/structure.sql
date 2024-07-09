@@ -27,22 +27,6 @@ CREATE FUNCTION public.check_eth_block_order() RETURNS trigger
 
 
 --
--- Name: check_ethscription_order(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.check_ethscription_order() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-        BEGIN
-          IF NEW.block_number < (SELECT MAX(block_number) FROM ethscriptions) OR (NEW.block_number = (SELECT MAX(block_number) FROM ethscriptions) AND NEW.transaction_index <= (SELECT MAX(transaction_index) FROM ethscriptions WHERE block_number = NEW.block_number)) THEN
-            RAISE EXCEPTION 'New ethscription must be later in order';
-          END IF;
-          RETURN NEW;
-        END;
-        $$;
-
-
---
 -- Name: check_facet_block_order(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -83,23 +67,23 @@ CREATE TABLE public.eth_blocks (
     id bigint NOT NULL,
     number bigint NOT NULL,
     block_hash character varying NOT NULL,
-    logs_bloom text NOT NULL,
+    logs_bloom text,
     total_difficulty numeric(78,0),
-    receipts_root character varying NOT NULL,
-    extra_data character varying NOT NULL,
-    withdrawals_root character varying NOT NULL,
+    receipts_root character varying,
+    extra_data character varying,
+    withdrawals_root character varying,
     base_fee_per_gas bigint,
-    nonce character varying NOT NULL,
-    miner character varying NOT NULL,
+    nonce character varying,
+    miner character varying,
     excess_blob_gas bigint,
-    difficulty bigint NOT NULL,
-    gas_limit bigint NOT NULL,
-    gas_used bigint NOT NULL,
-    parent_beacon_block_root character varying,
-    size integer NOT NULL,
-    transactions_root character varying NOT NULL,
-    state_root character varying NOT NULL,
-    mix_hash character varying NOT NULL,
+    difficulty bigint,
+    gas_limit bigint,
+    gas_used bigint,
+    parent_beacon_block_root character varying NOT NULL,
+    size integer,
+    transactions_root character varying,
+    state_root character varying,
+    mix_hash character varying,
     parent_hash character varying NOT NULL,
     blob_gas_used bigint,
     "timestamp" bigint NOT NULL,
@@ -190,17 +174,17 @@ CREATE TABLE public.eth_transactions (
     tx_hash character varying NOT NULL,
     y_parity integer,
     access_list jsonb,
-    transaction_index integer NOT NULL,
-    tx_type integer NOT NULL,
-    nonce integer NOT NULL,
-    input text NOT NULL,
-    r character varying NOT NULL,
-    s character varying NOT NULL,
+    transaction_index integer,
+    tx_type integer,
+    nonce integer,
+    input text,
+    r character varying,
+    s character varying,
     chain_id integer,
-    v integer NOT NULL,
-    gas bigint NOT NULL,
+    v integer,
+    gas bigint,
     max_priority_fee_per_gas numeric(78,0),
-    from_address character varying NOT NULL,
+    from_address character varying,
     to_address character varying,
     max_fee_per_gas numeric(78,0),
     value numeric(78,0) NOT NULL,
@@ -414,6 +398,7 @@ CREATE TABLE public.facet_transactions (
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_12c02c54dd CHECK (((tx_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_449a99a608 CHECK (((eth_transaction_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
+    CONSTRAINT chk_rails_5c5b932304 CHECK (((source_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_5c8a2c3595 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_a85c151836 CHECK (((to_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
     CONSTRAINT chk_rails_d9f50b7f8a CHECK (((from_address)::text ~ '^0x[a-f0-9]{40}$'::text))
@@ -745,6 +730,13 @@ CREATE INDEX index_facet_transactions_on_eth_transaction_hash ON public.facet_tr
 
 
 --
+-- Name: index_facet_transactions_on_source_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_facet_transactions_on_source_hash ON public.facet_transactions USING btree (source_hash);
+
+
+--
 -- Name: index_facet_transactions_on_tx_hash; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -756,13 +748,6 @@ CREATE UNIQUE INDEX index_facet_transactions_on_tx_hash ON public.facet_transact
 --
 
 CREATE TRIGGER trigger_check_eth_block_order BEFORE INSERT ON public.eth_blocks FOR EACH ROW EXECUTE FUNCTION public.check_eth_block_order();
-
-
---
--- Name: ethscriptions trigger_check_ethscription_order; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER trigger_check_ethscription_order BEFORE INSERT ON public.ethscriptions FOR EACH ROW EXECUTE FUNCTION public.check_ethscription_order();
 
 
 --
