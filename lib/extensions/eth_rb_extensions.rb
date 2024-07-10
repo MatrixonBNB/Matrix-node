@@ -42,7 +42,8 @@ module EthRbExtensions
         Eth::Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
       end
     rescue => e
-      binding.irb
+      # binding.irb
+      raise
     end
     
     def normalize_args(args, inputs)
@@ -73,7 +74,7 @@ module EthRbExtensions
           j.instance_variable_set(:@components, comps || [])
         end
       end
-      decoded_result = Eth::Abi.decode(output_types, result) rescue binding.irb
+      decoded_result = Eth::Abi.decode(output_types, result)
 
       if outputs.size == 1
         return decoded_result.first

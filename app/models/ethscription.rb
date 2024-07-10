@@ -75,7 +75,7 @@ class Ethscription < ApplicationRecord
       implementation_address = get_implementation(to_address)
       
       unless implementation_address
-        binding.irb
+        # binding.irb
         raise "No implementation address for #{to_address}"
       end
       
@@ -96,10 +96,10 @@ class Ethscription < ApplicationRecord
     data['to']
   rescue KeyError => e
     ap content
-    binding.irb
+    # binding.irb
     raise
   rescue => e
-    binding.irb
+    # binding.irb
     raise
   end
   

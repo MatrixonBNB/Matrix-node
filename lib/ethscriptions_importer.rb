@@ -139,7 +139,7 @@ module EthscriptionsImporter
       )
       
       unless legacy_tx_receipts.size == facet_receipts.size
-        binding.irb
+        # binding.irb
         raise "Mismatched number of legacy and facet receipts"
       end
       
@@ -148,17 +148,17 @@ module EthscriptionsImporter
         facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
         
         if legacy_receipt.status != facet_status
-          binding.irb
+          # binding.irb
           raise "Status mismatch: Legacy receipt status #{legacy_status} does not match Facet receipt status #{facet_status}"
         end
         
         if legacy_receipt.created_contract_address && facet_receipts[index].legacy_contract_address_map.keys.exclude?(legacy_receipt.created_contract_address)
-          binding.irb
+          # binding.irb
           raise "Contract address mismatch"
         end
         
         if legacy_receipt.status == 'success' && legacy_receipt.logs.present? && facet_receipt.logs.blank?
-          binding.irb
+          # binding.irb
           raise "Log mismatch: Legacy receipt has logs but Facet receipt has none"
         end
       end
@@ -294,7 +294,7 @@ module EthscriptionsImporter
     
     [facet_block, facet_txs, receipts]
   rescue => e
-    binding.irb
+    # binding.irb
     raise
   end
   

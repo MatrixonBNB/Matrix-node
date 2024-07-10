@@ -60,7 +60,7 @@ module EVMHelpers
     encoded_constructor_params = contract.parent.function_hash['constructor'].get_call_data(*constructor_args)
     deploy_data = contract.bin + encoded_constructor_params
   rescue => e
-    binding.irb
+    # binding.irb
     raise
   end
 

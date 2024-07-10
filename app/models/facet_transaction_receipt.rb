@@ -67,7 +67,7 @@ class FacetTransactionReceipt < ApplicationRecord
     logs.map do |log|
       implementation_address = Ethscription.get_implementation(log['address'])
       
-      implementation_name = Ethscription.local_from_predeploy(implementation_address) rescue binding.irb
+      implementation_name = Ethscription.local_from_predeploy(implementation_address)
       impl = EVMHelpers.compile_contract(implementation_name)
       begin
         impl.parent.decode_log(log)
@@ -75,7 +75,8 @@ class FacetTransactionReceipt < ApplicationRecord
         impl = EVMHelpers.compile_contract("legacy/ERC1967Proxy")
         impl.parent.decode_log(log)
       rescue => e
-        binding.irb
+        # binding.irb
+        raise
       end
     end
   end
