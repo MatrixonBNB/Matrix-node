@@ -3,17 +3,18 @@ pragma solidity 0.8.26;
 
 import "./Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
-import "./FacetSwapPairV2b2.sol";
+import "./FacetSwapPairVdfd.sol";
 import "./ERC1967Proxy.sol";
 
-contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
+contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     struct FacetSwapFactoryStorage {
         address feeTo;
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
+        uint256 lpFeeBPS;
     }
-
+    
     function s() internal pure returns (FacetSwapFactoryStorage storage fs) {
         bytes32 position = keccak256("FacetSwapFactoryStorage.contract.storage.v1");
         assembly {
@@ -35,10 +36,6 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     function allPairsLength() public view returns (uint256) {
         return s().allPairs.length;
     }
-
-    function getAllPairs() public view returns (address[] memory) {
-        return s().allPairs;
-    }
     
     function getPair(address tokenA, address tokenB) public view returns (address pair) {
         return s().getPair[tokenA][tokenB];
@@ -54,15 +51,15 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         require(token0 != address(0), "FacetSwapV1: ZERO_ADDRESS");
         require(s().getPair[token0][token1] == address(0), "FacetSwapV1: PAIR_EXISTS");
 
-        bytes32 hsh = keccak256(type(FacetSwapPairV2b2).creationCode);
+        bytes32 hsh = keccak256(type(FacetSwapPairVdfd).creationCode);
         address implementationAddress = address(uint160(uint256(hsh)));
         
         bytes32 proxySalt = keccak256(abi.encodePacked(token0, token1));
-        bytes memory initBytes = abi.encodeCall(FacetSwapPairV2b2.initialize, ());
+        bytes memory initBytes = abi.encodeCall(FacetSwapPairVdfd.initialize, ());
         
         pair = address(new ERC1967Proxy{salt: proxySalt}(implementationAddress, initBytes));
-
-        FacetSwapPairV2b2(pair).init(token0, token1);
+        
+        FacetSwapPairVdfd(pair).init(token0, token1);
 
         s().getPair[token0][token1] = pair;
         s().getPair[token1][token0] = pair;
@@ -79,5 +76,32 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     function setFeeToSetter(address _feeToSetter) public {
         require(msg.sender == s().feeToSetter, "FacetSwapV1: FORBIDDEN");
         s().feeToSetter = _feeToSetter;
+    }
+    
+        
+    function lpFeeBPS() public view returns (uint256) {
+        return s().lpFeeBPS;
+    }
+    
+    function setLpFeeBPS(uint256 lpFeeBPS) public {
+        require(msg.sender == s().feeToSetter, "FacetSwapV1: FORBIDDEN");
+        require(lpFeeBPS <= 10000, "Fees cannot exceed 100%");
+        s().lpFeeBPS = lpFeeBPS;
+    }
+    
+    function upgradePairs(address[] calldata pairs, bytes32 newHash, string calldata newSource) public {
+        require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
+        require(pairs.length <= 10, "Too many pairs to upgrade at once");
+
+        for (uint256 i = 0; i < pairs.length; i++) {
+            address pair = pairs[i];
+            string memory sourceToUse = i == 0 ? newSource : "";
+            upgradePair(pair, newHash, sourceToUse);
+        }
+    }
+
+    function upgradePair(address pair, bytes32 newHash, string memory newSource) public {
+        require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
+        Upgradeable(pair).upgrade(newHash, newSource);
     }
 }

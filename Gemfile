@@ -103,3 +103,5 @@ gem "dalli", "~> 3.2"
 gem "clipboard", "~> 2.0", :group => [:development, :test]
 gem "order_query", "~> 0.5.3"
 gem "rack-cors", "~> 2.0"
+
+gem "diffy", "~> 3.4"

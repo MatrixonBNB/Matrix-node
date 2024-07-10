@@ -327,7 +327,6 @@ CREATE TABLE public.facet_transaction_receipts (
     block_hash character varying NOT NULL,
     block_number integer NOT NULL,
     contract_address character varying,
-    legacy_contract_address character varying,
     legacy_contract_address_map jsonb DEFAULT '{}'::jsonb NOT NULL,
     cumulative_gas_used bigint NOT NULL,
     deposit_nonce character varying NOT NULL,
@@ -345,7 +344,6 @@ CREATE TABLE public.facet_transaction_receipts (
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_038b99632c CHECK (((transaction_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_13f8317911 CHECK (((contract_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
-    CONSTRAINT chk_rails_737f1f7a0a CHECK (((legacy_contract_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
     CONSTRAINT chk_rails_9f12b65d79 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_b7acdadd3b CHECK (((from_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
     CONSTRAINT chk_rails_c81a92d38b CHECK (((to_address)::text ~ '^0x[a-f0-9]{40}$'::text))

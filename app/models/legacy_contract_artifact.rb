@@ -1,8 +1,12 @@
 class LegacyContractArtifact < ApplicationRecord
+  include Memery
   self.table_name = "contract_artifacts"
   
+  scope :oldest_first, -> { order(:block_number, :transaction_index, :internal_transaction_index) }
+  scope :newest_first, -> { order(block_number: :desc, transaction_index: :desc, internal_transaction_index: :desc) }
+  
   def self.cached_all
-    @cached_all ||= reading { all }
+    @_cached_all ||= reading { all.oldest_first }
   end
   
   def self.shortest_unique_suffix_length
@@ -18,6 +22,101 @@ class LegacyContractArtifact < ApplicationRecord
     end
     
     max_length
+  end
+  
+  def self.find_next_artifact(current_artifact)
+    primary_contract_name = extract_primary_contract_name(current_artifact.source_code)
+    artifacts = cached_all.select do |artifact|
+      extract_primary_contract_name(artifact.source_code) == primary_contract_name
+    end
+
+    current_index = artifacts.index(current_artifact)
+    return nil if current_index.nil? || current_index + 1 >= artifacts.size
+
+    artifacts[current_index + 1]
+  end
+  
+  def self.diff_to_next_version(current_suffix)
+    current_artifact = find_by_suffix(current_suffix)
+    current_name = current_artifact.primary_contract_name + "V#{current_suffix}"
+    next_artifact = find_next_artifact(current_artifact)
+    return puts "No next version found for #{current_name}" unless next_artifact
+
+    next_suffix = next_artifact.init_code_hash.last(3)
+    next_name = current_name.gsub("V#{current_suffix}", "V#{next_suffix}")
+
+    legacy_dir = Rails.root.join("lib/solidity/legacy")
+    current_file_path = "#{legacy_dir}/#{current_name}.sol"
+    next_file_path = "#{legacy_dir}/#{next_name}.sol"
+    
+    unless File.exist?(current_file_path)
+      raise "File #{current_file_path} does not exist"
+    end
+
+    unless File.exist?(next_file_path)
+      FileUtils.cp(current_file_path, next_file_path)
+      puts "Created new version file: #{next_file_path}"
+    end
+
+    current_source = current_artifact.source_code
+    next_source = next_artifact.source_code
+
+    diff = Diffy::Diff.new(current_source, next_source, context: 3).to_s(:html)
+    
+    diff_file_path = "#{legacy_dir}/#{current_name}_to_#{next_name}.html"
+    File.open(diff_file_path, 'w') do |file|
+      file.write("<html><head><style>#{Diffy::CSS}</style></head><body>")
+      file.write(diff)
+      file.write("</body></html>")
+    end
+    puts "Diff saved to: #{diff_file_path}"
+  end
+  
+  def primary_contract_name
+    self.class.extract_primary_contract_name(source_code)
+  end
+  memoize :primary_contract_name
+  
+  def self.extract_primary_contract_name(source_code)
+    primary_contract = nil
+
+    # Define a dummy context with a contract method
+    context = BasicObject.new
+    singleton_class = class << context; self; end
+    singleton_class.define_method(:contract) do |name, *|
+      primary_contract = name
+    end
+
+    # Use method_missing to ignore other methods
+    singleton_class.define_method(:method_missing) { |*| }
+
+    # Evaluate the source code in the context
+    context.instance_eval(source_code)
+
+    primary_contract.to_s.gsub(/V\d+$/, '').gsub(/0\d$/, '').gsub("V1", '')
+  end
+  
+  def self.diff_source_code(artifact1, artifact2)
+    source1 = artifact1.source_code
+    source2 = artifact2.source_code
+
+    diff = Diffy::Diff.new(source1, source2, context: 3).to_s(:color)
+    puts diff
+  end
+  
+  def self.diff_artifacts_with_same_primary_contract
+    artifacts_by_contract = cached_all.group_by do |artifact|
+      extract_primary_contract_name(artifact.source_code)
+    end
+
+    artifacts_by_contract.each do |contract_name, artifacts|
+      next if artifacts.size < 2 # Skip if there are less than 2 artifacts for the contract
+
+      artifacts.combination(2).each do |artifact1, artifact2|
+        puts "Diff between #{artifact1.name} and #{artifact2.name} for contract #{contract_name}:"
+        diff_source_code(artifact1, artifact2)
+      end
+    end
   end
   
   def self.address_from_suffix(suffix)

@@ -268,7 +268,7 @@ module TransactionHelper
           end
         end
         
-        # ap trace
+        ap trace
       end
       
       expected = expect_failure ? [0] : [1]
@@ -307,9 +307,20 @@ module TransactionHelper
   end
 
   def trigger_contract_interaction_and_expect_success(from:, payload:, block_timestamp: nil)
-    res = trigger_contract_interaction(from: from, payload: payload, expect_failure: false, block_timestamp: block_timestamp)
+    if payload[:to].nil?
+      res = deploy_contract_with_proxy(
+        from: from,
+        implementation: payload[:data][:type],
+        args: payload[:data][:args].values,
+        value: payload[:data][:value] || 0,
+        gas_limit: payload[:data][:gas_limit] || 10_000_000,
+        max_fee_per_gas: payload[:data][:max_fee_per_gas] || 10.gwei,
+        expect_failure: false
+      )
+    else
+      res = trigger_contract_interaction(from: from, payload: payload, expect_failure: false, block_timestamp: block_timestamp)
+    end
 
-    # Ensure the transaction was successful
     unless res.receipts_imported.map(&:status) == [1]
       raise "Transaction failed"
     end

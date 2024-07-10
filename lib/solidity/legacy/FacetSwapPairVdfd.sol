@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import "./FacetERC20.sol";
 import "./Upgradeable.sol";
-import "./FacetSwapFactoryVe7f.sol";
+import "./FacetSwapFactoryVac5.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
 import "../contracts/Console.sol";
@@ -12,7 +12,7 @@ interface FacetSwapV1Callee {
     function facetSwapV1Call(address sender, uint256 amount0Out, uint256 amount1Out, bytes calldata data) external;
 }
 
-contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
+contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
     using LibString for *;
     
     struct FacetSwapPairStorage {
@@ -67,7 +67,7 @@ contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
         s().token0 = _token0;
         s().token1 = _token1;
     }
-
+    
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
         _reserve0 = s().reserve0;
         _reserve1 = s().reserve1;
@@ -103,7 +103,7 @@ contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
     }
 
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool) {
-        address feeTo = FacetSwapFactoryVe7f(s().factory).feeTo();
+        address feeTo = FacetSwapFactoryVac5(s().factory).feeTo();
         bool feeOn = feeTo != address(0);
         uint256 _kLast = s().kLast;
         if (feeOn) {
@@ -194,8 +194,9 @@ contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
         require(amount0In > 0 || amount1In > 0, "FacetSwapV1: INSUFFICIENT_INPUT_AMOUNT");
 
         {
-            uint256 balance0Adjusted = balance0 * 1000 - amount0In * 3;
-            uint256 balance1Adjusted = balance1 * 1000 - amount1In * 3;
+            uint256 lpFeeBPS = FacetSwapFactoryVac5(s().factory).lpFeeBPS();
+            uint256 balance0Adjusted = balance0 * 1000 - (amount0In * lpFeeBPS) / 10;
+            uint256 balance1Adjusted = balance1 * 1000 - (amount1In * lpFeeBPS) / 10;
             require(balance0Adjusted * balance1Adjusted >= uint256(_reserve0) * _reserve1 * (1000**2), "FacetSwapV1: K");
         }
 

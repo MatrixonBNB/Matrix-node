@@ -34,13 +34,20 @@ abstract contract Upgradeable is UUPSUpgradeable {
         require(msg.sender == _upgradeStorage().upgradeAdmin, "NOT_AUTHORIZED");
     }
 
-    function upgradeAndCall(address newImplementation, bytes calldata migrationCalldata) external {
+    function upgradeAndCall(bytes32 newHash, string calldata, bytes calldata migrationCalldata) external {
+        address newImplementation = address(uint160(uint256(newHash)));
         upgradeToAndCall(newImplementation, migrationCalldata);
         emit ContractUpgraded(newImplementation);
     }
 
-    function upgrade(address newImplementation) external {
+    function upgrade(bytes32 newHash, string calldata) external {
+        address newImplementation = address(uint160(uint256(newHash)));
+        
         this.upgradeToAndCall(newImplementation, bytes(''));
         emit ContractUpgraded(newImplementation);
+    }
+    
+    function upgradeAdmin() public view returns (address) {
+        return _upgradeStorage().upgradeAdmin;
     }
 }

@@ -2,16 +2,19 @@
 pragma solidity 0.8.26;
 
 import "./Upgradeable.sol";
-import "./FacetSwapPairV2b2.sol";
-import "./FacetSwapFactoryVe7f.sol";
+import "./FacetSwapPairVdfd.sol";
+import "./FacetSwapFactoryVac5.sol";
 import "./FacetERC20.sol";
+import "./Pausable.sol";
 import "solady/src/utils/Initializable.sol";
+import "solady/src/auth/Ownable.sol";
 
-contract FacetSwapRouterV099 is Initializable, Upgradeable {
+contract FacetSwapRouterVaf8 is Initializable, Upgradeable, Ownable, Pausable {
     struct FacetSwapRouterStorage {
         address factory;
         address WETH;
         uint256 maxPathLength;
+        uint256 protocolFeeBPS;
     }
 
     function s() internal pure returns (FacetSwapRouterStorage storage rs) {
@@ -20,16 +23,41 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
             rs.slot := position
         }
     }
+    
+    event FeeAdjustedSwap(
+        address indexed inputToken,
+        address indexed outputToken,
+        uint256 inputAmount,
+        uint256 outputAmount,
+        uint256 feeAmount,
+        address indexed to
+    );
 
     constructor() {
         _disableInitializers();
     }
-
-    function initialize(address _factory, address _WETH) public initializer {
+    
+    function initialize(address _factory, address _WETH, uint256 protocolFeeBPS, bool initialPauseState) public initializer {
         s().factory = _factory;
         s().WETH = _WETH;
         s().maxPathLength = 3;
         _initializeUpgradeAdmin(msg.sender);
+        
+        _initializeOwner(msg.sender);
+        updateProtocolFee(protocolFeeBPS);
+        _initializePausable(initialPauseState);
+    }
+    
+    function onUpgrade(address owner, bool initialPauseState) public reinitializer(2) {
+        require(msg.sender == address(this), "Only the contract itself can upgrade");
+        
+        _initializeOwner(owner);
+        
+        if (initialPauseState) {
+            _pause();
+        } else {
+            _unpause();
+        }
     }
 
     function _addLiquidity(
@@ -40,8 +68,8 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
         uint256 amountAMin,
         uint256 amountBMin
     ) internal virtual returns (uint256 amountA, uint256 amountB) {
-        if (FacetSwapFactoryVe7f(s().factory).getPair(tokenA, tokenB) == address(0)) {
-            FacetSwapFactoryVe7f(s().factory).createPair(tokenA, tokenB);
+        if (FacetSwapFactoryVac5(s().factory).getPair(tokenA, tokenB) == address(0)) {
+            FacetSwapFactoryVac5(s().factory).createPair(tokenA, tokenB);
         }
         (uint256 reserveA, uint256 reserveB) = getReserves(s().factory, tokenA, tokenB);
         if (reserveA == 0 && reserveB == 0) {
@@ -69,13 +97,13 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
         uint256 amountBMin,
         address to,
         uint256 deadline
-    ) public virtual returns (uint256 amountA, uint256 amountB, uint256 liquidity) {
+    ) public virtual whenNotPaused returns (uint256 amountA, uint256 amountB, uint256 liquidity) {
         require(deadline >= block.timestamp, "FacetSwapV1Router: EXPIRED");
         (amountA, amountB) = _addLiquidity(tokenA, tokenB, amountADesired, amountBDesired, amountAMin, amountBMin);
         address pair = pairFor(s().factory, tokenA, tokenB);
         _safeTransferFrom(tokenA, msg.sender, pair, amountA);
         _safeTransferFrom(tokenB, msg.sender, pair, amountB);
-        liquidity = FacetSwapPairV2b2(pair).mint(to);
+        liquidity = FacetSwapPairVdfd(pair).mint(to);
     }
 
     function removeLiquidity(
@@ -86,11 +114,11 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
         uint256 amountBMin,
         address to,
         uint256 deadline
-    ) public virtual returns (uint256 amountA, uint256 amountB) {
+    ) public virtual whenNotPaused returns (uint256 amountA, uint256 amountB) {
         require(deadline >= block.timestamp, "FacetSwapV1Router: EXPIRED");
         address pair = pairFor(s().factory, tokenA, tokenB);
-        FacetSwapPairV2b2(pair).transferFrom(msg.sender, pair, liquidity);
-        (uint256 amount0, uint256 amount1) = FacetSwapPairV2b2(pair).burn(to);
+        FacetSwapPairVdfd(pair).transferFrom(msg.sender, pair, liquidity);
+        (uint256 amount0, uint256 amount1) = FacetSwapPairVdfd(pair).burn(to);
         (address token0, ) = sortTokens(tokenA, tokenB);
         (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
         require(amountA >= amountAMin, "FacetSwapV1Router: INSUFFICIENT_A_AMOUNT");
@@ -100,29 +128,75 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,
-        address[] calldata path,
+        address[] memory path,
         address to,
         uint256 deadline
-    ) public virtual returns (uint256[] memory amounts) {
+    ) public virtual whenNotPaused returns (uint256[] memory amounts) {
+        require(path[0] == s().WETH || path[path.length - 1] == s().WETH, "Must have WETH as either the first or last token in the path");
+        uint256 amountInWithFee = path[0] == s().WETH ? amountIn - calculateFeeAmount(amountIn) : amountIn;
+        amounts = _swapExactTokensForTokens(amountInWithFee, amountOutMin, path, to, deadline);
+        uint256 amountToChargeFeeOn = path[0] == s().WETH ? amountIn : amounts[amounts.length - 1];
+        uint256 feeAmount = calculateFeeAmount(amountToChargeFeeOn);
+        chargeWethFee(feeAmount);
+        if (path[0] == s().WETH) {
+            amounts[0] = amountIn;
+        } else {
+            amounts[amounts.length - 1] = amounts[amounts.length - 1] - feeAmount;
+        }
+        emit FeeAdjustedSwap(path[0], path[path.length - 1], amounts[0], amounts[amounts.length - 1], feeAmount, to);
+        return amounts;
+    }
+
+    function _swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] memory path,
+        address to,
+        uint256 deadline
+    ) internal virtual returns (uint256[] memory amounts) {
         require(deadline >= block.timestamp, "FacetSwapV1Router: EXPIRED");
         amounts = getAmountsOut(s().factory, amountIn, path);
         require(amounts[amounts.length - 1] >= amountOutMin, "FacetSwapV1Router: INSUFFICIENT_OUTPUT_AMOUNT");
         _safeTransferFrom(path[0], msg.sender, pairFor(s().factory, path[0], path[1]), amounts[0]);
         _swap(amounts, path, to);
+        return amounts;
     }
 
     function swapTokensForExactTokens(
         uint256 amountOut,
         uint256 amountInMax,
-        address[] calldata path,
+        address[] memory path,
         address to,
         uint256 deadline
-    ) public virtual returns (uint256[] memory amounts) {
+    ) public virtual whenNotPaused returns (uint256[] memory amounts) {
+        require(path[0] == s().WETH || path[path.length - 1] == s().WETH, "Must have WETH as either the first or last token in the path");
+        uint256 amountOutWithFee = path[path.length - 1] == s().WETH ? amountOut + calculateFeeAmount(amountOut) : amountOut;
+        amounts = _swapTokensForExactTokens(amountOutWithFee, amountInMax, path, to, deadline);
+        uint256 amountToChargeFeeOn = path[0] == s().WETH ? amounts[0] : amountOut;
+        uint256 feeAmount = calculateFeeAmount(amountToChargeFeeOn);
+        chargeWethFee(feeAmount);
+        if (path[0] == s().WETH) {
+            amounts[0] = amounts[0] + feeAmount;
+        } else {
+            amounts[amounts.length - 1] = amountOut;
+        }
+        emit FeeAdjustedSwap(path[0], path[path.length - 1], amounts[0], amounts[amounts.length - 1], feeAmount, to);
+        return amounts;
+    }
+
+    function _swapTokensForExactTokens(
+        uint256 amountOut,
+        uint256 amountInMax,
+        address[] memory path,
+        address to,
+        uint256 deadline
+    ) internal virtual returns (uint256[] memory amounts) {
         require(deadline >= block.timestamp, "FacetSwapV1Router: EXPIRED");
         amounts = getAmountsIn(s().factory, amountOut, path);
         require(amounts[0] <= amountInMax, "FacetSwapV1Router: EXCESSIVE_INPUT_AMOUNT");
         _safeTransferFrom(path[0], msg.sender, pairFor(s().factory, path[0], path[1]), amounts[0]);
         _swap(amounts, path, to);
+        return amounts;
     }
 
     function _swap(uint256[] memory amounts, address[] memory path, address _to) internal virtual {
@@ -133,7 +207,7 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
             uint256 amountOut = amounts[i + 1];
             (uint256 amount0Out, uint256 amount1Out) = input == token0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
             address to = i < path.length - 2 ? pairFor(s().factory, output, path[i + 2]) : _to;
-            FacetSwapPairV2b2(pairFor(s().factory, input, output)).swap(amount0Out, amount1Out, to, new bytes(0));
+            FacetSwapPairVdfd(pairFor(s().factory, input, output)).swap(amount0Out, amount1Out, to, new bytes(0));
         }
     }
 
@@ -153,13 +227,15 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
         }
     }
 
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) public pure returns (uint256 amountOut) {
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) public view returns (uint256) {
         require(amountIn > 0, "FacetSwapV1Library: INSUFFICIENT_INPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "FacetSwapV1Library: INSUFFICIENT_LIQUIDITY");
-        uint256 amountInWithFee = amountIn * 997;
+        uint256 lpFeeBPS = FacetSwapFactoryVac5(s().factory).lpFeeBPS();
+        uint256 totalFeeFactor = 1000 - lpFeeBPS / 10;
+        uint256 amountInWithFee = amountIn * totalFeeFactor;
         uint256 numerator = amountInWithFee * reserveOut;
         uint256 denominator = reserveIn * 1000 + amountInWithFee;
-        amountOut = numerator / denominator;
+        return numerator / denominator;
     }
 
     function getAmountsIn(address factory, uint256 amountOut, address[] memory path) public view returns (uint256[] memory amounts) {
@@ -173,12 +249,14 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
         }
     }
 
-    function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut) public pure returns (uint256 amountIn) {
+    function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut) public view returns (uint256) {
         require(amountOut > 0, "FacetSwapV1Library: INSUFFICIENT_OUTPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "FacetSwapV1Library: INSUFFICIENT_LIQUIDITY");
+        uint256 lpFeeBPS = FacetSwapFactoryVac5(s().factory).lpFeeBPS();
+        uint256 totalFeeFactor = 1000 - lpFeeBPS / 10;
         uint256 numerator = reserveIn * amountOut * 1000;
-        uint256 denominator = (reserveOut - amountOut) * 997;
-        amountIn = (numerator / denominator) + 1;
+        uint256 denominator = (reserveOut - amountOut) * totalFeeFactor;
+        return (numerator / denominator) + 1;
     }
 
     function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) public pure returns (uint256 amountB) {
@@ -189,18 +267,44 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
 
     function getReserves(address factory, address tokenA, address tokenB) public view returns (uint256 reserveA, uint256 reserveB) {
         (address token0, ) = sortTokens(tokenA, tokenB);
-        (uint256 reserve0, uint256 reserve1, ) = FacetSwapPairV2b2(pairFor(factory, tokenA, tokenB)).getReserves();
+        (uint256 reserve0, uint256 reserve1, ) = FacetSwapPairVdfd(pairFor(factory, tokenA, tokenB)).getReserves();
         (reserveA, reserveB) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
     }
 
     function pairFor(address factory, address tokenA, address tokenB) internal view returns (address pair) {
-        return FacetSwapFactoryVe7f(factory).getPair(tokenA, tokenB);
+        return FacetSwapFactoryVac5(factory).getPair(tokenA, tokenB);
     }
 
     function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
         require(tokenA != tokenB, "FacetSwapV1Library: IDENTICAL_ADDRESSES");
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "FacetSwapV1Library: ZERO_ADDRESS");
+    }
+
+    function chargeWethFee(uint256 feeAmount) internal {
+        ERC20(s().WETH).transferFrom(msg.sender, address(this), feeAmount);
+    }
+
+    function calculateFeeAmount(uint256 amount) public view returns (uint256) {
+        return (amount * s().protocolFeeBPS) / 10000;
+    }
+
+    function updateProtocolFee(uint256 protocolFeeBPS) public onlyOwner {
+        require(protocolFeeBPS <= 10000, "Fee cannot be greater than 100%");
+        s().protocolFeeBPS = protocolFeeBPS;
+    }
+
+    function withdrawFees(address to) public onlyOwner {
+        uint256 balance = ERC20(s().WETH).balanceOf(address(this));
+        ERC20(s().WETH).transfer(to, balance);
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
     }
 
     function userStats(
@@ -220,9 +324,9 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
         tokenAReserves = 0;
         tokenBReserves = 0;
         userLPBalance = 0;
-        if (FacetSwapFactoryVe7f(s().factory).getPair(tokenA, tokenB) != address(0)) {
+        if (FacetSwapFactoryVac5(s().factory).getPair(tokenA, tokenB) != address(0)) {
             (tokenAReserves, tokenBReserves) = getReserves(s().factory, tokenA, tokenB);
-            pairAddress = FacetSwapFactoryVe7f(s().factory).getPair(tokenA, tokenB);
+            pairAddress = FacetSwapFactoryVac5(s().factory).getPair(tokenA, tokenB);
             userLPBalance = FacetERC20(pairAddress).balanceOf(user);
         }
         userTokenABalance = ERC20(tokenA).balanceOf(user);

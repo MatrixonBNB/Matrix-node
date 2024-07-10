@@ -6,7 +6,9 @@ module GethDriver
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
 
     EthBlock.delete_all
-
+    
+    Ethscription.write_alloc_to_genesis
+    
     system("cd #{geth_dir} && make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json")
     
     pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --authrpc.port 8551 --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > geth.log 2>&1})
