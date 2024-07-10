@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe "FacetSwapRouterV1 contract" do
+RSpec.describe "FacetSwapRouterV099 contract" do
   include ActiveSupport::Testing::TimeHelpers
 
   let(:user_address) { "0xc2172a6315c1d7f6855768f843c420ebb36eda97".downcase }
@@ -22,7 +22,7 @@ RSpec.describe "FacetSwapRouterV1 contract" do
     token_a_address = tokenA_deploy_receipt.contract_address
     
     factory_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/FacetSwapFactoryV1',
+      implementation: 'legacy/FacetSwapFactoryVe7f',
       from: user_address,
       args: [user_address]
     )
@@ -37,7 +37,7 @@ RSpec.describe "FacetSwapRouterV1 contract" do
     token_b_address = tokenB_deploy_receipt.contract_address
 
     router_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/FacetSwapRouterV1',
+      implementation: 'legacy/FacetSwapRouterV099',
       from: user_address,
       args: [factory_address, weth_address]
     )
@@ -64,7 +64,7 @@ RSpec.describe "FacetSwapRouterV1 contract" do
     )
 # binding.pry
     pair_address = create_pair_receipt.decoded_legacy_logs.detect { |i| i['event'] == 'PairCreated' }['data']['pair']
-    TransactionHelper.contract_addresses[pair_address] = "legacy/FacetSwapPairV1"
+    TransactionHelper.contract_addresses[pair_address] = "legacy/FacetSwapPairV2b2"
 
     make_static_call(
       contract: pair_address,

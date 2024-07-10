@@ -24,7 +24,7 @@ RSpec.describe "Reverts" do
   
   it do
     airdrop_address = deploy_contract_with_proxy(
-      implementation: 'legacy/AirdropERC20V1',
+      implementation: 'legacy/AirdropERC20Vb02',
       from: from_address,
       args: [
         "Facet Cards",

@@ -24,7 +24,8 @@ module EVMHelpers
     def memoized_compile_contract(contract_path, checksum)
       Rails.cache.fetch(['memoized_compile_contract', contract_path, checksum]) do
         contract_name = contract_path.split('/').last
-        contract_file = Rails.root.join('lib', 'solidity', "#{contract_path}.sol")
+        contract_path += ".sol" unless contract_path.ends_with?(".sol")
+        contract_file = Rails.root.join('lib', 'solidity', contract_path)
         
         contract_compiled = SolidityCompiler.compile(contract_file)
         contract_bytecode = contract_compiled[contract_name]['bytecode']
@@ -42,7 +43,7 @@ module EVMHelpers
   
   def proxy_and_implementation_deploy_data(
     proxy_path: 'legacy/EtherBridge',
-    implementation_path: 'legacy/EtherBridgeV1',
+    implementation_path: 'legacy/EtherBridgeV064',
     init_args: ["name", "symbol", "0xC2172a6315c1D7f6855768F843c420EbB36eDa97", "0xC2172a6315c1D7f6855768F843c420EbB36eDa97"]
   )
     implementation = compile_contract(implementation_path)

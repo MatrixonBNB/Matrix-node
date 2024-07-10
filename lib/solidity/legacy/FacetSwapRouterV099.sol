@@ -2,20 +2,20 @@
 pragma solidity 0.8.26;
 
 import "./Upgradeable.sol";
-import "./FacetSwapPairV1.sol";
-import "./FacetSwapFactoryV1.sol";
+import "./FacetSwapPairV2b2.sol";
+import "./FacetSwapFactoryVe7f.sol";
 import "./FacetERC20.sol";
 import "solady/src/utils/Initializable.sol";
 
-contract FacetSwapRouterV1 is Initializable, Upgradeable {
-    struct FacetSwapRouterV1Storage {
+contract FacetSwapRouterV099 is Initializable, Upgradeable {
+    struct FacetSwapRouterV099Storage {
         address factory;
         address WETH;
         uint256 maxPathLength;
     }
 
-    function s() internal pure returns (FacetSwapRouterV1Storage storage rs) {
-        bytes32 position = keccak256("FacetSwapRouterV1Storage.contract.storage.v1");
+    function s() internal pure returns (FacetSwapRouterV099Storage storage rs) {
+        bytes32 position = keccak256("FacetSwapRouterV099Storage.contract.storage.v1");
         assembly {
             rs.slot := position
         }
@@ -40,8 +40,8 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
         uint256 amountAMin,
         uint256 amountBMin
     ) internal virtual returns (uint256 amountA, uint256 amountB) {
-        if (FacetSwapFactoryV1(s().factory).getPair(tokenA, tokenB) == address(0)) {
-            FacetSwapFactoryV1(s().factory).createPair(tokenA, tokenB);
+        if (FacetSwapFactoryVe7f(s().factory).getPair(tokenA, tokenB) == address(0)) {
+            FacetSwapFactoryVe7f(s().factory).createPair(tokenA, tokenB);
         }
         (uint256 reserveA, uint256 reserveB) = getReserves(s().factory, tokenA, tokenB);
         if (reserveA == 0 && reserveB == 0) {
@@ -75,7 +75,7 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
         address pair = pairFor(s().factory, tokenA, tokenB);
         _safeTransferFrom(tokenA, msg.sender, pair, amountA);
         _safeTransferFrom(tokenB, msg.sender, pair, amountB);
-        liquidity = FacetSwapPairV1(pair).mint(to);
+        liquidity = FacetSwapPairV2b2(pair).mint(to);
     }
 
     function removeLiquidity(
@@ -89,8 +89,8 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
     ) public virtual returns (uint256 amountA, uint256 amountB) {
         require(deadline >= block.timestamp, "FacetSwapV1Router: EXPIRED");
         address pair = pairFor(s().factory, tokenA, tokenB);
-        FacetSwapPairV1(pair).transferFrom(msg.sender, pair, liquidity);
-        (uint256 amount0, uint256 amount1) = FacetSwapPairV1(pair).burn(to);
+        FacetSwapPairV2b2(pair).transferFrom(msg.sender, pair, liquidity);
+        (uint256 amount0, uint256 amount1) = FacetSwapPairV2b2(pair).burn(to);
         (address token0, ) = sortTokens(tokenA, tokenB);
         (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
         require(amountA >= amountAMin, "FacetSwapV1Router: INSUFFICIENT_A_AMOUNT");
@@ -133,7 +133,7 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
             uint256 amountOut = amounts[i + 1];
             (uint256 amount0Out, uint256 amount1Out) = input == token0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
             address to = i < path.length - 2 ? pairFor(s().factory, output, path[i + 2]) : _to;
-            FacetSwapPairV1(pairFor(s().factory, input, output)).swap(amount0Out, amount1Out, to, new bytes(0));
+            FacetSwapPairV2b2(pairFor(s().factory, input, output)).swap(amount0Out, amount1Out, to, new bytes(0));
         }
     }
 
@@ -189,12 +189,12 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
 
     function getReserves(address factory, address tokenA, address tokenB) public view returns (uint256 reserveA, uint256 reserveB) {
         (address token0, ) = sortTokens(tokenA, tokenB);
-        (uint256 reserve0, uint256 reserve1, ) = FacetSwapPairV1(pairFor(factory, tokenA, tokenB)).getReserves();
+        (uint256 reserve0, uint256 reserve1, ) = FacetSwapPairV2b2(pairFor(factory, tokenA, tokenB)).getReserves();
         (reserveA, reserveB) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
     }
 
     function pairFor(address factory, address tokenA, address tokenB) internal view returns (address pair) {
-        return FacetSwapFactoryV1(factory).getPair(tokenA, tokenB);
+        return FacetSwapFactoryVe7f(factory).getPair(tokenA, tokenB);
     }
 
     function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
@@ -220,9 +220,9 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
         tokenAReserves = 0;
         tokenBReserves = 0;
         userLPBalance = 0;
-        if (FacetSwapFactoryV1(s().factory).getPair(tokenA, tokenB) != address(0)) {
+        if (FacetSwapFactoryVe7f(s().factory).getPair(tokenA, tokenB) != address(0)) {
             (tokenAReserves, tokenBReserves) = getReserves(s().factory, tokenA, tokenB);
-            pairAddress = FacetSwapFactoryV1(s().factory).getPair(tokenA, tokenB);
+            pairAddress = FacetSwapFactoryVe7f(s().factory).getPair(tokenA, tokenB);
             userLPBalance = FacetERC20(pairAddress).balanceOf(user);
         }
         userTokenABalance = ERC20(tokenA).balanceOf(user);

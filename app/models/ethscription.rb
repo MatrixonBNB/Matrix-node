@@ -191,20 +191,23 @@ class Ethscription < ApplicationRecord
   end
   
   def self.predeploy_to_local_map
-    index_by_real_init_code = [
-      "FacetSwapPairV1"
-    ]
+    legacy_dir = Rails.root.join("lib/solidity/legacy")
+    map = {}
     
-    map = {
-      "0x897d289b77c8393783829489b9ab3255c0158064": "EtherBridgeV1",
-      "0x137e368f782453e41f622fa8cf68296d04c84c88": "PublicMintERC20V1",
-      "0x9dc4e7f596baf4227f919102a7f80523834edb02": "AirdropERC20V1",
-      "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d": "EthscriptionERC20BridgeV1",
-      "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139": "NameRegistryV1",
-      "0x0ad9c442bd4eb506447f125b7e71b64e33583e7f": "FacetSwapFactoryV1",
-      "0x1f157ea244a08dd78c14ba8faa7280559232b099": "FacetSwapRouterV1",
-      "0x00000000000000000000000000000000000000c5": "NonExistentContractShim"
-    }.with_indifferent_access
+    Dir.glob("#{legacy_dir}/*.sol").each do |file_path|
+      filename = File.basename(file_path, ".sol")
+  
+      if filename.match(/V[a-f0-9]{3}$/i)
+        address = LegacyContractArtifact.address_from_suffix(filename)
+        map[address] = filename
+      end
+    end  
+    
+    map["0x00000000000000000000000000000000000000c5"] = "NonExistentContractShim"
+    
+    index_by_real_init_code = [
+      "FacetSwapPairV2b2"
+    ]
     
     index_by_real_init_code.each do |contract|
       contract = EVMHelpers.compile_contract("legacy/#{contract}")

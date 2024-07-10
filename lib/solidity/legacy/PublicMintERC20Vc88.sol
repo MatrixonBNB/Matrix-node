@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import "./FacetERC20.sol";
 import "solady/src/utils/Initializable.sol";
 
-contract PublicMintERC20V1 is FacetERC20, Initializable {
+contract PublicMintERC20Vc88 is FacetERC20, Initializable {
     struct PublicMintERC20Storage {
         uint256 maxSupply;
         uint256 perMintLimit;

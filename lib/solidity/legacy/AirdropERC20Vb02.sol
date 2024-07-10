@@ -5,7 +5,7 @@ import "./FacetERC20.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/auth/Ownable.sol";
 
-contract AirdropERC20V1 is FacetERC20, Ownable, Initializable {
+contract AirdropERC20Vb02 is FacetERC20, Ownable, Initializable {
     struct AirdropERC20Storage {
         uint256 maxSupply;
         uint256 perMintLimit;

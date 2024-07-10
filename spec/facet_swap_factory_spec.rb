@@ -12,7 +12,7 @@ RSpec.describe "FacetSwapV1Factory" do
 
   it 'creates a new pair successfully' do
     factory_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/FacetSwapFactoryV1',
+      implementation: 'legacy/FacetSwapFactoryVe7f',
       from: from_address,
       args: [from_address]
     )
@@ -48,7 +48,7 @@ RSpec.describe "FacetSwapV1Factory" do
 
   it 'throws error when creating pair with identical tokens' do
     factory_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/FacetSwapFactoryV1',
+      implementation: 'legacy/FacetSwapFactoryVe7f',
       from: from_address,
       args: [from_address]
     )
@@ -71,7 +71,7 @@ RSpec.describe "FacetSwapV1Factory" do
 
   it 'throws error when creating pair that already exists' do
     factory_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/FacetSwapFactoryV1',
+      implementation: 'legacy/FacetSwapFactoryVe7f',
       from: from_address,
       args: [from_address]
     )

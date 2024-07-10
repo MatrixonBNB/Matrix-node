@@ -3,10 +3,10 @@ pragma solidity 0.8.26;
 
 import "./Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
-import "./FacetSwapPairV1.sol";
+import "./FacetSwapPairV2b2.sol";
 import "./ERC1967Proxy.sol";
 
-contract FacetSwapFactoryV1 is Initializable, Upgradeable {
+contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     struct FacetSwapV1FactoryStorage {
         address feeTo;
         address feeToSetter;
@@ -54,11 +54,11 @@ contract FacetSwapFactoryV1 is Initializable, Upgradeable {
         require(token0 != address(0), "FacetSwapV1: ZERO_ADDRESS");
         require(s().getPair[token0][token1] == address(0), "FacetSwapV1: PAIR_EXISTS");
 
-        bytes32 hsh = keccak256(type(FacetSwapPairV1).creationCode);
+        bytes32 hsh = keccak256(type(FacetSwapPairV2b2).creationCode);
         address implementationAddress = address(uint160(uint256(hsh)));
         
         bytes32 proxySalt = keccak256(abi.encodePacked(token0, token1));
-        bytes memory initBytes = abi.encodeCall(FacetSwapPairV1.initialize, (token0, token1));
+        bytes memory initBytes = abi.encodeCall(FacetSwapPairV2b2.initialize, (token0, token1));
         
         pair = address(new ERC1967Proxy{salt: proxySalt}(implementationAddress, initBytes));
 

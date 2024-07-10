@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import "./FacetERC20.sol";
 import "./Upgradeable.sol";
-import "./FacetSwapFactoryV1.sol";
+import "./FacetSwapFactoryVe7f.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
 import "../contracts/Console.sol";
@@ -12,7 +12,7 @@ interface FacetSwapV1Callee {
     function facetSwapV1Call(address sender, uint256 amount0Out, uint256 amount1Out, bytes calldata data) external;
 }
 
-contract FacetSwapPairV1 is FacetERC20, Initializable, Upgradeable {
+contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
     using LibString for *;
     
     struct FacetSwapV1PairStorage {
@@ -99,7 +99,7 @@ contract FacetSwapPairV1 is FacetERC20, Initializable, Upgradeable {
     }
 
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool) {
-        address feeTo = FacetSwapFactoryV1(s().factory).feeTo();
+        address feeTo = FacetSwapFactoryVe7f(s().factory).feeTo();
         bool feeOn = feeTo != address(0);
         uint256 _kLast = s().kLast;
         if (feeOn) {

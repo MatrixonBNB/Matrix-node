@@ -14,7 +14,7 @@ import "./FacetERC20.sol";
 import "./FacetERC721.sol";
 import "../contracts/Console.sol";
 
-contract NameRegistryV1 is FacetERC721, Upgradeable, Initializable, Ownable, Pausable, EIP712 {
+contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, Ownable, Pausable, EIP712 {
     using LibString for *;
     using SafeTransferLib for address;
     using ECDSA for bytes32;

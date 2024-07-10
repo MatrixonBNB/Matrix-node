@@ -36,7 +36,7 @@ RSpec.describe "Name Registry" do
     weth_address = res.contract_address
     
     registry_address = deploy_contract_with_proxy(
-      implementation: 'legacy/NameRegistryV1',
+      implementation: 'legacy/NameRegistryV139',
       from: from_address,
       args: [
         "Facet Cards",
