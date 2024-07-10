@@ -214,7 +214,7 @@ class Ethscription < ApplicationRecord
   
   def self.local_from_predeploy(address)
     name = predeploy_to_local_map.fetch(address.downcase)
-    
+    logger.info("Retreiving #{name} for #{address}")
     "legacy/#{name}"
   end
   
