@@ -17,8 +17,8 @@ RSpec.describe "Name Registry" do
   end
   
   it "deploys name registry" do
-    res = deploy_contract(
-      contract: 'contracts/StubERC20',
+    res = deploy_contract_with_proxy(
+      implementation: 'contracts/StubERC20',
       args: ["WETH"],
       from: from_address
     )

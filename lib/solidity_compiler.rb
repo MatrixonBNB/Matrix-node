@@ -23,7 +23,6 @@ class SolidityCompiler
   end
   
   def self.reset_checksum
-    Rails.cache.clear
     @checksum = nil
   end
   
@@ -31,10 +30,7 @@ class SolidityCompiler
     include Memery
 
     def compile(filename_or_solidity_code)
-      checksum = directory_checksum(
-        Rails.root.join('lib', 'solidity'),
-        Rails.root.join('node_modules')
-      )
+      checksum = directory_checksum
 
       if File.exist?(filename_or_solidity_code)
         memoized_compile(filename_or_solidity_code, checksum)
@@ -43,7 +39,12 @@ class SolidityCompiler
       end
     end
     
-    def directory_checksum(*directories)
+    def directory_checksum
+      directories = [
+        Rails.root.join('lib', 'solidity'),
+        Rails.root.join('node_modules')
+      ]
+      
       register_reloader_hook unless @reloader_hook_registered
       
       if ENV['LISTEN_FOR_SOLIDITY_CHANGES']

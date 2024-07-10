@@ -277,7 +277,7 @@ CREATE TABLE public.facet_blocks (
     number bigint NOT NULL,
     block_hash character varying NOT NULL,
     eth_block_hash character varying NOT NULL,
-    eth_block_number character varying NOT NULL,
+    eth_block_number integer NOT NULL,
     base_fee_per_gas bigint NOT NULL,
     extra_data character varying NOT NULL,
     gas_limit bigint NOT NULL,
@@ -328,6 +328,7 @@ CREATE TABLE public.facet_transaction_receipts (
     block_number integer NOT NULL,
     contract_address character varying,
     legacy_contract_address character varying,
+    legacy_contract_address_map jsonb DEFAULT '{}'::jsonb NOT NULL,
     cumulative_gas_used bigint NOT NULL,
     deposit_nonce character varying NOT NULL,
     deposit_receipt_version character varying NOT NULL,
@@ -559,6 +560,13 @@ ALTER TABLE ONLY public.schema_migrations
 --
 
 CREATE INDEX idx_on_block_number_transaction_index_c73dc27dfd ON public.facet_transaction_receipts USING btree (block_number, transaction_index);
+
+
+--
+-- Name: idx_on_legacy_contract_address_map_1188d7b51d; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_on_legacy_contract_address_map_1188d7b51d ON public.facet_transaction_receipts USING gin (legacy_contract_address_map);
 
 
 --

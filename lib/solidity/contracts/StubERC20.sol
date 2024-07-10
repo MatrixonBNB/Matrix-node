@@ -2,9 +2,14 @@
 pragma solidity 0.8.26;
 
 import '../legacy/FacetERC20.sol';
+import "solady/src/utils/Initializable.sol";
 
-contract StubERC20 is FacetERC20 {
-    constructor(string memory name) {
+contract StubERC20 is FacetERC20, Initializable {
+    constructor() {
+        _disableInitializers();
+    }
+    
+    function initialize(string memory name) public initializer {
         _initializeERC20(name, "symbol", 18);
     }
 

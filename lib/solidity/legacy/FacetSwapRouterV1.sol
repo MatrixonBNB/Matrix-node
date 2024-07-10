@@ -11,7 +11,7 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
     struct FacetSwapRouterV1Storage {
         address factory;
         address WETH;
-        uint8 maxPathLength;
+        uint256 maxPathLength;
     }
 
     function s() internal pure returns (FacetSwapRouterV1Storage storage rs) {
@@ -193,14 +193,8 @@ contract FacetSwapRouterV1 is Initializable, Upgradeable {
         (reserveA, reserveB) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
     }
 
-    function pairFor(address factory, address tokenA, address tokenB) internal pure returns (address pair) {
-        (address token0, address token1) = sortTokens(tokenA, tokenB);
-        pair = address(uint160(uint256(keccak256(abi.encodePacked(
-            hex'ff',
-            factory,
-            keccak256(abi.encodePacked(token0, token1)),
-            keccak256(type(FacetSwapPairV1).creationCode)
-        )))));
+    function pairFor(address factory, address tokenA, address tokenB) internal view returns (address pair) {
+        return FacetSwapFactoryV1(factory).getPair(tokenA, tokenB);
     }
 
     function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {

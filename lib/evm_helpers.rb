@@ -1,4 +1,8 @@
 module EVMHelpers
+  include Memery
+  class << self
+    include Memery
+  end
   extend self
   
   def get_contract(contract_path, address)
@@ -8,19 +12,33 @@ module EVMHelpers
     contract_abi = contract_compiled[contract_name]['abi']
     Eth::Contract.from_abi(name: contract_name, address: address.to_s, abi: contract_abi)
   end
+
   
-  def compile_contract(contract_path)
-    contract_name = contract_path.split('/').last
-    contract_file = Rails.root.join('lib', 'solidity', "#{contract_path}.sol")
+  class << self
+    def compile_contract(contract_path)
+      checksum = SolidityCompiler.directory_checksum
     
-    contract_compiled = SolidityCompiler.compile(contract_file)
-    contract_bytecode = contract_compiled[contract_name]['bytecode']
-    contract_abi = contract_compiled[contract_name]['abi']
-    contract_bin_runtime = contract_compiled[contract_name]['bin_runtime']
-    contract = Eth::Contract.from_bin(name: contract_name, bin: contract_bytecode, abi: contract_abi)
-    contract.parent.bin_runtime = contract_bin_runtime
-    contract
+      memoized_compile_contract(contract_path, checksum)
+    end
+    
+    def memoized_compile_contract(contract_path, checksum)
+      Rails.cache.fetch(['memoized_compile_contract', contract_path, checksum]) do
+        contract_name = contract_path.split('/').last
+        contract_file = Rails.root.join('lib', 'solidity', "#{contract_path}.sol")
+        
+        contract_compiled = SolidityCompiler.compile(contract_file)
+        contract_bytecode = contract_compiled[contract_name]['bytecode']
+        contract_abi = contract_compiled[contract_name]['abi']
+        contract_bin_runtime = contract_compiled[contract_name]['bin_runtime']
+        contract = Eth::Contract.from_bin(name: contract_name, bin: contract_bytecode, abi: contract_abi)
+        contract.parent.bin_runtime = contract_bin_runtime
+        contract
+      end
+    end
+    
+    memoize :memoized_compile_contract
   end
+  delegate :compile_contract, to: EVMHelpers
   
   def proxy_and_implementation_deploy_data(
     proxy_path: 'legacy/EtherBridge',
@@ -36,10 +54,13 @@ module EVMHelpers
   end
   
   def get_deploy_data(contract_path, constructor_args)
-    contract = compile_contract(contract_path)
+    contract = EVMHelpers.compile_contract(contract_path)
 
     encoded_constructor_params = contract.parent.function_hash['constructor'].get_call_data(*constructor_args)
     deploy_data = contract.bin + encoded_constructor_params
+  rescue => e
+    binding.irb
+    raise
   end
 
 end

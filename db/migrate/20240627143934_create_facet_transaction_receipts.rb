@@ -5,7 +5,7 @@ class CreateFacetTransactionReceipts < ActiveRecord::Migration[7.1]
       t.string :block_hash, null: false
       t.integer :block_number, null: false
       t.string :contract_address
-      t.string :legacy_contract_address
+      t.jsonb :legacy_contract_address_map, null: false, default: {}
       t.bigint :cumulative_gas_used, null: false
       t.string :deposit_nonce, null: false
       t.string :deposit_receipt_version, null: false
@@ -24,10 +24,10 @@ class CreateFacetTransactionReceipts < ActiveRecord::Migration[7.1]
       t.check_constraint "from_address ~ '^0x[a-f0-9]{40}$'"
       t.check_constraint "to_address ~ '^0x[a-f0-9]{40}$'"
       t.check_constraint "contract_address ~ '^0x[a-f0-9]{40}$'"
-      t.check_constraint "legacy_contract_address ~ '^0x[a-f0-9]{40}$'"
       
       t.timestamps
       
+      t.index :legacy_contract_address_map, using: :gin
       t.index :transaction_hash, unique: true
       t.index :block_hash
       t.index :block_number

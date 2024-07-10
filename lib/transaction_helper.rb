@@ -95,16 +95,22 @@ module TransactionHelper
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
-    implementation_address = deploy_contract(
-      from: from,
-      contract: implementation,
-      args: [],
-      value: value,
-      gas_limit: gas_limit,
-      max_fee_per_gas: max_fee_per_gas,
-      expect_failure: expect_failure
-    ).contract_address
+    pre_deploy = Ethscription.predeploy_to_local_map.invert[implementation.split("/").last]
     
+    implementation_address = if pre_deploy
+      pre_deploy
+    else
+      deploy_contract(
+        from: from,
+        contract: implementation,
+        args: [],
+        value: value,
+        gas_limit: gas_limit,
+        max_fee_per_gas: max_fee_per_gas,
+        expect_failure: expect_failure
+      ).contract_address  
+    end
+  
     initialize_calldata = get_function_calldata(
       contract: implementation,
       function: 'initialize',
@@ -304,11 +310,11 @@ module TransactionHelper
     res = trigger_contract_interaction(from: from, payload: payload, expect_failure: false, block_timestamp: block_timestamp)
 
     # Ensure the transaction was successful
-    unless res.receipts_imported.map(&:status).uniq == [1]
+    unless res.receipts_imported.map(&:status) == [1]
       raise "Transaction failed"
     end
 
-    res
+    res.receipts_imported.first
   end
 
   def trigger_contract_interaction_and_expect_error(from:, payload:, error_msg_includes: nil, block_timestamp: nil)

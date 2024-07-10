@@ -2,8 +2,11 @@
 pragma solidity 0.8.26;
 
 import "solady/src/tokens/ERC20.sol";
+import "solady/src/utils/LibString.sol";
 
 abstract contract FacetERC20 is ERC20 {
+    using LibString for *;
+    
     struct FacetERC20Storage {
         string name;
         string symbol;
@@ -33,5 +36,21 @@ abstract contract FacetERC20 is ERC20 {
     
     function decimals() public view virtual override returns (uint8) {
         return _FacetERC20Storage().decimals;
+    }
+    
+    function transfer(address to, uint amount) public override returns (bool) {
+        uint256 currentBalance = balanceOf(msg.sender);
+        require(currentBalance >= amount, 
+        string.concat("ERC20: transfer amount exceeds balance. Balance: ", currentBalance.toString(), " Amount: ", amount.toString())
+        );
+        return super.transfer(to, amount);
+    }
+    
+    function _burn(address from, uint amount) internal override {
+        uint256 currentBalance = balanceOf(from);
+        require(currentBalance >= amount,
+        string.concat("ERC20: burn amount exceeds balance. Balance: ", currentBalance.toString(), " Amount: ", amount.toString())
+        );
+        return super._burn(from, amount);
     }
 }

@@ -3,17 +3,18 @@ pragma solidity 0.8.26;
 
 import "./FacetERC20.sol";
 import "./Upgradeable.sol";
+import "./FacetSwapFactoryV1.sol";
 import "solady/src/utils/Initializable.sol";
-
-interface IFacetSwapV1Factory {
-    function feeTo() external view returns (address);
-}
+import "solady/src/utils/LibString.sol";
+import "../contracts/Console.sol";
 
 interface FacetSwapV1Callee {
     function facetSwapV1Call(address sender, uint256 amount0Out, uint256 amount1Out, bytes calldata data) external;
 }
 
 contract FacetSwapPairV1 is FacetERC20, Initializable, Upgradeable {
+    using LibString for *;
+    
     struct FacetSwapV1PairStorage {
         address factory;
         address token0;
@@ -57,7 +58,6 @@ contract FacetSwapPairV1 is FacetERC20, Initializable, Upgradeable {
         _initializeERC20("FacetSwap V1 ERC20", "FACET-V1", 18);
         s().factory = msg.sender;
         _initializeUpgradeAdmin(msg.sender);
-        _mint(address(0), MINIMUM_LIQUIDITY);
         s().unlocked = 1;
         
         s().token0 = _token0;
@@ -99,12 +99,13 @@ contract FacetSwapPairV1 is FacetERC20, Initializable, Upgradeable {
     }
 
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool) {
-        address feeTo = IFacetSwapV1Factory(s().factory).feeTo();
+        address feeTo = FacetSwapFactoryV1(s().factory).feeTo();
         bool feeOn = feeTo != address(0);
         uint256 _kLast = s().kLast;
         if (feeOn) {
             if (_kLast != 0) {
-                uint256 rootK = sqrt(_reserve0 * _reserve1);
+                uint squared = uint(_reserve0) * uint(_reserve1);
+                uint256 rootK = sqrt(squared);
                 uint256 rootKLast = sqrt(_kLast);
                 if (rootK > rootKLast) {
                     uint256 numerator = totalSupply() * (rootK - rootKLast);
@@ -209,17 +210,11 @@ contract FacetSwapPairV1 is FacetERC20, Initializable, Upgradeable {
         _update(ERC20(s().token0).balanceOf(address(this)), ERC20(s().token1).balanceOf(address(this)), s().reserve0, s().reserve1);
     }
 
-    function sqrt(uint y) internal pure returns (uint z) {
-        if (y > 3) {
-            z = y;
-            uint x = y / 2 + 1;
-            while (x < z) {
-                z = x;
-                x = (y / x + x) / 2;
-            }
-        } else if (y != 0) {
-            z = 1;
-        }
+    function sqrt(uint input) public view returns (uint) {
+        address pre = 0xf8F50DB43a2b7Dace8D24C481e0FE45459A0966D;
+        (bool success, bytes memory output) = pre.staticcall(abi.encode(input));
+        require(success, "Failed to call sqrt precompile contract");
+        return abi.decode(output, (uint));
     }
 
     function min(uint x, uint y) internal pure returns (uint z) {

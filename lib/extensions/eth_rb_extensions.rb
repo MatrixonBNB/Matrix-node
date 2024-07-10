@@ -2,6 +2,10 @@ module EthRbExtensions
   ::Eth::Contract.class_eval do
     attr_accessor :bin_runtime
     
+    def init_code_hash
+      @init_code_hash ||= Eth::Util.keccak256(bin.hex_to_bytes).bytes_to_hex
+    end
+    
     def function_hash
       @function_hash = functions.each_with_object({}) do |function, hash|
         hash[function.name] = function
@@ -27,6 +31,7 @@ module EthRbExtensions
     def get_call_data(*args)
       types = inputs.map(&:parsed_type)
       
+      args = args.map{|i| i.is_a?(String) ? i.b : i}
       args = normalize_args(args, inputs)
       
       encoded_str = Eth::Util.bin_to_hex(Eth::Abi.encode(types, args))
@@ -121,7 +126,7 @@ module EthRbExtensions
         end
       end
 
-      decoded_event
+      decoded_event.with_indifferent_access
     end
   end
 
@@ -137,7 +142,9 @@ module EthRbExtensions
       decoded_event = event.decode_log(log, abi)
       {
         address: log["address"],
-        event: "#{event.name} (#{event.input_types.join(", ")})",
+        # event: "#{event.name} (#{event.input_types.join(", ")})",
+        # name: event.name,
+        event: event.name,
         data: decoded_event,
         blockNumber: log["blockNumber"],
         transactionHash: log["transactionHash"],
@@ -145,7 +152,7 @@ module EthRbExtensions
         blockHash: log["blockHash"],
         logIndex: log["logIndex"],
         removed: log["removed"]
-      }
+      }.with_indifferent_access
     end
   end
 end

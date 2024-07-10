@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import "./Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
 import "./FacetSwapPairV1.sol";
+import "./ERC1967Proxy.sol";
 
 contract FacetSwapFactoryV1 is Initializable, Upgradeable {
     struct FacetSwapV1FactoryStorage {
@@ -42,6 +43,10 @@ contract FacetSwapFactoryV1 is Initializable, Upgradeable {
     function getPair(address tokenA, address tokenB) public view returns (address pair) {
         return s().getPair[tokenA][tokenB];
     }
+    
+    function feeTo() public view returns (address) {
+        return s().feeTo;
+    }
 
     function createPair(address tokenA, address tokenB) public returns (address pair) {
         require(tokenA != tokenB, "FacetSwapV1: IDENTICAL_ADDRESSES");
@@ -49,17 +54,13 @@ contract FacetSwapFactoryV1 is Initializable, Upgradeable {
         require(token0 != address(0), "FacetSwapV1: ZERO_ADDRESS");
         require(s().getPair[token0][token1] == address(0), "FacetSwapV1: PAIR_EXISTS");
 
-        // bytes32 salt = keccak256(abi.encodePacked(token0, token1));
-        // pair = address(new FacetSwapPairV1{salt: salt}());
-        // FacetSwapPairV1(pair).initialize(token0, token1);
+        bytes32 hsh = keccak256(type(FacetSwapPairV1).creationCode);
+        address implementationAddress = address(uint160(uint256(hsh)));
         
-        bytes memory bytecode = type(FacetSwapPairV1).creationCode;
-        bytes32 salt = keccak256(abi.encodePacked(token0, token1));
-        assembly {
-            pair := create2(0, add(bytecode, 32), mload(bytecode), salt)
-        }
-        FacetSwapPairV1(pair).initialize(token0, token1);
+        bytes32 proxySalt = keccak256(abi.encodePacked(token0, token1));
+        bytes memory initBytes = abi.encodeCall(FacetSwapPairV1.initialize, (token0, token1));
         
+        pair = address(new ERC1967Proxy{salt: proxySalt}(implementationAddress, initBytes));
 
         s().getPair[token0][token1] = pair;
         s().getPair[token1][token0] = pair;

@@ -72,13 +72,11 @@ class Ethscription < ApplicationRecord
     elsif content['op'] == 'call'
       to_address = calculate_to_address(data['to'], block_number)
       
-      implementation_address = Rails.cache.fetch([to_address, '__getImplementation'], expires_in: 10.seconds) do
-        TransactionHelper.static_call(
-          contract: 'legacy/ERC1967Proxy',
-          address: to_address,
-          function: '__getImplementation',
-          args: []
-        )
+      implementation_address = get_implementation(to_address)
+      
+      unless implementation_address
+        binding.irb
+        raise "No implementation address for #{to_address}"
       end
       
       contract_name = local_from_predeploy(implementation_address)
@@ -113,18 +111,31 @@ class Ethscription < ApplicationRecord
   end
   
   class << self
+    def get_implementation(to_address)
+      Rails.cache.fetch([to_address, '__getImplementation', Rails.env]) do
+        TransactionHelper.static_call(
+          contract: 'legacy/ERC1967Proxy',
+          address: to_address,
+          function: '__getImplementation',
+          args: []
+        )
+      end
+    end
+    memoize :get_implementation
+    
     def calculate_to_address(legacy_to, block_number)
-      deploy_receipt = FacetTransactionReceipt.find_by(legacy_contract_address: legacy_to)
+      deploy_receipt = FacetTransactionReceipt.find_by("legacy_contract_address_map ? :legacy_to", legacy_to: legacy_to)
       
       unless deploy_receipt
         raise ContractMissing, "Contract #{legacy_to} not found"
       end
       
-      deploy_receipt.contract_address
+      deploy_receipt.legacy_contract_address_map[legacy_to]
     end
     memoize :calculate_to_address
   end
   delegate :calculate_to_address, to: :class
+  delegate :get_implementation, to: :class
   
   def self.t
     no_ar_logging; EthBlock.delete_all; reload!; 50.times{EthBlockImporter.import_next_block;}
@@ -180,7 +191,11 @@ class Ethscription < ApplicationRecord
   end
   
   def self.predeploy_to_local_map
-    {
+    index_by_real_init_code = [
+      "FacetSwapPairV1"
+    ]
+    
+    map = {
       "0x897d289b77c8393783829489b9ab3255c0158064": "EtherBridgeV1",
       "0x137e368f782453e41f622fa8cf68296d04c84c88": "PublicMintERC20V1",
       "0x9dc4e7f596baf4227f919102a7f80523834edb02": "AirdropERC20V1",
@@ -190,6 +205,13 @@ class Ethscription < ApplicationRecord
       "0x1f157ea244a08dd78c14ba8faa7280559232b099": "FacetSwapRouterV1",
       "0x00000000000000000000000000000000000000c5": "NonExistentContractShim"
     }.with_indifferent_access
+    
+    index_by_real_init_code.each do |contract|
+      contract = EVMHelpers.compile_contract("legacy/#{contract}")
+      map["0x" + contract.parent.init_code_hash.last(40)] = contract.name
+    end
+    
+    map
   end
   
   def self.local_from_predeploy(address)
@@ -218,6 +240,7 @@ class Ethscription < ApplicationRecord
   end
   
   def self.write_alloc_to_genesis
+    Rails.cache.clear
     SolidityCompiler.reset_checksum
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
