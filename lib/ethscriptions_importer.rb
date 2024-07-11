@@ -215,8 +215,6 @@ module EthscriptionsImporter
   end
   
   def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, timestamp: nil)
-    eth_block.reload
-    
     facet_block = FacetBlock.from_eth_block(eth_block, timestamp: timestamp)
     
     facet_txs = facet_txs_from_ethscriptions_in_block(

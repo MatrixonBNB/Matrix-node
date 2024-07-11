@@ -260,9 +260,7 @@ class Ethscription < ApplicationRecord
       filename = File.basename(file_path, ".sol")
   
       if filename.match(/V[a-f0-9]{3}$/i)
-        logger.info("Retreiving address of #{filename}")
         address = LegacyContractArtifact.address_from_suffix(filename)
-        logger.info("Address of #{filename} is #{address}")
         map[address] = filename
   
         # Compile the contract and add to the map using init_code_hash
