@@ -105,3 +105,5 @@ gem "order_query", "~> 0.5.3"
 gem "rack-cors", "~> 2.0"
 
 gem "diffy", "~> 3.4"
+
+gem "parallel", "~> 1.25"

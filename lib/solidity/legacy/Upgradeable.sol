@@ -2,8 +2,14 @@
 pragma solidity 0.8.26;
 
 import "solady/src/utils/UUPSUpgradeable.sol";
+import "solady/src/utils/LibString.sol";
+import "../contracts/Console.sol";
 
 abstract contract Upgradeable is UUPSUpgradeable {
+    using LibString for *;
+    
+    uint256 public immutable __myAddress = uint256(uint160(address(this)));
+    
     struct UpgradeStorage {
         address upgradeAdmin;
     }
@@ -34,13 +40,15 @@ abstract contract Upgradeable is UUPSUpgradeable {
         require(msg.sender == _upgradeStorage().upgradeAdmin, "NOT_AUTHORIZED");
     }
 
-    function upgradeAndCall(bytes32 newHash, string calldata, bytes calldata migrationCalldata) external {
+    function upgradeAndCall(bytes32 newHash, string calldata newSource, bytes calldata migrationCalldata) external {
         address newImplementation = address(uint160(uint256(newHash)));
-        upgradeToAndCall(newImplementation, migrationCalldata);
+        console.log("__myAddress: ".concat(__myAddress.toHexString()));
+        console.log("address(this): ".concat(address(this).toHexString()));
+        this.upgradeToAndCall(newImplementation, migrationCalldata);
         emit ContractUpgraded(newImplementation);
     }
 
-    function upgrade(bytes32 newHash, string calldata) external {
+    function upgrade(bytes32 newHash, string calldata newSource) external {
         address newImplementation = address(uint160(uint256(newHash)));
         
         this.upgradeToAndCall(newImplementation, bytes(''));

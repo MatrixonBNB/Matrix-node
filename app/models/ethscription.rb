@@ -6,6 +6,7 @@ class Ethscription < ApplicationRecord
   
   class FunctionMissing < StandardError; end
   class InvalidArgValue < StandardError; end
+  class InvalidNumberOfArgs < StandardError; end
   class ContractMissing < StandardError; end
   
   belongs_to :eth_block, foreign_key: :block_number, primary_key: :block_number, optional: true, autosave: false
@@ -70,7 +71,7 @@ class Ethscription < ApplicationRecord
         'legacy/ERC1967Proxy', [predeploy_address, initialize_calldata]
       )
     elsif content['op'] == 'call'
-      to_address = calculate_to_address(data['to'], block_number)
+      to_address = calculate_to_address(data['to'])
       
       implementation_address = get_implementation(to_address)
       
@@ -82,6 +83,31 @@ class Ethscription < ApplicationRecord
       contract_name = local_from_predeploy(implementation_address)
       args = convert_args(contract_name, data['function'], data['args'])
       
+      if data['function'] == 'upgradeAndCall'
+        new_impl_address = "0x" + args.first.last(40)
+        new_contract_name = local_from_predeploy(new_impl_address)
+        migrationCalldata = JSON.parse(args.last)
+        migration_args = convert_args(
+          new_contract_name,
+          migrationCalldata['function'],
+          migrationCalldata['args']
+        )
+        
+        cooked = TransactionHelper.get_function_calldata(
+          contract: new_contract_name,
+          function: migrationCalldata['function'],
+          args: migration_args
+        )
+        
+        args[1] = ''
+        
+        SolidityCompiler.reset_checksum
+        Rails.cache.clear
+        MemeryExtensions.clear_all_caches!
+        
+        args[2] = cooked
+      end
+      
       TransactionHelper.get_function_calldata(
         contract: contract_name,
         function: data['function'],
@@ -90,22 +116,26 @@ class Ethscription < ApplicationRecord
     else
       raise "Unsupported operation: #{content['op']}"
     end
-  rescue FunctionMissing, InvalidArgValue => e
-    data['args'].to_json.bytes_to_hex
+  rescue FunctionMissing, InvalidArgValue, InvalidNumberOfArgs, Eth::Abi::EncodingError => e
+    # ap e
+    # puts [contract_name, data['function'], data['args']].inspect
+    # binding.irb
+    message = "Invalid function call: #{e.message}"
+    message.bytes_to_hex
   rescue ContractMissing => e
     data['to']
   rescue KeyError => e
     ap content
-    # binding.irb
+    binding.irb
     raise
   rescue => e
-    # binding.irb
+    binding.irb
     raise
   end
   
   def facet_tx_to
     return if parsed_content['op'] == 'create'
-    calculate_to_address(parsed_content['data']['to'], block_number)
+    calculate_to_address(parsed_content['data']['to'])
   rescue ContractMissing => e
     "0x00000000000000000000000000000000000000c5"
   end
@@ -123,7 +153,7 @@ class Ethscription < ApplicationRecord
     end
     memoize :get_implementation
     
-    def calculate_to_address(legacy_to, block_number)
+    def calculate_to_address(legacy_to)
       deploy_receipt = FacetTransactionReceipt.find_by("legacy_contract_address_map ? :legacy_to", legacy_to: legacy_to)
       
       unless deploy_receipt
@@ -151,13 +181,37 @@ class Ethscription < ApplicationRecord
     
     inputs = function.inputs
     
+    if inputs.empty? && args.nil?
+      return []
+    end
+    
     args = [args] if args.is_a?(String) || args.is_a?(Integer)
     
     if args.is_a?(Hash)
       args_hash = args.with_indifferent_access
-      args = inputs.map do |input|
-        args_hash[input.name]
+      if args_hash.size != inputs.size
+        raise InvalidNumberOfArgs, "Expected #{inputs.size} arguments, got #{args_hash.size}"
       end
+      args = inputs.map do |input|
+        if input.name == 'withdrawalId'
+          real_withdrawal_id(args_hash[input.name])
+        else
+          args_hash[input.name]
+        end
+      end
+    elsif args.is_a?(Array)
+      if args.size != inputs.size
+        raise InvalidNumberOfArgs, "Expected #{inputs.size} arguments, got #{args.size}"
+      end
+      args = args.each_with_index.map do |arg, index|
+        if inputs[index].name == 'withdrawalId'
+          real_withdrawal_id(arg)
+        else
+          arg
+        end
+      end
+    else
+      raise ArgumentError, "Expected arguments to be a Hash or Array, got #{args.class}"
     end
     
     args = normalize_args(args, inputs)
@@ -169,6 +223,14 @@ class Ethscription < ApplicationRecord
     else
       raise
     end
+  end
+  
+  def real_withdrawal_id(user_withdrawal_id)
+    receipt = FacetTransaction.find_by!(eth_transaction_hash: user_withdrawal_id).facet_transaction_receipt
+    receipt.decoded_legacy_logs.
+      detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId'].bytes_to_hex
+  rescue ActiveRecord::RecordNotFound => e
+    raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
   end
   
   def normalize_args(args, inputs)
@@ -216,7 +278,6 @@ class Ethscription < ApplicationRecord
   
   def self.local_from_predeploy(address)
     name = predeploy_to_local_map.fetch(address.downcase)
-    logger.info("Retreiving #{name} for #{address}")
     "legacy/#{name}"
   end
   
@@ -241,6 +302,7 @@ class Ethscription < ApplicationRecord
   
   def self.write_alloc_to_genesis
     SolidityCompiler.reset_checksum
+    SolidityCompiler.compile_all_legacy_files
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
     genesis_path = File.join(geth_dir, 'facet-chain', 'genesis3.json')

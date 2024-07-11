@@ -110,8 +110,11 @@ module GethDriver
       raise "New payload was not valid: #{status}"
     end
 
-    new_safe_block = FacetBlock.find_by(number: head_block.number - 32) || earliest
-    new_finalized_block = FacetBlock.find_by(number: head_block.number - 63) || earliest
+    target_numbers = [head_block.number - 32, head_block.number - 63]
+    blocks = FacetBlock.where(number: target_numbers).index_by(&:number)
+    
+    new_safe_block = blocks[head_block.number - 32] || earliest
+    new_finalized_block = blocks[head_block.number - 63] || earliest
     
     fork_choice_state = {
       headBlockHash: payload['blockHash'],

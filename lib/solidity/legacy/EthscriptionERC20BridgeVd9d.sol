@@ -3,16 +3,17 @@ pragma solidity 0.8.26;
 
 import "./FacetERC20.sol";
 import "./Upgradeable.sol";
+import "./FacetOwnable.sol";
 import "solady/src/utils/Initializable.sol";
-import "solady/src/auth/Ownable.sol";
 
-contract EthscriptionERC20BridgeVd9d is FacetERC20, Initializable, Upgradeable, Ownable {
+contract EthscriptionERC20BridgeVd9d is FacetERC20, Initializable, Upgradeable, FacetOwnable {
     struct EthscriptionERC20BridgeStorage {
         uint256 mintAmount;
         address trustedSmartContract;
         mapping(address => uint256) bridgedInAmount;
         mapping(bytes32 => uint256) withdrawalIdAmount;
         mapping(address => bytes32) userWithdrawalId;
+        uint256 withdrawalIdNonce;
     }
 
     event BridgedIn(address indexed to, uint256 amount);
@@ -53,7 +54,8 @@ contract EthscriptionERC20BridgeVd9d is FacetERC20, Initializable, Upgradeable, 
     }
 
     function bridgeOut(uint256 amount) public {
-        bytes32 withdrawalId = keccak256(abi.encodePacked(block.timestamp, msg.sender, amount));
+        bytes32 withdrawalId = generateWithdrawalId();
+        
         require(s().userWithdrawalId[msg.sender] == bytes32(0), "Withdrawal pending");
         require(s().withdrawalIdAmount[withdrawalId] == 0, "Already bridged out");
         require(s().bridgedInAmount[msg.sender] >= amount, "Not enough bridged in");
@@ -72,5 +74,9 @@ contract EthscriptionERC20BridgeVd9d is FacetERC20, Initializable, Upgradeable, 
         s().withdrawalIdAmount[withdrawalId] = 0;
         s().userWithdrawalId[to] = bytes32(0);
         emit WithdrawalComplete(to, amount, withdrawalId);
+    }
+    
+    function generateWithdrawalId() internal returns (bytes32) {
+        return keccak256(abi.encode(address(this), msg.sender, s().withdrawalIdNonce++));
     }
 }

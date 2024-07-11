@@ -28,4 +28,12 @@ abstract contract FacetERC721 is ERC721 {
     function symbol() public view virtual override returns (string memory) {
         return _FacetERC721Storage().symbol;
     }
+    
+    function setApprovalForAll(address operator, bool approved) public virtual override {
+        super.setApprovalForAll(operator, approved);
+    }
+    
+    function approve(address spender, uint256 id) public payable virtual override {
+        super.approve(spender, id);
+    }
 }

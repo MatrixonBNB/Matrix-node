@@ -402,6 +402,7 @@ DEPENDENCIES
   memery (~> 1.5)
   net-pop!
   order_query (~> 0.5.3)
+  parallel (~> 1.25)
   pg (~> 1.1)
   pry (~> 0.14.2)
   puma (>= 5.0)

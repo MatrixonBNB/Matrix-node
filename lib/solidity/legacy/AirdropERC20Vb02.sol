@@ -2,10 +2,10 @@
 pragma solidity 0.8.26;
 
 import "./FacetERC20.sol";
+import "./FacetOwnable.sol";
 import "solady/src/utils/Initializable.sol";
-import "solady/src/auth/Ownable.sol";
 
-contract AirdropERC20Vb02 is FacetERC20, Ownable, Initializable {
+contract AirdropERC20Vb02 is FacetERC20, FacetOwnable, Initializable {
     struct AirdropERC20Storage {
         uint256 maxSupply;
         uint256 perMintLimit;

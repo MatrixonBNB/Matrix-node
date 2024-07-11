@@ -319,13 +319,13 @@ module TransactionHelper
       )
     else
       res = trigger_contract_interaction(from: from, payload: payload, expect_failure: false, block_timestamp: block_timestamp)
+      
+      unless res.receipts_imported.map(&:status) == [1]
+        raise "Transaction failed"
+      end
+      
+      res.receipts_imported.first
     end
-
-    unless res.receipts_imported.map(&:status) == [1]
-      raise "Transaction failed"
-    end
-
-    res.receipts_imported.first
   end
 
   def trigger_contract_interaction_and_expect_error(from:, payload:, error_msg_includes: nil, block_timestamp: nil)
@@ -369,6 +369,9 @@ module TransactionHelper
     end
 
     args
+  rescue => e
+    binding.irb
+    raise
   end
   
   def make_static_call(contract:, function_name:, function_args: {})

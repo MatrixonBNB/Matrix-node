@@ -30,6 +30,7 @@ module EthscriptionsImporter
   
   def import_blocks_until_done
     SolidityCompiler.reset_checksum
+    SolidityCompiler.compile_all_legacy_files
     
     raise if in_v2?(next_block_to_import)
     
@@ -109,12 +110,11 @@ module EthscriptionsImporter
     average_gas_per_block_millions = (total_gas / blocks.length / 1_000_000.0).round(2)
     gas_per_second_millions = (total_gas / elapsed_time / 1_000_000.0).round(2)
     
-    puts "Imported #{total_transactions} transactions"
+    puts "Time elapsed: #{elapsed_time.round(2)} s"
     puts "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
-    puts "Imported #{transactions_per_second} transactions / s"
-    puts "Total gas used: #{total_gas_millions} million"
-    puts "Average gas per block: #{average_gas_per_block_millions} million"
-    puts "Gas per second: #{gas_per_second_millions} million"
+    puts "Imported #{total_transactions} transactions (#{transactions_per_second} / s)"
+    puts "Total gas used: #{total_gas_millions} million (avg: #{average_gas_per_block_millions} million / block)"
+    puts "Gas per second: #{gas_per_second_millions} million / s"
     
     block_numbers
   end
@@ -139,7 +139,7 @@ module EthscriptionsImporter
       )
       
       unless legacy_tx_receipts.size == facet_receipts.size
-        # binding.irb
+        binding.irb
         raise "Mismatched number of legacy and facet receipts"
       end
       
@@ -148,17 +148,17 @@ module EthscriptionsImporter
         facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
         
         if legacy_receipt.status != facet_status
-          # binding.irb
+          binding.irb
           raise "Status mismatch: Legacy receipt status #{legacy_status} does not match Facet receipt status #{facet_status}"
         end
         
         if legacy_receipt.created_contract_address && facet_receipts[index].legacy_contract_address_map.keys.exclude?(legacy_receipt.created_contract_address)
-          # binding.irb
+          binding.irb
           raise "Contract address mismatch"
         end
         
         if legacy_receipt.status == 'success' && legacy_receipt.logs.present? && facet_receipt.logs.blank?
-          # binding.irb
+          binding.irb
           raise "Log mismatch: Legacy receipt has logs but Facet receipt has none"
         end
       end
@@ -281,8 +281,7 @@ module EthscriptionsImporter
       )
       
       # Pair the receipt with its legacy counterpart
-      legacy_receipt =legacy_tx_receipts.find { |legacy_tx| legacy_tx.transaction_hash == facet_tx.eth_transaction_hash }
-      # binding.irb
+      legacy_receipt = legacy_tx_receipts.find { |legacy_tx| legacy_tx.transaction_hash == facet_tx.eth_transaction_hash }
       facet_receipt.legacy_receipt = legacy_receipt
       
       receipts << facet_receipt
@@ -294,7 +293,7 @@ module EthscriptionsImporter
     
     [facet_block, facet_txs, receipts]
   rescue => e
-    # binding.irb
+    binding.irb
     raise
   end
   

@@ -9,6 +9,14 @@ class LegacyContractArtifact < ApplicationRecord
     @_cached_all ||= reading { all.oldest_first }
   end
   
+  def self.find_by_name(name)
+    artifacts = cached_all.select { |artifact| artifact.name == name }
+    unless artifacts.size == 1
+      raise "Ambiguous name: #{name}, #{artifacts.map(&:name)}"
+    end
+    artifacts.first
+  end
+  
   def self.shortest_unique_suffix_length
     strings = cached_all.map(&:init_code_hash)
     

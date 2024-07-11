@@ -9,7 +9,7 @@ import "./Pausable.sol";
 import "./FacetOwnable.sol";
 import "solady/src/utils/Initializable.sol";
 
-contract FacetSwapRouterVaf8 is Initializable, Upgradeable, FacetOwnable, Pausable {
+contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausable {
     struct FacetSwapRouterStorage {
         address factory;
         address WETH;
@@ -134,15 +134,17 @@ contract FacetSwapRouterVaf8 is Initializable, Upgradeable, FacetOwnable, Pausab
     ) public virtual whenNotPaused returns (uint256[] memory amounts) {
         require(path[0] == s().WETH || path[path.length - 1] == s().WETH, "Must have WETH as either the first or last token in the path");
         uint256 amountInWithFee = path[0] == s().WETH ? amountIn - calculateFeeAmount(amountIn) : amountIn;
-        amounts = _swapExactTokensForTokens(amountInWithFee, amountOutMin, path, to, deadline);
+        amounts = _swapExactTokensForTokens(amountInWithFee, amountOutMin, path, address(this), deadline);
         uint256 amountToChargeFeeOn = path[0] == s().WETH ? amountIn : amounts[amounts.length - 1];
         uint256 feeAmount = calculateFeeAmount(amountToChargeFeeOn);
-        chargeWethFee(feeAmount);
         if (path[0] == s().WETH) {
             amounts[0] = amountIn;
+            ERC20(s().WETH).transferFrom(msg.sender, address(this), feeAmount);
         } else {
             amounts[amounts.length - 1] = amounts[amounts.length - 1] - feeAmount;
         }
+        ERC20 outputToken = ERC20(path[path.length - 1]);
+        outputToken.transfer(to, amounts[amounts.length - 1]);
         emit FeeAdjustedSwap(path[0], path[path.length - 1], amounts[0], amounts[amounts.length - 1], feeAmount, to);
         return amounts;
     }
@@ -171,15 +173,17 @@ contract FacetSwapRouterVaf8 is Initializable, Upgradeable, FacetOwnable, Pausab
     ) public virtual whenNotPaused returns (uint256[] memory amounts) {
         require(path[0] == s().WETH || path[path.length - 1] == s().WETH, "Must have WETH as either the first or last token in the path");
         uint256 amountOutWithFee = path[path.length - 1] == s().WETH ? amountOut + calculateFeeAmount(amountOut) : amountOut;
-        amounts = _swapTokensForExactTokens(amountOutWithFee, amountInMax, path, to, deadline);
+        amounts = _swapTokensForExactTokens(amountOutWithFee, amountInMax, path, address(this), deadline);
         uint256 amountToChargeFeeOn = path[0] == s().WETH ? amounts[0] : amountOut;
         uint256 feeAmount = calculateFeeAmount(amountToChargeFeeOn);
-        chargeWethFee(feeAmount);
         if (path[0] == s().WETH) {
             amounts[0] = amounts[0] + feeAmount;
+            ERC20(s().WETH).transferFrom(msg.sender, address(this), feeAmount);
         } else {
             amounts[amounts.length - 1] = amountOut;
         }
+        ERC20 outputToken = ERC20(path[path.length - 1]);
+        outputToken.transfer(to, amounts[amounts.length - 1]);
         emit FeeAdjustedSwap(path[0], path[path.length - 1], amounts[0], amounts[amounts.length - 1], feeAmount, to);
         return amounts;
     }
@@ -279,10 +283,6 @@ contract FacetSwapRouterVaf8 is Initializable, Upgradeable, FacetOwnable, Pausab
         require(tokenA != tokenB, "FacetSwapV1Library: IDENTICAL_ADDRESSES");
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "FacetSwapV1Library: ZERO_ADDRESS");
-    }
-
-    function chargeWethFee(uint256 feeAmount) internal {
-        ERC20(s().WETH).transferFrom(msg.sender, address(this), feeAmount);
     }
 
     function calculateFeeAmount(uint256 amount) public view returns (uint256) {

@@ -3,7 +3,6 @@ pragma solidity 0.8.26;
 
 import "solady/src/utils/SafeTransferLib.sol";
 import "solady/src/utils/Initializable.sol";
-import "solady/src/auth/Ownable.sol";
 import "solady/src/utils/Base64.sol";
 import "solady/src/utils/LibString.sol";
 import "solady/src/utils/EIP712.sol";
@@ -12,9 +11,10 @@ import "./Upgradeable.sol";
 import "./Pausable.sol";
 import "./FacetERC20.sol";
 import "./FacetERC721.sol";
+import "./FacetOwnable.sol";
 import "../contracts/Console.sol";
 
-contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, Ownable, Pausable, EIP712 {
+contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnable, Pausable, EIP712 {
     using LibString for *;
     using SafeTransferLib for address;
     using ECDSA for bytes32;

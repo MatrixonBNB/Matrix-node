@@ -15,13 +15,6 @@ class SolidityCompiler
     @current_contract = nil
   end
 
-  def self.register_reloader_hook
-    ActiveSupport::Reloader.to_prepare do
-      SolidityCompiler.reset_checksum
-    end
-    @reloader_hook_registered = true
-  end
-  
   def self.reset_checksum
     @checksum = nil
   end
@@ -45,8 +38,6 @@ class SolidityCompiler
         Rails.root.join('node_modules')
       ]
       
-      register_reloader_hook unless @reloader_hook_registered
-      
       if ENV['LISTEN_FOR_SOLIDITY_CHANGES']
         calculate_checksum(directories)
       else
@@ -63,39 +54,29 @@ class SolidityCompiler
       digest.hexdigest
     end
 
+    def compile_all_legacy_files
+      directory = Rails.root.join('lib', 'solidity', 'legacy')
+      files = Dir.glob("#{directory}/**/*.sol").select { |f| File.file?(f) }
+  
+      results = Parallel.map(files, in_processes: Parallel.processor_count) do |file|
+        checksum = directory_checksum
+        memoized_compile(file, checksum)
+      end
+  
+      # Combine results into a single hash
+      combined_results = results.reduce({}) do |acc, result|
+        acc.merge(result)
+      end
+  
+      combined_results
+    end
+    
     def memoized_compile(filename_or_solidity_code, checksum = nil)
       Rails.cache.fetch(['compile', checksum, filename_or_solidity_code.to_s], expires_in: 1.day) do
         new(filename_or_solidity_code).get_solidity_bytecode_and_abi
       end
     end
     memoize :memoized_compile
-  end
-
-  def self.deploy(file, contract, *constructor_args)
-    bytecode = SolidityCompiler.compile(file)[contract]['bytecode']
-    abi = SolidityCompiler.compile(file)[contract]['abi']
-    
-    contract = Eth::Contract.from_bin(name: contract, bin: bytecode, abi: abi)
-
-    encoded_args = contract.parent.function_hash["constructor"].get_call_data(*constructor_args)
-    
-    deployment_data = bytecode + encoded_args
-    
-    evm = EVM.new(
-      common: Common.stub,
-      state_manager: StateManager.new(common: Common.stub),
-      # performance_logger: performance_logger,
-      # transient_storage: transient_storage,
-      # opts_cached: opts_cached
-    )
-    
-    result = evm.run_call(
-      gasPrice: 1,
-      caller: Address.from_string("0x32768bf8bf25915d43949eb17aa1c794e7d8f8c7"),
-      value: 0,
-      data: [deployment_data].pack('H*').unpack('C*'),
-      gas_limit: 1_000_00000,
-    )
   end
   
   def compile_solidity(file_path)

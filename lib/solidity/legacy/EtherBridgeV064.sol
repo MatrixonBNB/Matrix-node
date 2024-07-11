@@ -10,6 +10,7 @@ contract EtherBridgeV064 is FacetERC20, Initializable, Upgradeable {
         address trustedSmartContract;
         mapping(bytes32 => uint256) withdrawalIdAmount;
         mapping(address => bytes32) userWithdrawalId;
+        uint256 withdrawalIdNonce;
     }
     
     function s() internal pure returns (BridgeStorage storage cs) {
@@ -41,7 +42,8 @@ contract EtherBridgeV064 is FacetERC20, Initializable, Upgradeable {
     }
 
     function bridgeOut(uint256 amount) public {
-        bytes32 withdrawalId = keccak256(abi.encodePacked(block.timestamp, msg.sender, amount));
+        bytes32 withdrawalId = generateWithdrawalId();
+        
         require(s().userWithdrawalId[msg.sender] == bytes32(0), "Withdrawal pending");
         require(s().withdrawalIdAmount[withdrawalId] == 0, "Already bridged out");
         require(amount > 0, "Invalid amount");
@@ -61,5 +63,9 @@ contract EtherBridgeV064 is FacetERC20, Initializable, Upgradeable {
         s().userWithdrawalId[to] = bytes32(0);
 
         emit WithdrawalComplete(to, amount, withdrawalId);
+    }
+    
+    function generateWithdrawalId() internal returns (bytes32) {
+        return keccak256(abi.encode(address(this), msg.sender, s().withdrawalIdNonce++));
     }
 }
