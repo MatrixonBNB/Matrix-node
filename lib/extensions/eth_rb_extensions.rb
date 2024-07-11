@@ -41,9 +41,9 @@ module EthRbExtensions
       else
         Eth::Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
       end
-    # rescue Eth::Abi::EncodingError => e
-    #   binding.irb
-    #   raise
+    rescue Eth::Abi::EncodingError => e
+      # binding.irb
+      raise
     rescue => e
       binding.irb
       raise
