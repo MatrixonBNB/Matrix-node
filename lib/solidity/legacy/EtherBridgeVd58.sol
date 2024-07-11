@@ -6,7 +6,7 @@ import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/Base64.sol";
 import "./FacetERC20.sol";
 import "./FacetOwnable.sol";
-import "./FacetBuddyFactory.sol";
+import "./FacetBuddyFactoryVef8.sol";
 
 contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable {
     struct BridgeStorage {
@@ -66,13 +66,13 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
             return;
         }
 
-        address buddy = FacetBuddyFactory(s().facetBuddyFactory).findOrCreateBuddy(to);
+        address buddy = FacetBuddyFactoryVef8(s().facetBuddyFactory).findOrCreateBuddy(to);
         bridgeIn(buddy, amount);
-        FacetBuddy(buddy).callFromBridge(addressToCall, Base64.decode(base64Calldata));
+        FacetBuddyVe5c(buddy).callFromBridge(addressToCall, Base64.decode(base64Calldata));
     }
 
     function predictBuddyAddress(address forUser) public view returns (address) {
-        return FacetBuddyFactory(s().facetBuddyFactory).predictBuddyAddress(forUser);
+        return FacetBuddyFactoryVef8(s().facetBuddyFactory).predictBuddyAddress(forUser);
     }
 
     function bridgeOut(uint256 amount) public {

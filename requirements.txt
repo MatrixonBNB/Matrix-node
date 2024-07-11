@@ -1,1 +1,1 @@
-solc-select
+solc-select==1.0.4
