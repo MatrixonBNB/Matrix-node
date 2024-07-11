@@ -334,4 +334,8 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         tokenAName = ERC20(tokenA).name();
         tokenBName = ERC20(tokenB).name();
     }
+    
+    function factory() public view returns (address) {
+        return s().factory;
+    }
 }

@@ -80,6 +80,10 @@ class LegacyContractArtifact < ApplicationRecord
     puts "Diff saved to: #{diff_file_path}"
   end
   
+  def name_and_suffix
+    "#{primary_contract_name}V#{init_code_hash.last(3)}"
+  end
+  
   def primary_contract_name
     self.class.extract_primary_contract_name(source_code)
   end

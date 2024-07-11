@@ -1,18 +1,6 @@
 class SolidityCompiler
   def initialize(filename_or_solidity_code)
-    # if filename_or_solidity_code.to_s.each_line.count == 1 && !File.exist?(filename_or_solidity_code)
-    #   raise "File not found: #{filename_or_solidity_code}"
-    # end
-    
-    if File.exist?(filename_or_solidity_code)
-      @solidity_file = filename_or_solidity_code
-      @solidity_code = nil
-    else
-      @solidity_code = filename_or_solidity_code
-      @solidity_file = nil
-    end
-    @contracts = {}
-    @current_contract = nil
+    @solidity_file = filename_or_solidity_code
   end
 
   def self.reset_checksum
@@ -25,11 +13,7 @@ class SolidityCompiler
     def compile(filename_or_solidity_code)
       checksum = directory_checksum
 
-      if File.exist?(filename_or_solidity_code)
-        memoized_compile(filename_or_solidity_code, checksum)
-      else
-        memoized_compile(filename_or_solidity_code, checksum)
-      end
+      memoized_compile(filename_or_solidity_code, checksum)
     end
     
     def directory_checksum
@@ -71,15 +55,15 @@ class SolidityCompiler
       combined_results
     end
     
-    def memoized_compile(filename_or_solidity_code, checksum = nil)
-      Rails.cache.fetch(['compile', checksum, filename_or_solidity_code.to_s], expires_in: 1.day) do
-        new(filename_or_solidity_code).get_solidity_bytecode_and_abi
+    def memoized_compile(filename, checksum)
+      Rails.cache.fetch(['compile', checksum, filename.to_s]) do
+        compile_solidity(filename)
       end
     end
     memoize :memoized_compile
   end
   
-  def compile_solidity(file_path)
+  def self.compile_solidity(file_path)
     pragma_version = nil
     File.foreach(file_path) do |line|
       if line =~ /pragma solidity (.+);/
@@ -141,17 +125,5 @@ class SolidityCompiler
   
     # Return the hash mapping contract names to their bytecode and ABI
     contract_data
-  end
-
-  def get_solidity_bytecode_and_abi
-    if @solidity_file
-      compile_solidity(@solidity_file)
-    else
-      Tempfile.open(['temp_contract', '.sol']) do |file|
-        file.write(@solidity_code)
-        file.flush
-        compile_solidity(file.path)
-      end
-    end
   end
 end

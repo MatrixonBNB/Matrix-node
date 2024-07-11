@@ -36,4 +36,8 @@ abstract contract FacetERC721 is ERC721 {
     function approve(address spender, uint256 id) public payable virtual override {
         super.approve(spender, id);
     }
+    
+    function isApprovedOrOwner(address spender, uint256 id) public view virtual returns (bool) {
+        return super._isApprovedOrOwner(spender, id);
+    }
 }

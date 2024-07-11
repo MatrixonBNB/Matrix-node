@@ -35,6 +35,9 @@ module EVMHelpers
         contract.parent.bin_runtime = contract_bin_runtime
         contract
       end
+    rescue => e
+      binding.irb
+      raise
     end
     
     memoize :memoized_compile_contract
