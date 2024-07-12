@@ -57,14 +57,16 @@ module EVMHelpers
     proxy_deploy_data = get_deploy_data(proxy_path, [implementation_byte_code, implementation_init])
   end
   
-  def get_deploy_data(contract_path, constructor_args)
-    contract = EVMHelpers.compile_contract(contract_path)
-
-    encoded_constructor_params = contract.parent.function_hash['constructor'].get_call_data(*constructor_args)
-    deploy_data = contract.bin + encoded_constructor_params
-  rescue => e
-    # binding.irb
-    raise
+  class << self
+    def get_deploy_data(contract_path, constructor_args)
+      contract = EVMHelpers.compile_contract(contract_path)
+  
+      encoded_constructor_params = contract.parent.function_hash['constructor'].get_call_data(*constructor_args)
+      deploy_data = contract.bin + encoded_constructor_params
+    rescue => e
+      binding.irb
+      raise
+    end
+    memoize :get_deploy_data
   end
-
 end

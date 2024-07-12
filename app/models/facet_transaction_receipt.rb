@@ -8,29 +8,56 @@ class FacetTransactionReceipt < ApplicationRecord
   
   attr_accessor :legacy_receipt
   
+  
   def set_legacy_contract_address_map
     unless legacy_receipt
       self.legacy_contract_address_map[calculate_legacy_contract_address] = contract_address
       self.legacy_contract_address_map.compact!
       return
     end
-    
+  
     self.legacy_contract_address_map[legacy_receipt.created_contract_address] = contract_address
-    
-    our_pair_created = decoded_legacy_logs.detect do |log|
-      log['event'] == 'PairCreated'
-    end
-    
-    if our_pair_created
-      their_pair_created = legacy_receipt.logs.detect{|i| i['event'] == 'PairCreated'}
-      
-      if their_pair_created
-        self.legacy_contract_address_map[their_pair_created['data']['pair']] = our_pair_created['data']['pair']
-      end
-    end
-    
+  
+    update_legacy_contract_address_map('PairCreated', 'pair')
+    update_legacy_contract_address_map('BridgeCreated', 'bridge')
+    update_legacy_contract_address_map('BuddyCreated', 'buddy')
+  
     self.legacy_contract_address_map.compact!
   end
+  
+  def update_legacy_contract_address_map(event_name, key_name)
+    our_event = decoded_legacy_logs.detect { |log| log['event'] == event_name }
+    return unless our_event
+  
+    their_event = legacy_receipt.logs.detect { |i| i['event'] == event_name }
+    return unless their_event
+  
+    self.legacy_contract_address_map[their_event['data'][key_name]] = our_event['data'][key_name]
+  end
+
+  # def set_legacy_contract_address_map
+  #   unless legacy_receipt
+  #     self.legacy_contract_address_map[calculate_legacy_contract_address] = contract_address
+  #     self.legacy_contract_address_map.compact!
+  #     return
+  #   end
+    
+  #   self.legacy_contract_address_map[legacy_receipt.created_contract_address] = contract_address
+    
+  #   our_pair_created = decoded_legacy_logs.detect do |log|
+  #     log['event'] == 'PairCreated'
+  #   end
+    
+  #   if our_pair_created
+  #     their_pair_created = legacy_receipt.logs.detect{|i| i['event'] == 'PairCreated'}
+      
+  #     if their_pair_created
+  #       self.legacy_contract_address_map[their_pair_created['data']['pair']] = our_pair_created['data']['pair']
+  #     end
+  #   end
+    
+  #   self.legacy_contract_address_map.compact!
+  # end
   
   def trace
     process_trace(GethDriver.trace_transaction(transaction_hash))

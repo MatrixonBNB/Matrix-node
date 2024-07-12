@@ -49,8 +49,6 @@ contract FacetSwapRouterVaf8 is Initializable, Upgradeable, FacetOwnable, Pausab
     }
     
     function onUpgrade(address owner, bool initialPauseState) public reinitializer(2) {
-        require(msg.sender == address(this), "Only the contract itself can upgrade");
-        
         _initializeOwner(owner);
         
         if (initialPauseState) {

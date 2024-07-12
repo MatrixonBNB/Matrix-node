@@ -33,6 +33,6 @@ Memery::ModuleMethods.prepend(MemeryExtensions)
 # Register a reloader hook to reset the checksum and clear caches
 ActiveSupport::Reloader.to_prepare do
   SolidityCompiler.reset_checksum
-  Rails.cache.clear
+  # Rails.cache.clear
   MemeryExtensions.clear_all_caches!
 end

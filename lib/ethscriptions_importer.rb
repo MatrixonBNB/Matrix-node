@@ -28,6 +28,7 @@ module EthscriptionsImporter
     [blocks_behind, 100].min
   end
   
+  # reload!; no_ar_logging; EthscriptionsImporter.import_blocks_until_done
   def import_blocks_until_done
     SolidityCompiler.reset_checksum
     SolidityCompiler.compile_all_legacy_files
@@ -163,6 +164,8 @@ module EthscriptionsImporter
         end
       end
       
+      ethscriptions.each(&:clear_caches_if_upgrade!)
+      
       OpenStruct.new(
         facet_block: facet_block,
         transactions_imported: facet_txs,
@@ -204,6 +207,8 @@ module EthscriptionsImporter
 
   def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, legacy_tx_receipts)
     ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
+      ethscription.clear_caches_if_upgrade!
+      
       legacy_tx_receipt = legacy_tx_receipts.find { |r| r.transaction_hash == ethscription.transaction_hash }
       facet_tx = FacetTransaction.from_eth_tx_and_ethscription(ethscription, idx, legacy_tx_receipt)
       facet_tx.mint = 500.ether

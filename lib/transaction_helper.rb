@@ -26,15 +26,18 @@ module TransactionHelper
     function_obj.parse_result(result)
   end
   
-  def get_function_calldata(
-    contract:,
-    function:,
-    args:
-  )
-    contract_object = get_contract(contract, "0x0000000000000000000000000000000000000000")
-    
-    function_obj = contract_object.parent.function_hash[function]
-    function_obj.get_call_data(*args)
+  class << self
+    def get_function_calldata(
+      contract:,
+      function:,
+      args:
+    )
+      contract_object = compile_contract(contract)
+      
+      function_obj = contract_object.parent.function_hash[function]
+      function_obj.get_call_data(*args)
+    end
+    memoize :get_function_calldata
   end
   
   def call_contract_function(

@@ -71,7 +71,15 @@ class Ethscription < ApplicationRecord
         'legacy/ERC1967Proxy', [predeploy_address, initialize_calldata]
       )
     elsif content['op'] == 'call'
+      clear_caches_if_upgrade!
+      
       to_address = calculate_to_address(data['to'])
+      
+      if data['function'] == 'upgradePairs'
+        data['args']['pairs'] = data['args']['pairs'].map do |pair|
+          Ethscription.calculate_to_address(pair)
+        end
+      end
       
       implementation_address = get_implementation(to_address)
       
@@ -101,13 +109,11 @@ class Ethscription < ApplicationRecord
         
         args[1] = ''
         
-        SolidityCompiler.reset_checksum
-        Rails.cache.clear
-        MemeryExtensions.clear_all_caches!
-        
         args[2] = cooked
       end
       
+      clear_caches_if_upgrade!
+
       TransactionHelper.get_function_calldata(
         contract: contract_name,
         function: data['function'],
@@ -131,6 +137,24 @@ class Ethscription < ApplicationRecord
   rescue => e
     binding.irb
     raise
+  end
+  
+  def is_upgrade?
+    content = parsed_content
+    data = content['data']
+    fn = data['function']
+    
+    ['upgradeAndCall', 'upgrade', 'upgradePairs', 'upgradePair'].include?(fn)
+  end
+  
+  def clear_caches!
+    SolidityCompiler.reset_checksum
+    Rails.cache.clear
+    MemeryExtensions.clear_all_caches!
+  end
+  
+  def clear_caches_if_upgrade!
+    clear_caches! if is_upgrade?
   end
   
   def facet_tx_to
@@ -163,66 +187,86 @@ class Ethscription < ApplicationRecord
       deploy_receipt.legacy_contract_address_map[legacy_to]
     end
     memoize :calculate_to_address
+    
+    def convert_args(contract_name, function_name, args)
+      contract = EVMHelpers.compile_contract(contract_name)
+      function = contract.functions.find { |f| f.name == function_name }
+      
+      unless function
+        # If the function is missing, try to find the next implementation
+        current_suffix = contract_name.last(3)
+        current_artifact = LegacyContractArtifact.find_by_suffix(current_suffix)
+        
+        next_artifact = LegacyContractArtifact.find_next_artifact(current_artifact)
+        if next_artifact
+          next_artifact_suffix = next_artifact.init_code_hash.last(3)
+        
+          next_artifact_name = contract_name.gsub(current_suffix, next_artifact_suffix)
+          
+          contract = EVMHelpers.compile_contract(next_artifact_name)
+          function = contract.functions.find { |f| f.name == function_name }
+          
+          unless function
+            raise FunctionMissing, "Function #{function_name} not found in #{contract} or its next implementation"
+          end
+        else
+          raise FunctionMissing, "Function #{function_name} not found in #{contract} and no next implementation found"
+        end
+      end
+      
+      inputs = function.inputs
+      
+      if inputs.empty? && args.nil?
+        return []
+      end
+      
+      args = [args] if args.is_a?(String) || args.is_a?(Integer)
+      
+      if args.is_a?(Hash)
+        args_hash = args.with_indifferent_access
+        if args_hash.size != inputs.size
+          raise InvalidNumberOfArgs, "Expected #{inputs.size} arguments, got #{args_hash.size}"
+        end
+        args = inputs.map do |input|
+          if input.name == 'withdrawalId'
+            real_withdrawal_id(args_hash[input.name])
+          else
+            args_hash[input.name]
+          end
+        end
+      elsif args.is_a?(Array)
+        if args.size != inputs.size
+          raise InvalidNumberOfArgs, "Expected #{inputs.size} arguments, got #{args.size}"
+        end
+        args = args.each_with_index.map do |arg, index|
+          if inputs[index].name == 'withdrawalId'
+            real_withdrawal_id(arg)
+          else
+            arg
+          end
+        end
+      else
+        raise ArgumentError, "Expected arguments to be a Hash or Array, got #{args.class}"
+      end
+      
+      args = normalize_args(args, inputs)
+      
+      args
+    rescue ArgumentError => e
+      if e.message.include?("invalid value for Integer()")
+        raise InvalidArgValue, "Invalid value: #{e.message.split(':').last.strip}"
+      else
+        raise
+      end
+    end
+    memoize :convert_args
   end
   delegate :calculate_to_address, to: :class
   delegate :get_implementation, to: :class
+  delegate :convert_args, to: :class
   
   def self.t
     no_ar_logging; EthBlock.delete_all; reload!; 50.times{EthBlockImporter.import_next_block;}
-  end
-  
-  def convert_args(contract, function_name, args)
-    contract = EVMHelpers.compile_contract(contract)
-    function = contract.functions.find { |f| f.name == function_name }
-    
-    unless function
-      raise FunctionMissing, "Function #{function_name} not found in #{contract}"
-    end
-    
-    inputs = function.inputs
-    
-    if inputs.empty? && args.nil?
-      return []
-    end
-    
-    args = [args] if args.is_a?(String) || args.is_a?(Integer)
-    
-    if args.is_a?(Hash)
-      args_hash = args.with_indifferent_access
-      if args_hash.size != inputs.size
-        raise InvalidNumberOfArgs, "Expected #{inputs.size} arguments, got #{args_hash.size}"
-      end
-      args = inputs.map do |input|
-        if input.name == 'withdrawalId'
-          real_withdrawal_id(args_hash[input.name])
-        else
-          args_hash[input.name]
-        end
-      end
-    elsif args.is_a?(Array)
-      if args.size != inputs.size
-        raise InvalidNumberOfArgs, "Expected #{inputs.size} arguments, got #{args.size}"
-      end
-      args = args.each_with_index.map do |arg, index|
-        if inputs[index].name == 'withdrawalId'
-          real_withdrawal_id(arg)
-        else
-          arg
-        end
-      end
-    else
-      raise ArgumentError, "Expected arguments to be a Hash or Array, got #{args.class}"
-    end
-    
-    args = normalize_args(args, inputs)
-    
-    args
-  rescue ArgumentError => e
-    if e.message.include?("invalid value for Integer()")
-      raise InvalidArgValue, "Invalid value: #{e.message.split(':').last.strip}"
-    else
-      raise
-    end
   end
   
   def real_withdrawal_id(user_withdrawal_id)
@@ -252,31 +296,35 @@ class Ethscription < ApplicationRecord
     end
   end
   
-  def self.predeploy_to_local_map
-    legacy_dir = Rails.root.join("lib/solidity/legacy")
-    map = {}
+  class << self
+    def predeploy_to_local_map
+      legacy_dir = Rails.root.join("lib/solidity/legacy")
+      map = {}
+      
+      Dir.glob("#{legacy_dir}/*.sol").each do |file_path|
+        filename = File.basename(file_path, ".sol")
     
-    Dir.glob("#{legacy_dir}/*.sol").each do |file_path|
-      filename = File.basename(file_path, ".sol")
-  
-      if filename.match(/V[a-f0-9]{3}$/i)
-        address = LegacyContractArtifact.address_from_suffix(filename)
-        map[address] = filename
-  
-        # Compile the contract and add to the map using init_code_hash
-        contract = EVMHelpers.compile_contract("legacy/#{filename}")
-        map["0x" + contract.parent.init_code_hash.last(40)] = filename
-      end
-    end 
+        if filename.match(/V[a-f0-9]{3}$/i)
+          address = LegacyContractArtifact.address_from_suffix(filename)
+          map[address] = filename
     
-    map["0x00000000000000000000000000000000000000c5"] = "NonExistentContractShim"
+          # Compile the contract and add to the map using init_code_hash
+          contract = EVMHelpers.compile_contract("legacy/#{filename}")
+          map["0x" + contract.parent.init_code_hash.last(40)] = filename
+        end
+      end 
+      
+      map["0x00000000000000000000000000000000000000c5"] = "NonExistentContractShim"
+      
+      map
+    end
+    memoize :predeploy_to_local_map
     
-    map
-  end
-  
-  def self.local_from_predeploy(address)
-    name = predeploy_to_local_map.fetch(address.downcase)
-    "legacy/#{name}"
+    def local_from_predeploy(address)
+      name = predeploy_to_local_map.fetch(address.downcase)
+      "legacy/#{name}"
+    end
+    memoize :local_from_predeploy
   end
   
   def self.get_code(address)

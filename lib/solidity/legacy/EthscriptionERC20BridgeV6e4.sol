@@ -81,7 +81,6 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     }
     
     function onUpgrade(address owner, uint256 bridgeLimit) public reinitializer(2) {
-        require(msg.sender == address(this), "Only the contract itself can upgrade");
         _setOwner(owner);
         s().bridgeLimit = bridgeLimit;
     }

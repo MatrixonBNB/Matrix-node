@@ -3,10 +3,14 @@ pragma solidity 0.8.26;
 
 import "./Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
+import "solady/src/utils/LibString.sol";
 import "./FacetSwapPairVdfd.sol";
 import "./ERC1967Proxy.sol";
+import "../contracts/Console.sol";
 
 contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
+    using LibString for *;
+    
     struct FacetSwapFactoryStorage {
         address feeTo;
         address feeToSetter;
@@ -92,16 +96,24 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     function upgradePairs(address[] calldata pairs, bytes32 newHash, string calldata newSource) public {
         require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
         require(pairs.length <= 10, "Too many pairs to upgrade at once");
-
+        console.log("Upgrading pairs...");
+        console.log("newHash: ".concat(abi.encodePacked(newHash).toHexString()));
+        console.log("newSource: ".concat(newSource));
+        console.log("Pairs length: ".concat(pairs.length.toString()));
         for (uint256 i = 0; i < pairs.length; i++) {
+            console.log("i: ".concat(i.toString()));
             address pair = pairs[i];
-            string memory sourceToUse = i == 0 ? newSource : "";
-            upgradePair(pair, newHash, sourceToUse);
+            console.log("pair: ".concat(pair.toHexString()));
+            // string memory sourceToUse = i == 0 ? newSource : "";
+            upgradePair(pair, newHash, "");
         }
     }
 
     function upgradePair(address pair, bytes32 newHash, string memory newSource) public {
         require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
+        console.log("Upgrading pair...");
+        console.log("newHash: ".concat(abi.encodePacked(newHash).toHexString()));
+        console.log("newSource: ".concat(newSource));
         Upgradeable(pair).upgrade(newHash, newSource);
     }
 }
