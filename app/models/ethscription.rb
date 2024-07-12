@@ -279,23 +279,24 @@ class Ethscription < ApplicationRecord
         arg_value
       end
     end
+    
+    def real_withdrawal_id(user_withdrawal_id)
+      receipt = FacetTransaction.find_by!(eth_transaction_hash: user_withdrawal_id).facet_transaction_receipt
+      receipt.decoded_legacy_logs.
+        detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId'].bytes_to_hex
+    rescue ActiveRecord::RecordNotFound => e
+      raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
+    end
   end
   delegate :calculate_to_address, to: :class
   delegate :get_implementation, to: :class
   delegate :convert_args, to: :class
   delegate :normalize_args, to: :class
   delegate :normalize_arg_value, to: :class
+  delegate :real_withdrawal_id, to: :class
   
   def self.t
     no_ar_logging; EthBlock.delete_all; reload!; 50.times{EthBlockImporter.import_next_block;}
-  end
-  
-  def real_withdrawal_id(user_withdrawal_id)
-    receipt = FacetTransaction.find_by!(eth_transaction_hash: user_withdrawal_id).facet_transaction_receipt
-    receipt.decoded_legacy_logs.
-      detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId'].bytes_to_hex
-  rescue ActiveRecord::RecordNotFound => e
-    raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
   end
   
   class << self
