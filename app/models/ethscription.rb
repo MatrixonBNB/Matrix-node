@@ -67,7 +67,7 @@ class Ethscription < ApplicationRecord
         args: args
       )
       
-      TransactionHelper.get_deploy_data(
+      EVMHelpers.get_deploy_data(
         'legacy/ERC1967Proxy', [predeploy_address, initialize_calldata]
       )
     elsif content['op'] == 'call'
@@ -260,10 +260,31 @@ class Ethscription < ApplicationRecord
       end
     end
     memoize :convert_args
+    
+    def normalize_args(args, inputs)
+      args&.each_with_index&.map do |arg_value, idx|
+        input = inputs[idx]
+        normalize_arg_value(arg_value, input)
+      end
+    end
+  
+    def normalize_arg_value(arg_value, input)
+      if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
+        Integer(arg_value, 10)
+      elsif arg_value.is_a?(Array)
+        arg_value.map do |val|
+          normalize_arg_value(val, input)
+        end
+      else
+        arg_value
+      end
+    end
   end
   delegate :calculate_to_address, to: :class
   delegate :get_implementation, to: :class
   delegate :convert_args, to: :class
+  delegate :normalize_args, to: :class
+  delegate :normalize_arg_value, to: :class
   
   def self.t
     no_ar_logging; EthBlock.delete_all; reload!; 50.times{EthBlockImporter.import_next_block;}
@@ -275,25 +296,6 @@ class Ethscription < ApplicationRecord
       detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId'].bytes_to_hex
   rescue ActiveRecord::RecordNotFound => e
     raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
-  end
-  
-  def normalize_args(args, inputs)
-    args&.each_with_index&.map do |arg_value, idx|
-      input = inputs[idx]
-      normalize_arg_value(arg_value, input)
-    end
-  end
-
-  def normalize_arg_value(arg_value, input)
-    if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
-      Integer(arg_value, 10)
-    elsif arg_value.is_a?(Array)
-      arg_value.map do |val|
-        normalize_arg_value(val, input)
-      end
-    else
-      arg_value
-    end
   end
   
   class << self

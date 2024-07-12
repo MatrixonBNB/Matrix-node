@@ -3,6 +3,7 @@ module TransactionHelper
   include Memery
   class << self
     include Memery
+    include EVMHelpers
   end
   extend self
   
