@@ -1,5 +1,9 @@
 module TransactionHelper
   include EVMHelpers
+  include Memery
+  class << self
+    include Memery
+  end
   extend self
   
   @contract_addresses = {}
