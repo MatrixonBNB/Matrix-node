@@ -282,6 +282,11 @@ class Ethscription < ApplicationRecord
     
     def real_withdrawal_id(user_withdrawal_id)
       receipt = FacetTransaction.find_by!(eth_transaction_hash: user_withdrawal_id).facet_transaction_receipt
+      
+      if receipt.status == 0
+        return user_withdrawal_id
+      end
+      
       receipt.decoded_legacy_logs.
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId'].bytes_to_hex
     rescue ActiveRecord::RecordNotFound => e
