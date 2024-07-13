@@ -125,12 +125,12 @@ contract FacetPortV27b is Upgradeable, FacetOwnable, Pausable, Initializable, EI
     ) internal whenNotPaused returns (bool) {
         bytes32 hashedMessage = keccak256(abi.encode(
             keccak256("Offer(string offerType,bytes16 offerId,address offerer,address assetContract,uint256 assetId,string assetType,uint256 assetAmount,address considerationToken,uint256 considerationAmount,uint256 startTime,uint256 endTime)"),
-            offerType,
+            keccak256(bytes(offerType)),
             offerId,
             offerer,
             assetContract,
             assetId,
-            assetType,
+            keccak256(bytes(assetType)),
             assetAmount,
             considerationToken,
             considerationAmount,
