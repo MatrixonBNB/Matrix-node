@@ -30,7 +30,7 @@ module GethDriver
   end
   
   def non_authed_rpc_url
-    GethClient.new(ENV.fetch('NON_AUTH_GETH_RPC_URL'))
+    ENV.fetch('NON_AUTH_GETH_RPC_URL')
   end
   
   def trace_transaction(tx_hash)

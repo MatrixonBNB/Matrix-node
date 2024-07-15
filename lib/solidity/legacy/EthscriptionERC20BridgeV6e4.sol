@@ -80,7 +80,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         emit WithdrawalComplete(to, amount, withdrawalId);
     }
     
-    function onUpgrade(address owner, uint256 bridgeLimit) public reinitializer(2) {
+    function onUpgrade(address owner, uint256 bridgeLimit) public reinitializer(3) {
         _setOwner(owner);
         s().bridgeLimit = bridgeLimit;
     }
