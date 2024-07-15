@@ -78,7 +78,7 @@ gem "rspec-rails", "~> 6.1"
 
 gem "awesome_print", "~> 1.9"
 
-gem "eth"
+gem "eth", github: "RogerPodacter/eth.rb"
 
 gem "dotenv-rails", "~> 3.1", :group => [:development, :test]
 
