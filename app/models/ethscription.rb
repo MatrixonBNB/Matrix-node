@@ -270,7 +270,8 @@ class Ethscription < ApplicationRecord
   
     def normalize_arg_value(arg_value, input)
       if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
-        Integer(arg_value, 10)
+        base = arg_value.start_with?('0x') ? 16 : 10
+        Integer(arg_value, base)
       elsif arg_value.is_a?(Array)
         arg_value.map do |val|
           normalize_arg_value(val, input)
