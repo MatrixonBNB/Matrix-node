@@ -110,8 +110,59 @@ class Ethscription < ApplicationRecord
         args[1] = ''
         
         args[2] = cooked
+      elsif data['function'] == 'setMetadataRenderer'
+        metadata_calldata = JSON.parse(data['args'].is_a?(Array) ? data['args'].last : data['args']['data'])
+        
+        target_contract_name = if metadata_calldata['args'].keys == ['info']
+          "legacy/EditionMetadataRendererV3f8"
+        else
+          "legacy/TokenUpgradeRendererVbf5"
+        end
+        
+        metadata_args = convert_args(
+          target_contract_name,
+          metadata_calldata['function'],
+          metadata_calldata['args']
+        )
+        
+        cooked_metadata = TransactionHelper.get_function_calldata(
+          contract: target_contract_name,
+          function: metadata_calldata['function'],
+          args: metadata_args.map(&:to_h)
+        )
+        
+        args[1] = cooked_metadata.hex_to_bytes
+      elsif data['function'] == 'bridgeAndCall'
+        base64_input = data['args'].is_a?(Hash) ? data['args']['base64Calldata'] : data['args'].last
+        decoded_input = Base64.strict_decode64(base64_input)
+        
+        to_address = calculate_to_address(data['args'].is_a?(Hash) ? data['args']['addressToCall'] : data['args'].third)
+        implementation_address = get_implementation(to_address)
+        sub_contract_name = local_from_predeploy(implementation_address)
+        
+        bridge_calldata = begin
+          json_input = JSON.parse(decoded_input)
+          
+          bridge_args = convert_args(
+            sub_contract_name,
+            json_input['function'],
+            json_input['args']
+          )
+          
+          TransactionHelper.get_function_calldata(
+            contract: sub_contract_name,
+            function: json_input['function'],
+            args: bridge_args
+          )
+        rescue JSON::ParserError => e
+          "__invalidJSON__: #{e.message}".bytes_to_hex
+        end
+                
+        encoded_calldata = Base64.strict_encode64(bridge_calldata.hex_to_bytes)
+        args[3] = encoded_calldata
+        # binding.irb
       end
-      
+      # binding.irb
       clear_caches_if_upgrade!
 
       TransactionHelper.get_function_calldata(
@@ -122,10 +173,9 @@ class Ethscription < ApplicationRecord
     else
       raise "Unsupported operation: #{content['op']}"
     end
-  rescue FunctionMissing, InvalidArgValue, InvalidNumberOfArgs, Eth::Abi::EncodingError => e
+  rescue FunctionMissing, InvalidArgValue, InvalidNumberOfArgs, Eth::Abi::EncodingError, Eth::Abi::ValueOutOfBounds => e
     # ap e
     # puts [contract_name, data['function'], data['args']].inspect
-    # binding.irb
     message = "Invalid function call: #{e.message}"
     message.bytes_to_hex
   rescue ContractMissing => e
@@ -178,6 +228,12 @@ class Ethscription < ApplicationRecord
     memoize :get_implementation
     
     def calculate_to_address(legacy_to)
+      EthscriptionsImporter.facet_transaction_receipts_in_current_batch&.each do |receipt|
+        if receipt.legacy_contract_address_map.key?(legacy_to)
+          return receipt.legacy_contract_address_map[legacy_to]
+        end
+      end  
+      
       deploy_receipt = FacetTransactionReceipt.find_by("legacy_contract_address_map ? :legacy_to", legacy_to: legacy_to)
       
       unless deploy_receipt
@@ -282,14 +338,31 @@ class Ethscription < ApplicationRecord
     end
     
     def real_withdrawal_id(user_withdrawal_id)
-      receipt = FacetTransaction.find_by!(eth_transaction_hash: user_withdrawal_id).facet_transaction_receipt
+      # Check in-memory cache first
+      transaction = EthscriptionsImporter.facet_transactions_in_current_batch&.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
+      
+      if transaction
+        receipt = EthscriptionsImporter.facet_transaction_receipts_in_current_batch.find { |r| r.transaction_hash == transaction.tx_hash }
+      else
+        # Fallback to database query
+        transaction = FacetTransaction.find_by(eth_transaction_hash: user_withdrawal_id)
+        if transaction
+          receipt = transaction.facet_transaction_receipt
+        else
+          raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
+        end
+      end
+      
+      unless receipt
+        raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
+      end
       
       if receipt.status == 0
         return user_withdrawal_id
       end
       
       receipt.decoded_legacy_logs.
-        detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId'].bytes_to_hex
+        detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
     rescue ActiveRecord::RecordNotFound => e
       raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
     end

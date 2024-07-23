@@ -31,7 +31,7 @@ class CreateEthCalls < ActiveRecord::Migration[7.1]
     add_index :eth_calls, [:block_hash, :call_index], unique: true
     add_index :eth_calls, [:block_hash, :parent_call_index]
     
-    add_foreign_key :eth_calls, :eth_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
-    add_foreign_key :eth_calls, :eth_transactions, column: :transaction_hash, primary_key: :tx_hash, on_delete: :cascade
+    # add_foreign_key :eth_calls, :eth_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
+    # add_foreign_key :eth_calls, :eth_transactions, column: :transaction_hash, primary_key: :tx_hash, on_delete: :cascade
   end
 end

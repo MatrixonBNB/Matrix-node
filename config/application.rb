@@ -18,6 +18,8 @@ module SimpleVm
     
     config.active_record.schema_format = :sql
     
+    config.active_record.async_query_executor = :global_thread_pool
+    
     config.active_record.raise_int_wider_than_64bit = false
 
     # Configuration for the application, engines, and railties goes here.

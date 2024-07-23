@@ -25,13 +25,52 @@ module EthRbExtensions
       
       @function_hash
     end
+    
+    def decode_call_data(calldata)
+      # Extract the function signature (first 4 bytes)
+      function_signature = calldata[0, 10]
+      
+      # Find the function by its signature hash
+      function = functions.find { |f| f.signature == function_signature[2..9] }
+      raise "Function not found for signature: #{function_signature}" unless function
+      
+      # Remove the function signature from the calldata
+      encoded_args = calldata[10..-1]
+      
+      # Decode the arguments using the ABI types
+      types = function.inputs.map(&:parsed_type)
+      decoded_args = Eth::Abi.decode(types, Eth::Util.hex_to_bin(encoded_args))
+      
+      # Map the decoded values back to their respective function inputs
+      function.inputs.each_with_index.map do |input, idx|
+        [input.name, decoded_args[idx]]
+      end.to_h
+    rescue Eth::Abi::DecodingError, Eth::Abi::ValueOutOfBounds => e
+      # binding.irb
+      raise
+    rescue => e
+      binding.irb
+      raise
+    end
   end
   
   ::Eth::Contract::Function.class_eval do
+    def fix_encodings(arg)
+      if arg.is_a?(String)
+        arg.b
+      elsif arg.is_a?(Array)
+        arg.map { |i| fix_encodings(i) }
+      elsif arg.is_a?(Hash)
+        arg.transform_values { |v| fix_encodings(v) }
+      else
+        arg
+      end
+    end
+    
     def get_call_data(*args)
       types = inputs.map(&:parsed_type)
       
-      args = args.map{|i| i.is_a?(String) ? i.b : i}
+      args = fix_encodings(args)
       args = normalize_args(args, inputs)
       
       encoded_str = Eth::Util.bin_to_hex(Eth::Abi.encode(types, args))
@@ -41,7 +80,7 @@ module EthRbExtensions
       else
         Eth::Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
       end
-    rescue Eth::Abi::EncodingError => e
+    rescue Eth::Abi::EncodingError, Eth::Abi::ValueOutOfBounds => e
       # binding.irb
       raise
     rescue => e
@@ -119,14 +158,23 @@ module EthRbExtensions
       # Decode indexed data from topics
       decoded_event = {}
       indexed_inputs.each_with_index do |input, index|
-        decoded_event[input["name"]] = Eth::Abi.decode([input["type"]], topics[index + 1]).first
+        value = Eth::Abi.decode([input["type"]], topics[index + 1]).first
+        value = value.bytes_to_hex if input["type"].starts_with?("bytes")
+        value = value.force_encoding("utf-8") if input["type"] == "string"
+        decoded_event[input["name"]] = value
       end
-
+      
       # Decode non-indexed data from data field
       unless data == "0x"
         decoded_data = Eth::Abi.decode(non_indexed_inputs.map { |input| input["type"] }, data)
         non_indexed_inputs.each_with_index do |input, index|
-          decoded_event[input["name"]] = decoded_data[index]
+          value = decoded_data[index]
+          # Convert bytes32 to hex
+          value = value.bytes_to_hex if input["type"].starts_with?("bytes")
+          value = value.force_encoding("utf-8") if input["type"] == "string"
+
+          # value = value.bytes_to_hex if input["type"] == "address"
+          decoded_event[input["name"]] = value
         end
       end
 
@@ -157,6 +205,9 @@ module EthRbExtensions
         logIndex: log["logIndex"],
         removed: log["removed"]
       }.with_indifferent_access
+    rescue => e
+      # binding.irb
+      raise
     end
   end
 end

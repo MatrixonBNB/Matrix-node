@@ -1,7 +1,7 @@
 class EthBlock < ApplicationRecord
-  has_many :eth_transactions, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
-  has_many :eth_calls, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
-  has_many :facet_blocks, primary_key: :block_hash, foreign_key: :eth_block_hash, dependent: :destroy
+  has_many :eth_transactions, primary_key: :block_hash, foreign_key: :block_hash, dependent: :delete_all
+  has_many :eth_calls, primary_key: :block_hash, foreign_key: :block_hash, dependent: :delete_all
+  has_many :facet_blocks, primary_key: :block_hash, foreign_key: :eth_block_hash, dependent: :delete_all
   
   def self.from_rpc_result(res)
     block_result = res['result']

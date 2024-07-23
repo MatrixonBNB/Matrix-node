@@ -89,7 +89,7 @@ contract NFTCollectionV5f8 is FacetERC721, FacetERC2981, Upgradeable, FacetOwnab
         address to,
         uint256 amount,
         bytes32[] memory merkleProof
-    ) internal {
+    ) whenNotPaused internal {
         require(isMintActive(), "Mint is not active");
         require(amount > 0, "Amount must be positive");
         require(s().maxSupply == 0 || s().totalSupply + amount <= s().maxSupply, "Exceeded max supply");

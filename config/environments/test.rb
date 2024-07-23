@@ -46,6 +46,9 @@ Rails.application.configure do
 
     config.cache_store = :null_store
   end
+  
+  config.logger = ActiveSupport::Logger.new(IO::NULL)
+  
   # Render exception templates for rescuable exceptions and raise for other exceptions.
   config.action_dispatch.show_exceptions = :rescuable
 

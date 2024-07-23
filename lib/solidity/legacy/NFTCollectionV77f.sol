@@ -91,7 +91,7 @@ contract NFTCollectionV77f is FacetERC721, FacetERC2981, Upgradeable, FacetOwnab
         address to,
         uint256 amount,
         bytes32[] memory merkleProof
-    ) internal {
+    ) whenNotPaused internal {
         require(isMintActive(), "Mint is not active");
         require(amount > 0, "Amount must be positive");
         require(s().maxSupply == 0 || s().totalSupply + amount <= s().maxSupply, "Exceeded max supply");
@@ -130,7 +130,8 @@ contract NFTCollectionV77f is FacetERC721, FacetERC2981, Upgradeable, FacetOwnab
 
         uint256 initialId = s().nextTokenId;
         s().nextTokenId += amount;
-
+        s().totalSupply += amount;
+        
         for (uint256 i = 0; i < amount; i++) {
             _mint(to, initialId + i);
         }

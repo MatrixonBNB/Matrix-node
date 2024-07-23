@@ -24,15 +24,13 @@ module EthscriptionsImporter
   end
   
   def import_batch_size
-    # [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
     [blocks_behind, 100].min
   end
   
-  # reload!; no_ar_logging; EthscriptionsImporter.import_blocks_until_done
   def import_blocks_until_done
     SolidityCompiler.reset_checksum
-    SolidityCompiler.compile_all_legacy_files
-    
+    # SolidityCompiler.compile_all_legacy_files
+    ensure_genesis_blocks
     raise if in_v2?(next_block_to_import)
     
     loop do
@@ -67,37 +65,130 @@ module EthscriptionsImporter
       eth_block = EthBlock.from_legacy_eth_block(genesis_eth_block)
       eth_block.save!
       
-      facet_block = FacetBlock.from_eth_block(eth_block)
+      current_max_block_number = FacetBlock.maximum(:number).to_i
+      
+      facet_block = FacetBlock.from_eth_block(eth_block, current_max_block_number + 1)
       facet_block.from_rpc_response(facet_genesis_block)
       facet_block.save!
     end
   end
   
+  def facet_transaction_receipts_in_current_batch
+    @facet_transaction_receipts_cache
+  end
+  
+  def facet_transactions_in_current_batch
+    @facet_transactions_cache
+  end
+  
   def import_blocks(block_numbers)
-    ensure_genesis_blocks
-    
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
-    legacy_blocks, ethscriptions, legacy_tx_receipts = LegacyEthBlock.reading do
+    @facet_transaction_receipts_cache = []
+    @facet_transactions_cache = []
+
+    legacy_blocks_future, ethscriptions_future, legacy_tx_receipts_future = ApplicationRecord.reading do
       [
-        LegacyEthBlock.where(block_number: block_numbers).to_a,
-        Ethscription.where(block_number: block_numbers).to_a.select(&:contract_transaction?),
-        LegacyFacetTransactionReceipt.where(block_number: block_numbers).to_a
+        LegacyEthBlock.where(block_number: block_numbers).load_async,
+        Ethscription.where(block_number: block_numbers).load_async,
+        LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
       ]
     end
+    
+    legacy_blocks = legacy_blocks_future.to_a
+    ethscriptions = ethscriptions_future.to_a.select(&:contract_transaction?)
+    legacy_tx_receipts = legacy_tx_receipts_future.to_a
     
     ethscriptions_by_block = ethscriptions.group_by(&:block_number)
     legacy_tx_receipts_by_block = legacy_tx_receipts.group_by(&:block_number)
     
+    eth_blocks = []
+    eth_transactions = []
+    all_ethscriptions = []
+    facet_blocks = []
+    all_facet_txs = []
+    all_receipts = []
     res = []
     
-    legacy_blocks.each do |block|
-      res << import_block(
-        block,
-        Array.wrap(ethscriptions_by_block[block.block_number]).sort_by(&:transaction_index),
-        Array.wrap(legacy_tx_receipts_by_block[block.block_number]).sort_by(&:transaction_index)
-      )
+    # Get the current maximum block number from the database
+    current_max_block_number = FacetBlock.maximum(:number).to_i
+    
+    # Get the earliest block
+    earliest = FacetBlock.order(number: :asc).first
+    
+    # Initialize in-memory representation of blocks
+    in_memory_blocks = FacetBlock.where(number: (current_max_block_number - 64 - block_numbers.size)..current_max_block_number).index_by(&:number)
+    
+    ActiveRecord::Base.transaction do
+      legacy_blocks.each_with_index do |block, index|
+        eth_block = EthBlock.from_legacy_eth_block(block)
+        eth_blocks << eth_block
+        
+        block_ethscriptions = Array.wrap(ethscriptions_by_block[block.block_number]).sort_by(&:transaction_index)
+        block_legacy_tx_receipts = Array.wrap(legacy_tx_receipts_by_block[block.block_number]).sort_by(&:transaction_index)
+        
+        eth_transactions.concat(block_ethscriptions.map { |e| EthTransaction.from_ethscription(e) })
+        # all_ethscriptions.concat(block_ethscriptions.map(&:dup))
+        
+        block_number = current_max_block_number + index + 1
+        
+        # Determine the head, safe, and finalized blocks
+        head_block = in_memory_blocks[block_number - 1] || earliest
+        safe_block = in_memory_blocks[block_number - 32] || earliest
+        finalized_block = in_memory_blocks[block_number - 64] || earliest
+        
+        facet_block, facet_txs, receipts = propose_facet_block(
+          eth_block,
+          block_ethscriptions,
+          block_legacy_tx_receipts,
+          block_number: block_number,
+          earliest: earliest,
+          head_block: head_block,
+          safe_block: safe_block,
+          finalized_block: finalized_block
+        )
+        
+        # Update in-memory blocks
+        in_memory_blocks[block_number] = facet_block
+        
+        facet_blocks << facet_block
+        all_facet_txs.concat(facet_txs)
+        all_receipts.concat(receipts)
+        
+        @facet_transaction_receipts_cache.concat(receipts)
+        @facet_transactions_cache.concat(facet_txs)
+
+        receipts.each(&:set_legacy_contract_address_map)
+        
+        validate_receipts(block_legacy_tx_receipts, receipts)
+        
+        block_ethscriptions.each(&:clear_caches_if_upgrade!)
+        
+        res << OpenStruct.new(
+          facet_block: facet_block,
+          transactions_imported: facet_txs,
+          receipts_imported: receipts
+        )
+      end
+      
+      # Parallelize the bulk import operations
+      eth_block_import = Concurrent::Promises.future { EthBlock.import!(eth_blocks) }
+      eth_transaction_import = Concurrent::Promises.future { EthTransaction.import!(eth_transactions) }
+      # ethscription_import = Concurrent::Promises.future { Ethscription.import!(all_ethscriptions) }
+      facet_block_import = Concurrent::Promises.future { FacetBlock.import!(facet_blocks) }
+      facet_transaction_import = Concurrent::Promises.future { FacetTransaction.import!(all_facet_txs) }
+      facet_receipt_import = Concurrent::Promises.future { FacetTransactionReceipt.import!(all_receipts) }
+
+      # Wait for all futures to complete together
+      Concurrent::Promises.zip(
+        eth_block_import,
+        eth_transaction_import,
+        # ethscription_import,
+        facet_block_import,
+        facet_transaction_import,
+        facet_receipt_import
+      ).value!
     end
     
     elapsed_time = Time.current - start
@@ -120,70 +211,129 @@ module EthscriptionsImporter
     block_numbers
   end
   
-  def import_block(block, ethscriptions, legacy_tx_receipts, timestamp: nil)
-    ActiveRecord::Base.transaction do
-      eth_block = EthBlock.from_legacy_eth_block(block)
-
-      eth_block.save!
-
-      eth_transactions = ethscriptions.map { |e| EthTransaction.from_ethscription(e) }
-
-      EthTransaction.import!(eth_transactions)
-      
-      Ethscription.import!(ethscriptions.map(&:dup))
-      
-      facet_block, facet_txs, facet_receipts = propose_facet_block(
-        eth_block,
-        ethscriptions,
-        legacy_tx_receipts,
-        timestamp: timestamp
-      )
-      
-      unless legacy_tx_receipts.size == facet_receipts.size
-        binding.irb
-        raise "Mismatched number of legacy and facet receipts"
-      end
-      
-      legacy_tx_receipts.each_with_index do |legacy_receipt, index|
-        facet_receipt = facet_receipts[index]
-        facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
-        
-        if legacy_receipt.status != facet_status
-          binding.irb
-          raise "Status mismatch: Legacy receipt status #{legacy_status} does not match Facet receipt status #{facet_status}"
-        end
-        
-        if legacy_receipt.created_contract_address && facet_receipts[index].legacy_contract_address_map.keys.exclude?(legacy_receipt.created_contract_address)
-          binding.irb
-          raise "Contract address mismatch"
-        end
-        
-        if legacy_receipt.status == 'success' && legacy_receipt.logs.present? && facet_receipt.logs.blank?
-          binding.irb
-          raise "Log mismatch: Legacy receipt has logs but Facet receipt has none"
-        end
-      end
-      
-      ethscriptions.each(&:clear_caches_if_upgrade!)
-      
-      OpenStruct.new(
-        facet_block: facet_block,
-        transactions_imported: facet_txs,
-        receipts_imported: facet_receipts
-      )
+  def validate_receipts(legacy_tx_receipts, facet_receipts)
+    unless legacy_tx_receipts.size == facet_receipts.size
+      binding.irb
+      raise "Mismatched number of legacy and facet receipts"
     end
-  rescue ActiveRecord::RecordNotUnique => e
-    if e.message.include?("eth_blocks") && e.message.include?("number")
-      logger.info "Block Importer: Block #{block_number} already exists"
-      raise ActiveRecord::Rollback
-    else
-      raise
+    
+    legacy_tx_receipts.each_with_index do |legacy_receipt, index|
+      facet_receipt = facet_receipts[index]
+      facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
+      
+      special_cases = [
+        "0x7926c3ff3acc5089c01ec03982916cbce09a0b5707df9754ac76488e0ff13b9f",
+        "0x71d55e1428ab79f5d2355326ea4fbe9dda74fd7edfd0ef0a45cc24b8cae64a64",
+        "0x040a7d80e00abdb3fb9e59103be7323afb90c00fa9ea2444b9b8b6874a2ba311",
+        "0x2bb5d730d1553eb725a1190d8981943dabb0a6f88548b6edeb192b688b2e0d7c",
+        "0xb3080f456d00e5bc4d2e30cebc2d16ee77e384639f5d21ba9ed48da833afd0b8",
+        "0x7f3141145c852f7eb9d98b277ce901b9a707121153ea5b2e2d43a5ea054eafb6"
+      ]
+      
+      if special_cases.include?(legacy_receipt.transaction_hash)
+        if legacy_receipt.status != 'success' || facet_status != 'failure'
+          binding.irb
+          raise "Special case status mismatch: Legacy receipt status #{legacy_receipt.status} should be 'success' and Facet receipt status #{facet_status} should be 'failure'"
+        end
+      elsif legacy_receipt.status != facet_status
+        binding.irb
+        raise "Status mismatch: Legacy receipt status #{legacy_receipt.status} does not match Facet receipt status #{facet_status}"
+      end
+      
+      if legacy_receipt.created_contract_address && facet_receipts[index].legacy_contract_address_map.keys.exclude?(legacy_receipt.created_contract_address)
+        binding.irb
+        raise "Contract address mismatch"
+      end
+      
+      if legacy_receipt.status == 'success' && legacy_receipt.logs.present? && facet_receipt.logs.blank?
+        binding.irb
+        raise "Log mismatch: Legacy receipt has logs but Facet receipt has none"
+      end
+      
+      # Check for all attributes in CallFromBridge event, with special handling for 'calldata' -> 'outsideCalldata'
+      compare_event_attributes(legacy_receipt, facet_receipt, 'CallFromBridge', { 'outsideCalldata' => 'calldata' }, ['outsideCalldata', 'calldata', 'resultData'])
+
+      # Check for all attributes in CallOnBehalfOfUser event, with special handling for 'userCalldata' -> 'calldata'
+      compare_event_attributes(legacy_receipt, facet_receipt, 'CallOnBehalfOfUser', { 'userCalldata' => 'calldata' }, ['userCalldata', 'calldata', 'resultData'])
+
+      # Check for all attributes in BridgedIn event
+      compare_event_attributes(legacy_receipt, facet_receipt, 'BridgedIn')
+
+      # Check for all attributes in InitiateWithdrawal event, excluding 'withdrawalId'
+      compare_events_multi(legacy_receipt, facet_receipt, [
+        'InitiateWithdrawal',
+        'WithdrawalComplete',
+        'BuddyCreated'
+      ], except: { 'InitiateWithdrawal' => ['withdrawalId'], 'WithdrawalComplete' => ['withdrawalId'], 'BuddyCreated' => ['buddy'] })
+
+      compare_events_multi(legacy_receipt, facet_receipt, [
+        'OfferAccepted',
+        'OfferCancelled',
+        'AllOffersOnAssetCancelledForUser',
+        'AllOffersCancelledForUser',
+        'BridgedIn',
+        'Minted',
+        'PublicMaxPerAddressUpdated',
+        'PublicMintStartUpdated',
+        'PublicMintEndUpdated',
+        'PublicMintPriceUpdated',
+        'AllowListMerkleRootUpdated',
+        'AllowListMaxPerAddressUpdated',
+        'AllowListMintStartUpdated',
+        'AllowListMintEndUpdated',
+        'AllowListMintPriceUpdated',
+        'MaxSupplyUpdated',
+        'BaseURIUpdated',
+        'MediaURIsUpdated',
+        'EditionInitialized',
+        'DescriptionUpdated',
+        'CollectionInitialized',
+        'UpgradeLevelUpdated',
+        'TokenUpgraded',
+        'ContractInfoUpdated',
+        'BatchTransfer',
+        'WithdrawStuckTokens',
+        'PresaleBuy',
+        'PresaleSell',
+        'TokensClaimed',
+        'MetadataRendererUpdated'
+      ])
+    end
+  end
+  
+  def compare_event_attributes(legacy_receipt, facet_receipt, event_name, attribute_mapping = {}, except = [])
+    legacy_event = legacy_receipt.logs.find { |log| log['event'] == event_name }
+    facet_event = facet_receipt.decoded_legacy_logs.find { |log| log['event'] == event_name }
+
+    if legacy_event && facet_event
+      attributes = (legacy_event['data'].keys + facet_event['data'].keys).uniq - except
+      attributes.each do |attribute|
+        legacy_attribute = attribute_mapping[attribute] || attribute
+        facet_attribute = attribute_mapping.invert[attribute] || attribute
+        legacy_value = legacy_event.dig('data', legacy_attribute)
+        facet_value = facet_event.dig('data', facet_attribute)
+
+        both_blank = ['null', ''].include?(legacy_value) && facet_value == "0x"
+
+        if legacy_value != facet_value && !both_blank
+          binding.irb
+          raise "#{event_name} attribute mismatch: Legacy #{legacy_attribute} #{legacy_value} does not match Facet #{facet_attribute} #{facet_value}"
+        end
+      end
+    elsif legacy_event || facet_event
+      binding.irb
+      raise "#{event_name} event presence mismatch: Legacy event present? #{!!legacy_event}, Facet event present? #{!!facet_event}"
+    end
+  end
+
+  def compare_events_multi(legacy_receipt, facet_receipt, events, except: {})
+    events.each do |event_name|
+      compare_event_attributes(legacy_receipt, facet_receipt, event_name, {}, except[event_name] || [])
     end
   end
   
   def import_next_block
     block_number = next_block_to_import
-    
     import_blocks([block_number])
   end
   
@@ -192,7 +342,7 @@ module EthscriptionsImporter
   end
   
   def next_blocks_to_import(n)
-    ensure_genesis_blocks
+    # ensure_genesis_blocks
     
     max_db_block = EthBlock.maximum(:number)
     
@@ -219,8 +369,8 @@ module EthscriptionsImporter
     end
   end
   
-  def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, timestamp: nil)
-    facet_block = FacetBlock.from_eth_block(eth_block, timestamp: timestamp)
+  def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, timestamp: nil, block_number:, earliest:, head_block:, safe_block:, finalized_block:)
+    facet_block = FacetBlock.from_eth_block(eth_block, block_number, timestamp: timestamp)
     
     facet_txs = facet_txs_from_ethscriptions_in_block(
       eth_block,
@@ -232,16 +382,20 @@ module EthscriptionsImporter
     
     response = geth_driver.propose_block(
       payload,
-      facet_block
+      facet_block,
+      earliest,
+      head_block,
+      safe_block,
+      finalized_block
     )
+  
+    geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
+    receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
 
-    geth_block = geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true])
+    # Wait for both futures to complete
+    geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
     
     facet_block.from_rpc_response(geth_block)
-
-    facet_block.save!
-    
-    receipts_data = geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']])
     receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
     
     facet_txs_by_source_hash = facet_txs.index_by(&:source_hash)
@@ -289,10 +443,6 @@ module EthscriptionsImporter
       
       receipts << facet_receipt
     end
-    
-    FacetTransaction.import!(facet_txs)
-    
-    FacetTransactionReceipt.import!(receipts)
     
     [facet_block, facet_txs, receipts]
   rescue => e

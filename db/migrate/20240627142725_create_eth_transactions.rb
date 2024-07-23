@@ -30,7 +30,7 @@ class CreateEthTransactions < ActiveRecord::Migration[7.1]
       t.timestamps
     end
 
-    add_foreign_key :eth_transactions, :eth_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
+    # add_foreign_key :eth_transactions, :eth_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
     add_index :eth_transactions, :block_hash
     add_index :eth_transactions, :block_number
     add_index :eth_transactions, :tx_hash, unique: true

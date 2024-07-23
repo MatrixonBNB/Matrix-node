@@ -41,7 +41,7 @@ class CreateFacetTransactions < ActiveRecord::Migration[7.1]
     add_index :facet_transactions, :tx_hash, unique: true
     add_index :facet_transactions, :eth_transaction_hash
 
-    add_foreign_key :facet_transactions, :eth_transactions, column: :eth_transaction_hash, primary_key: :tx_hash, on_delete: :cascade
-    add_foreign_key :facet_transactions, :facet_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
+    # add_foreign_key :facet_transactions, :eth_transactions, column: :eth_transaction_hash, primary_key: :tx_hash, on_delete: :cascade
+    # add_foreign_key :facet_transactions, :facet_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
   end
 end

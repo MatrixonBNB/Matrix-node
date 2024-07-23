@@ -4,10 +4,7 @@ class FacetTransactionReceipt < ApplicationRecord
   belongs_to :facet_transaction, primary_key: :tx_hash, foreign_key: :transaction_hash
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash
   
-  before_validation :set_legacy_contract_address_map
-  
   attr_accessor :legacy_receipt
-  
   
   def set_legacy_contract_address_map
     unless legacy_receipt
@@ -99,8 +96,16 @@ class FacetTransactionReceipt < ApplicationRecord
       begin
         impl.parent.decode_log(log)
       rescue Eth::Contract::UnknownEvent => e
-        impl = EVMHelpers.compile_contract("legacy/ERC1967Proxy")
-        impl.parent.decode_log(log)
+        begin
+          impl = EVMHelpers.compile_contract("legacy/ERC1967Proxy")
+          impl.parent.decode_log(log)
+        rescue Eth::Contract::UnknownEvent => e
+          impl = EVMHelpers.compile_contract("FacetBuddyVe5c")
+          impl.parent.decode_log(log)
+        rescue => e
+          # binding.irb
+          raise
+        end
       rescue => e
         # binding.irb
         raise

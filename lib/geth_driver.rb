@@ -16,7 +16,8 @@ module GethDriver
     
     sleep 1
   end
-
+  
+  # make geth && \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --http.port 9545 --authrpc.port 9551 --discovery.port 40303 --port 40303 --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --cache 64000 --cache.preimages=true --maxpeers 0 --verbosity 2 --syncmode full --gcmode archive --history.state 0 --history.transactions 0 --nocompaction --rollup.disabletxpoolgossip=true console
   def self.teardown_rspec_geth
     system("pkill -f geth")
   end
@@ -34,6 +35,17 @@ module GethDriver
   end
   
   def trace_transaction(tx_hash)
+    # contract = EVMHelpers.compile_contract("legacy/NFTCollectionVa11")
+    # function = contract.parent.function_hash['contractURI']
+    # data = function.get_call_data
+    
+    # result = GethDriver.non_auth_client.call("eth_call", [{
+    #   to: "0xdcf075616bf2d26775c3500ea3c1513e0442966a",
+    #   data: data
+    # }, "latest"])
+    
+    # function.parse_result(result)
+    
     non_auth_client.call("debug_traceTransaction", [tx_hash, {
       enableMemory: true,
       disableStack: false,
@@ -44,22 +56,7 @@ module GethDriver
     }])
   end
   
-  def propose_block(transactions, new_facet_block, reorg: false)
-    # TODO: make sure that the geth node's latest block is the same as the ruby's
-    earliest = FacetBlock.order(number: :asc).first
-    
-    target_numbers = [
-      new_facet_block.number - 1,
-      new_facet_block.number - 32,
-      new_facet_block.number - 64
-    ]
-    
-    blocks = FacetBlock.where(number: target_numbers).index_by(&:number)
-    
-    head_block = blocks[new_facet_block.number - 1] || earliest
-    safe_block = blocks[new_facet_block.number - 32] || earliest
-    finalized_block = blocks[new_facet_block.number - 64] || earliest
-    
+  def propose_block(transactions, new_facet_block, earliest, head_block, safe_block, finalized_block, reorg: false)
     head_block_hash = head_block.block_hash
     safe_block_hash = safe_block.block_hash
     finalized_block_hash = finalized_block.block_hash
@@ -80,10 +77,6 @@ module GethDriver
       transactions: transactions,
       gasLimit: "0x" + 300e6.to_i.to_s(16),
     }
-    
-    # Recall that a batch contains a list of transactions to be included in a specific L2 block.
-
-    # A batch is encoded as batch_version ++ content, where content depends on the batch_version. Prior to the Delta upgrade, batches all have batch_version 0 and are encoded as described below.
     
     fork_choice_response = client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, payload_attributes])
     raise "Fork choice update failed: #{fork_choice_response['error']}" if fork_choice_response['error']
@@ -109,12 +102,9 @@ module GethDriver
     unless status == 'VALID'
       raise "New payload was not valid: #{status}"
     end
-
-    target_numbers = [head_block.number - 32, head_block.number - 63]
-    blocks = FacetBlock.where(number: target_numbers).index_by(&:number)
-    
-    new_safe_block = blocks[head_block.number - 32] || earliest
-    new_finalized_block = blocks[head_block.number - 63] || earliest
+  
+    new_safe_block = safe_block
+    new_finalized_block = finalized_block
     
     fork_choice_state = {
       headBlockHash: payload['blockHash'],

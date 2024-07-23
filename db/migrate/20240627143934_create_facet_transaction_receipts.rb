@@ -34,7 +34,7 @@ class CreateFacetTransactionReceipts < ActiveRecord::Migration[7.1]
       t.index [:block_number, :transaction_index]
     end
 
-    add_foreign_key :facet_transaction_receipts, :facet_transactions, column: :transaction_hash, primary_key: :tx_hash, on_delete: :cascade
-    add_foreign_key :facet_transaction_receipts, :facet_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
+    # add_foreign_key :facet_transaction_receipts, :facet_transactions, column: :transaction_hash, primary_key: :tx_hash, on_delete: :cascade
+    # add_foreign_key :facet_transaction_receipts, :facet_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
   end
 end

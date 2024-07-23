@@ -30,11 +30,11 @@ class CreateEthscriptions < ActiveRecord::Migration[7.1]
       
       t.check_constraint "processing_state = 'pending' OR processed_at IS NOT NULL"
       
-      t.foreign_key :eth_blocks, column: :block_number, primary_key: :number, on_delete: :cascade
+      # t.foreign_key :eth_blocks, column: :block_number, primary_key: :number, on_delete: :cascade
       
       t.timestamps
     end
     
-    add_foreign_key :ethscriptions, :eth_transactions, column: :transaction_hash, primary_key: :tx_hash, on_delete: :cascade
+    # add_foreign_key :ethscriptions, :eth_transactions, column: :transaction_hash, primary_key: :tx_hash, on_delete: :cascade
   end
 end
