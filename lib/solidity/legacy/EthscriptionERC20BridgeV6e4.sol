@@ -19,8 +19,8 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     }
 
     event BridgedIn(address indexed to, uint256 amount);
-    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 withdrawalId);
-    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 withdrawalId);
+    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 indexed withdrawalId);
+    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 indexed withdrawalId);
 
     function s() internal pure returns (EthscriptionERC20BridgeStorage storage cs) {
         bytes32 position = keccak256("EthscriptionERC20BridgeStorage.contract.storage.v1");

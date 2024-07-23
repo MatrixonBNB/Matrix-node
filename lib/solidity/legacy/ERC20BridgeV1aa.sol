@@ -7,8 +7,8 @@ import "solady/src/utils/Initializable.sol";
 
 contract ERC20BridgeV1aa is FacetERC20, Upgradeable, Initializable {
     event BridgedIn(address indexed to, uint256 amount);
-    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 withdrawalId);
-    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 withdrawalId);
+    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 indexed withdrawalId);
+    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 indexed withdrawalId);
 
     struct ERC20BridgeStorage {
         address factory;

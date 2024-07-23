@@ -26,8 +26,8 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
     }
     
     event BridgedIn(address indexed to, uint256 amount);
-    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 withdrawalId);
-    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 withdrawalId);
+    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 indexed withdrawalId);
+    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 indexed withdrawalId);
 
     constructor() {
       _disableInitializers();

@@ -21,8 +21,8 @@ contract EtherBridgeV064 is FacetERC20, Initializable, Upgradeable {
     }
     
     event BridgedIn(address indexed to, uint256 amount);
-    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 withdrawalId);
-    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 withdrawalId);
+    event InitiateWithdrawal(address indexed from, uint256 amount, bytes32 indexed withdrawalId);
+    event WithdrawalComplete(address indexed to, uint256 amount, bytes32 indexed withdrawalId);
 
     constructor() {
       _disableInitializers();
