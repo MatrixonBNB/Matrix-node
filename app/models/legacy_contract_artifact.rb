@@ -1,4 +1,5 @@
 class LegacyContractArtifact < ApplicationRecord
+  class AmbiguousSuffixError < StandardError; end
   include Memery
   self.table_name = "contract_artifacts"
   
@@ -143,7 +144,9 @@ class LegacyContractArtifact < ApplicationRecord
       artifact.init_code_hash.last(suffix.length) == suffix
     end
        
-    raise "Ambiguous suffix: #{suffix}, #{candidate.map(&:init_code_hash)}" if candidate.size != 1
+    if candidate.size != 1
+      raise AmbiguousSuffixError, "Ambiguous suffix: #{suffix}, #{candidate.map(&:init_code_hash)}"
+    end
     
     candidate.first
   end

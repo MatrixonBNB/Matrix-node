@@ -17,9 +17,7 @@ module BaseFeeGetter
   def start_block
     network = ENV.fetch('ETHEREUM_NETWORK')
     
-    network == "eth-mainnet" ? 18684900 : 5192784
-    
-    # 20441267 - 1000
+    network == "eth-mainnet" ? 18684900 : 5193575
   end
   
   def fetch_base_fees(fetch_batch_size = 100, save_batch_size = 10000)

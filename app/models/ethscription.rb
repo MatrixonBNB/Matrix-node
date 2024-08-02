@@ -454,7 +454,13 @@ class Ethscription < ApplicationRecord
         filename = File.basename(file_path, ".sol")
     
         if filename.match(/V[a-f0-9]{3}$/i)
-          address = LegacyContractArtifact.address_from_suffix(filename)
+          begin
+            address = LegacyContractArtifact.address_from_suffix(filename)
+          rescue LegacyContractArtifact::AmbiguousSuffixError => e
+            next if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+            raise
+          end
+          
           map[address] = filename
     
           # Compile the contract and add to the map using init_code_hash
