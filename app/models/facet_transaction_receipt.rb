@@ -27,7 +27,9 @@ class FacetTransactionReceipt < ApplicationRecord
   
     their_event = legacy_receipt.logs.detect { |i| i['event'] == event_name }
     
-    return if our_event.nil? && their_event.nil?
+    if (our_event.nil? && their_event.nil?) || (legacy_receipt.status == 'failure' && status == 0)
+      return
+    end
     
     unless our_event.present? && their_event.present?
       binding.irb
