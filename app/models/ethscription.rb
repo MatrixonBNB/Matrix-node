@@ -161,8 +161,65 @@ class Ethscription < ApplicationRecord
         encoded_calldata = Base64.strict_encode64(bridge_calldata.hex_to_bytes)
         args[3] = encoded_calldata
         # binding.irb
+      elsif data['function'] == 'callBuddyForUser'
+        input = data['args'].is_a?(Hash) ? data['args']['calldata'] : data['args'].last
+        decoded_input = input
+        
+        to_address = calculate_to_address(data['args'].is_a?(Hash) ? data['args']['addressToCall'] : data['args'].second)
+        implementation_address = get_implementation(to_address)
+        sub_contract_name = local_from_predeploy(implementation_address)
+        
+        factory_calldata = begin
+          json_input = JSON.parse(decoded_input)
+          
+          function = json_input.is_a?(Hash) ? json_input['function'] : json_input.first
+          function_args = json_input.is_a?(Hash) ? json_input['args'] : json_input[1..-1]
+          
+          buddy_args = convert_args(
+            sub_contract_name,
+            function,
+            function_args
+          )
+          
+          TransactionHelper.get_function_calldata(
+            contract: sub_contract_name,
+            function: function,
+            args: buddy_args
+          )
+        rescue JSON::ParserError => e
+          "__invalidJSON__: #{e.message}".bytes_to_hex
+        end
+        
+        args[2] = factory_calldata.hex_to_bin
+      elsif data['function'] == 'bridgeOut' && contract_name == "legacy/ERC20BridgeFactoryVce0"
+        # TransactionHelper.static_call(
+        #   contract: "legacy/ERC20BridgeFactoryVce0",
+        #   address: to_address,
+        #   function: 'bridgeDumbContractToTokenSmartContract',
+        #   args: [data['args']['bridgeDumbContract']]
+        # )
+        args[0] = calculate_to_address(args[0])
+      elsif ['addLiquidity', 'removeLiquidity'].include?(data['function'])
+        token_a = args[0].downcase
+        token_b = args[1].downcase
+        
+        if TransactionHelper.code_at_address(token_a) == "0x"
+          args[0] = calculate_to_address(token_a)
+        end
+        
+        if TransactionHelper.code_at_address(token_b) == "0x"
+          args[1] = calculate_to_address(token_b)
+        end
+      elsif data['function'] == 'swapExactTokensForTokens'
+        path = args[2].map(&:downcase)
+        path.each_with_index do |token, index|
+          if TransactionHelper.code_at_address(token) == "0x"
+            path[index] = calculate_to_address(token)
+          end
+        end
+        
+        args[2] = path
       end
-      # binding.irb
       clear_caches_if_upgrade!
 
       TransactionHelper.get_function_calldata(
@@ -228,6 +285,12 @@ class Ethscription < ApplicationRecord
     memoize :get_implementation
     
     def calculate_to_address(legacy_to)
+      legacy_to = legacy_to.downcase
+      
+      if legacy_to == "0xf9d5202287cef92d34eae7d0a046705e9ec76543"
+        return "0xfaa11f6380ed233a2a7f99940046b853f632c128"
+      end
+      
       EthscriptionsImporter.facet_transaction_receipts_in_current_batch&.each do |receipt|
         if receipt.legacy_contract_address_map.key?(legacy_to)
           return receipt.legacy_contract_address_map[legacy_to]
@@ -413,7 +476,15 @@ class Ethscription < ApplicationRecord
     local = local_from_predeploy(address)
     contract = EVMHelpers.compile_contract(local)
     raise unless contract.parent.bin_runtime
+    unless is_valid_hex?("0x" + contract.parent.bin_runtime)
+      binding.irb
+      raise
+    end
     contract.parent.bin_runtime
+  end
+  
+  def self.is_valid_hex?(hex)
+    hex.match?(/^0x[0-9a-fA-F]+$/) && hex.length.even?
   end
   
   def self.generate_alloc_for_genesis
@@ -429,6 +500,7 @@ class Ethscription < ApplicationRecord
   end
   
   def self.write_alloc_to_genesis
+    Rails.cache.clear
     SolidityCompiler.reset_checksum
     SolidityCompiler.compile_all_legacy_files
     

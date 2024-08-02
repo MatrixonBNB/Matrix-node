@@ -27,4 +27,8 @@ class String
   def hex_to_bytes
     [self.sub(/\A0x/, '')].pack('H*')
   end
+  
+  def hex_to_bin
+    hex_to_bytes
+  end
 end

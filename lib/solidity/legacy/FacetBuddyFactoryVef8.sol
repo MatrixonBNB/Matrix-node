@@ -22,6 +22,10 @@ contract FacetBuddyFactoryVef8 is Upgradeable, Initializable {
         }
     }
 
+    function buddyForUser(address forUser) public view returns (address) {
+        return s().buddyForUser[forUser];
+    }
+
     function initialize(address erc20Bridge) public initializer {
         require(erc20Bridge != address(0), "Invalid smart contract");
         _initializeUpgradeAdmin(msg.sender);

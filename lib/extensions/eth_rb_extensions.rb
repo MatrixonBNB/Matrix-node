@@ -71,7 +71,7 @@ module EthRbExtensions
       types = inputs.map(&:parsed_type)
       
       args = fix_encodings(args)
-      args = normalize_args(args, inputs)
+      args = normalize_args(args, types)
       
       encoded_str = Eth::Util.bin_to_hex(Eth::Abi.encode(types, args))
       
@@ -81,25 +81,42 @@ module EthRbExtensions
         Eth::Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
       end
     rescue Eth::Abi::EncodingError, Eth::Abi::ValueOutOfBounds => e
-      # binding.irb
+      puts "Error in get_call_data: #{e.message.inspect}"
+      puts "Types: #{types.inspect}"
+      puts "Args: #{args.inspect}"
+      
       raise
     rescue => e
+      puts "Unexpected error in get_call_data: #{e.message.inspect}"
+      puts e.backtrace.join("\n")
       binding.irb
       raise
     end
-    
-    def normalize_args(args, inputs)
+  
+    def normalize_args(args, types)
       args.each_with_index.map do |arg, idx|
-        input = inputs[idx]
-        normalize_arg_value(arg, input)
+        normalize_arg_value(arg, types[idx])
       end
     end
     
-    def normalize_arg_value(arg_value, input)
-      if arg_value.is_a?(String) && arg_value.starts_with?("0x") && !input.type.starts_with?('string')
-        arg_value.hex_to_bytes
-      elsif arg_value.is_a?(Array)
-        arg_value.map { |val| normalize_arg_value(val, input) }
+    def normalize_arg_value(arg_value, type)
+      if arg_value.nil? && type.base_type == "address"
+        "0x0000000000000000000000000000000000000000"
+      elsif arg_value.is_a?(String)
+        if type.base_type == "uint" || type.base_type == "int"
+          base = arg_value.start_with?('0x') ? 16 : 10
+          Integer(arg_value, base)
+        elsif arg_value.start_with?("0x") && type.base_type != "string"
+          arg_value.hex_to_bin
+        else
+          arg_value
+        end
+      elsif arg_value.is_a?(Hash) && type.base_type == "tuple"
+        type.components.each_with_object({}) do |c, normalized_hash|
+          normalized_hash[c.name] = normalize_arg_value(arg_value[c.name], c)
+        end
+      elsif arg_value.is_a?(Array) && type.dimensions.any?
+        arg_value.map { |v| normalize_arg_value(v, type.nested_sub) }
       else
         arg_value
       end
@@ -166,19 +183,52 @@ module EthRbExtensions
       
       # Decode non-indexed data from data field
       unless data == "0x"
-        decoded_data = Eth::Abi.decode(non_indexed_inputs.map { |input| input["type"] }, data)
+        begin
+          detailed_types = get_detailed_types(non_indexed_inputs)
+          # puts "Detailed types: #{detailed_types.inspect}"
+          # puts "Data: #{data}"
+          decoded_data = Eth::Abi.decode(detailed_types, Eth::Util.hex_to_bin(data))
+          # puts "Decoded data: #{decoded_data.inspect}"
+        rescue => e
+          puts "Error in decode_log: #{e.message}"
+          puts "Detailed types: #{detailed_types.inspect}"
+          puts "Data: #{data}"
+          puts e.backtrace.join("\n")
+          binding.irb
+          raise
+        end
         non_indexed_inputs.each_with_index do |input, index|
           value = decoded_data[index]
-          # Convert bytes32 to hex
-          value = value.bytes_to_hex if input["type"].starts_with?("bytes")
-          value = value.force_encoding("utf-8") if input["type"] == "string"
-
-          # value = value.bytes_to_hex if input["type"] == "address"
+          value = process_decoded_value(value, input["type"])
           decoded_event[input["name"]] = value
         end
       end
-
+    
       decoded_event.with_indifferent_access
+    end
+    
+    def get_detailed_types(inputs)
+      inputs.map do |input|
+        if input["type"] == "tuple"
+          Eth::Abi::Type.parse(input["type"], input["components"])
+        else
+          Eth::Abi::Type.parse(input["type"])
+        end
+      end
+    end
+    
+    def process_decoded_value(value, type)
+      if type.start_with?("tuple")
+        value.transform_values do |v|
+          v.is_a?(String) ? v.force_encoding("utf-8") : v
+        end
+      elsif type.start_with?("bytes")
+        value.bytes_to_hex
+      elsif type == "string"
+        value.force_encoding("utf-8")
+      else
+        value
+      end
     end
   end
 
@@ -205,9 +255,92 @@ module EthRbExtensions
         logIndex: log["logIndex"],
         removed: log["removed"]
       }.with_indifferent_access
-    rescue => e
-      # binding.irb
-      raise
+    # rescue => e
+    #   binding.irb
+    #   raise
+    end
+
+    def self.decode_function_inputs(contract_address, input_data)
+      implementation_address = Ethscription.get_implementation(contract_address)
+      implementation_name = Ethscription.local_from_predeploy(implementation_address)
+      contract = EVMHelpers.compile_contract(implementation_name)
+
+      contract.parent.decode_function_inputs(input_data)
+    end
+
+    def decode_function_inputs(input_data)
+      # Remove '0x' prefix if present
+      input_data = input_data.gsub(/^0x/, '')
+
+      # Function selector (first 4 bytes)
+      function_selector = input_data[0...8]
+
+      # Find the function by its signature
+      function = functions.find { |f| f.signature == function_selector }
+      raise "Function not found for selector: 0x#{function_selector}" unless function
+
+      # Remaining data
+      data = input_data[8..]
+
+      # Convert hex string to binary data
+      binary_data = [data].pack('H*')
+
+      # Get input types from function
+      input_types = function.inputs
+
+      # Decode the input data
+      decoded_inputs = {}
+      begin
+        detailed_types = get_detailed_types(input_types)
+        puts "Function: #{function.name}"
+        puts "Detailed types: #{detailed_types.inspect}"
+        puts "Data: #{data}"
+        decoded_data = Eth::Abi.decode(detailed_types, binary_data)
+        puts "Decoded data: #{decoded_data.inspect}"
+
+        input_types.each_with_index do |input, index|
+          value = decoded_data[index]
+          value = process_decoded_value(value, input.type)
+          decoded_inputs[input.name] = value
+        end
+      rescue => e
+        puts "Error in decode_function_inputs: #{e.message}"
+        puts "Function: #{function.name}"
+        puts "Detailed types: #{detailed_types.inspect}"
+        puts "Data: #{data}"
+        puts e.backtrace.join("\n")
+        binding.irb
+        raise
+      end
+
+      {
+        function: function.name,
+        inputs: decoded_inputs
+      }
+    end
+
+    def get_detailed_types(inputs)
+      inputs.map do |input|
+        if input.type == "tuple"
+          Eth::Abi::Type.parse(input.type, input.components)
+        else
+          Eth::Abi::Type.parse(input.type)
+        end
+      end
+    end
+
+    def process_decoded_value(value, type)
+      if type.start_with?("tuple")
+        value.transform_values do |v|
+          v.is_a?(String) ? v.force_encoding("utf-8") : v
+        end
+      elsif type.start_with?("bytes")
+        value.bytes_to_hex
+      elsif type == "string"
+        value.force_encoding("utf-8")
+      else
+        value
+      end
     end
   end
 end

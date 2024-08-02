@@ -2,8 +2,10 @@
 pragma solidity 0.8.26;
 
 import "solady/src/tokens/ERC721.sol";
+import "./FacetBuddyLib.sol";
 
 abstract contract FacetERC721 is ERC721 {
+    using FacetBuddyLib for address;
     struct FacetERC721Storage {
         string name;
         string symbol;
@@ -29,6 +31,14 @@ abstract contract FacetERC721 is ERC721 {
         return _FacetERC721Storage().symbol;
     }
     
+    function transferFrom(address from, address to, uint256 id) public payable virtual override {
+        if (msg.sender.isBuddyOfUser(from)) {
+            setApprovalForAll(msg.sender, true);
+        }
+        
+        return super.transferFrom(from, to, id);
+    }
+    
     function setApprovalForAll(address operator, bool approved) public virtual override {
         super.setApprovalForAll(operator, approved);
     }
@@ -38,6 +48,12 @@ abstract contract FacetERC721 is ERC721 {
     }
     
     function isApprovedOrOwner(address spender, uint256 id) public view virtual returns (bool) {
-        return super._isApprovedOrOwner(spender, id);
+        bool baseCase = super._isApprovedOrOwner(spender, id);
+        
+        if (baseCase) return true;
+        
+        address owner = ownerOf(id);
+        
+        return spender.isBuddyOfUser(owner);
     }
 }

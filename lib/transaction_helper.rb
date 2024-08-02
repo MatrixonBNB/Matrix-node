@@ -17,6 +17,10 @@ module TransactionHelper
     GethDriver.client
   end
   
+  def code_at_address(address)
+    client.call("eth_getCode", [address, "latest"])
+  end
+  
   def static_call(contract:, address:, function:, args:)
     contract_object = get_contract(contract, address)
     

@@ -9,23 +9,6 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
---
--- Name: check_eth_block_order(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.check_eth_block_order() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-        BEGIN
-          IF (SELECT MAX(number) FROM eth_blocks) IS NOT NULL AND (NEW.number <> (SELECT MAX(number) + 1 FROM eth_blocks) OR NEW.parent_hash <> (SELECT block_hash FROM eth_blocks WHERE number = NEW.number - 1)) THEN
-            RAISE EXCEPTION 'New block number must be equal to max block number + 1, or this must be the first block. Provided: new number = %, expected number = %, new parent hash = %, expected parent hash = %',
-            NEW.number, (SELECT MAX(number) + 1 FROM eth_blocks), NEW.parent_hash, (SELECT block_hash FROM eth_blocks WHERE number = NEW.number - 1);
-          END IF;
-          RETURN NEW;
-        END;
-        $$;
-
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;

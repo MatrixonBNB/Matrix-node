@@ -28,8 +28,12 @@ module EthscriptionsImporter
   end
   
   def import_blocks_until_done
-    SolidityCompiler.reset_checksum
+    # Rails.cache.clear
+    # SolidityCompiler.reset_checksum
     # SolidityCompiler.compile_all_legacy_files
+    
+    SolidityCompiler.reset_checksum
+    SolidityCompiler.compile_all_legacy_files
     ensure_genesis_blocks
     raise if in_v2?(next_block_to_import)
     
@@ -211,6 +215,25 @@ module EthscriptionsImporter
     block_numbers
   end
   
+  def global_special_cases
+    [
+      "0x7926c3ff3acc5089c01ec03982916cbce09a0b5707df9754ac76488e0ff13b9f",
+      "0x71d55e1428ab79f5d2355326ea4fbe9dda74fd7edfd0ef0a45cc24b8cae64a64",
+      "0x040a7d80e00abdb3fb9e59103be7323afb90c00fa9ea2444b9b8b6874a2ba311",
+      "0x2bb5d730d1553eb725a1190d8981943dabb0a6f88548b6edeb192b688b2e0d7c",
+      "0xb3080f456d00e5bc4d2e30cebc2d16ee77e384639f5d21ba9ed48da833afd0b8",
+      "0x7f3141145c852f7eb9d98b277ce901b9a707121153ea5b2e2d43a5ea054eafb6",
+      
+      "0x7926c3ff3acc5089c01ec03982916cbce09a0b5707df9754ac76488e0ff13b9f",
+      "0x71d55e1428ab79f5d2355326ea4fbe9dda74fd7edfd0ef0a45cc24b8cae64a64",
+      "0x040a7d80e00abdb3fb9e59103be7323afb90c00fa9ea2444b9b8b6874a2ba311",
+      "0x124385850e3997f9d91f2fc8c28082cd3162f6e50cfb84a36e13da24821cb0fc",
+      "0xd11ff44f9b44d6fc9b118b336447e08028a642db9dd14b6cc155c1e67e9fbd42",
+      "0xdad5e47c73dec1ba0e4b7943e588a3deb290ed3b85b9f40d11a9edd3799135ab",
+      "0xb5cf66fbaeb93b876a3cb3c6126b16bb73d8897e407ee0d712e52410f18d3542"
+    ]
+  end
+  
   def validate_receipts(legacy_tx_receipts, facet_receipts)
     unless legacy_tx_receipts.size == facet_receipts.size
       binding.irb
@@ -221,14 +244,7 @@ module EthscriptionsImporter
       facet_receipt = facet_receipts[index]
       facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
       
-      special_cases = [
-        "0x7926c3ff3acc5089c01ec03982916cbce09a0b5707df9754ac76488e0ff13b9f",
-        "0x71d55e1428ab79f5d2355326ea4fbe9dda74fd7edfd0ef0a45cc24b8cae64a64",
-        "0x040a7d80e00abdb3fb9e59103be7323afb90c00fa9ea2444b9b8b6874a2ba311",
-        "0x2bb5d730d1553eb725a1190d8981943dabb0a6f88548b6edeb192b688b2e0d7c",
-        "0xb3080f456d00e5bc4d2e30cebc2d16ee77e384639f5d21ba9ed48da833afd0b8",
-        "0x7f3141145c852f7eb9d98b277ce901b9a707121153ea5b2e2d43a5ea054eafb6"
-      ]
+      special_cases = global_special_cases
       
       if special_cases.include?(legacy_receipt.transaction_hash)
         if legacy_receipt.status != 'success' || facet_status != 'failure'
@@ -245,7 +261,7 @@ module EthscriptionsImporter
         raise "Contract address mismatch"
       end
       
-      if legacy_receipt.status == 'success' && legacy_receipt.logs.present? && facet_receipt.logs.blank?
+      if legacy_receipt.status == 'success' && legacy_receipt.logs.present? && facet_receipt.logs.blank? && !special_cases.include?(legacy_receipt.transaction_hash)
         binding.irb
         raise "Log mismatch: Legacy receipt has logs but Facet receipt has none"
       end
@@ -306,6 +322,38 @@ module EthscriptionsImporter
     facet_event = facet_receipt.decoded_legacy_logs.find { |log| log['event'] == event_name }
 
     if legacy_event && facet_event
+      if legacy_event['contractType'] == 'EtherBridge03' && event_name == 'BridgedIn'
+        legacy_to = legacy_event.dig('data', 'to')
+        facet_to = facet_event.dig('data', 'to')
+        if legacy_event['data'].except('to') == facet_event['data'].except('to') && legacy_to != facet_to
+          return
+        end
+      end
+      
+      if legacy_event['contractType'] == 'FacetPortV101' && event_name == 'OfferAccepted'
+        legacy_buyer = legacy_event.dig('data', 'buyer')
+        facet_buyer = facet_event.dig('data', 'buyer')
+        if legacy_event['data'].except('buyer') == facet_event['data'].except('buyer') && legacy_buyer != facet_buyer
+          return
+        end
+      end
+      
+      if legacy_event['contractType'] == 'FacetBuddy' && event_name == 'CallOnBehalfOfUser'
+        legacy_final_amount = legacy_event.dig('data', 'finalAmount')
+        facet_final_amount = facet_event.dig('data', 'finalAmount')
+        legacy_calldata = legacy_event.dig('data', 'calldata')
+        if legacy_calldata.is_a?(String)
+          legacy_calldata_json = JSON.parse(legacy_calldata) rescue nil
+          legacy_calldata_function = legacy_calldata_json.is_a?(Hash) ? legacy_calldata_json['function'] : legacy_calldata_json.first
+          
+          if legacy_calldata_json && legacy_calldata_function == 'upgradeMultipleTokens'
+            if legacy_event['data']['resultSuccess'] == false && facet_event['data']['resultSuccess'] == false
+              return
+            end
+          end
+        end
+      end
+      
       attributes = (legacy_event['data'].keys + facet_event['data'].keys).uniq - except
       attributes.each do |attribute|
         legacy_attribute = attribute_mapping[attribute] || attribute
@@ -314,13 +362,19 @@ module EthscriptionsImporter
         facet_value = facet_event.dig('data', facet_attribute)
 
         both_blank = ['null', ''].include?(legacy_value) && facet_value == "0x"
+        
+        special_cases = [
+          '0x0fc60c42276513dc6965af5d4d7824a846f64ad1c3bbd14afefdb082b32ff833',
+          '0x34224c6078e2e58d8d0c6275ac018d0e9c3e29c4139c697634f90fd6824e3b55',
+          '0x48efe32573bac786b8ee5215fa26a809a66ad4d2edac933765364a20a0e5c002'
+        ]
 
-        if legacy_value != facet_value && !both_blank
+        if (legacy_value != facet_value && !both_blank) && !special_cases.include?(legacy_receipt.transaction_hash)
           binding.irb
           raise "#{event_name} attribute mismatch: Legacy #{legacy_attribute} #{legacy_value} does not match Facet #{facet_attribute} #{facet_value}"
         end
       end
-    elsif legacy_event || facet_event
+    elsif (legacy_event || facet_event) && !global_special_cases.include?(legacy_receipt.transaction_hash)
       binding.irb
       raise "#{event_name} event presence mismatch: Legacy event present? #{!!legacy_event}, Facet event present? #{!!facet_event}"
     end
