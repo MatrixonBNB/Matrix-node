@@ -7,6 +7,15 @@ module EthscriptionsImporter
     Rails.logger
   end
   
+  def validate_import?
+    network = ENV.fetch('ETHEREUM_NETWORK')
+    
+    return true if network == "eth-mainnet"
+    return false if network == "eth-sepolia"
+    
+    raise "Invalid network: #{network}"
+  end
+  
   def genesis_block
     ENV.fetch('START_BLOCK').to_i - 1
   end
@@ -165,7 +174,7 @@ module EthscriptionsImporter
 
         receipts.each(&:set_legacy_contract_address_map)
         
-        validate_receipts(block_legacy_tx_receipts, receipts)
+        validate_receipts(block_legacy_tx_receipts, receipts) if validate_import?
         
         block_ethscriptions.each(&:clear_caches_if_upgrade!)
         

@@ -48,7 +48,8 @@ contract PresaleERC20V6f0 is FacetERC20, FacetOwnable, Initializable {
         
         uint8 decimals = ERC20(_wethAddress).decimals();
         _initializeERC20(name, symbol, decimals);
-
+        _initializeOwner(msg.sender);
+        
         s().wethAddress = _wethAddress;
         s().facetSwapRouterAddress = _facetSwapRouterAddress;
         s().maxSupply = _maxSupply;

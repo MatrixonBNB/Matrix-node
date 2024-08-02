@@ -42,6 +42,14 @@ contract ERC20BridgeFactoryVce0 is Ownable, Pausable, Upgradeable, Initializable
         require(msg.sender == s().trustedSmartContract, "Only the trusted smart contract can call this function");
         _;
     }
+    
+    function bridgeDumbContractToTokenSmartContract(address bridgeDumbContract) public view returns (address) {
+        return s().bridgeDumbContractToTokenSmartContract[bridgeDumbContract];
+    }
+    
+    function tokenSmartContractToBridgeDumbContract(address tokenSmartContract) public view returns (address) {
+        return s().tokenSmartContractToBridgeDumbContract[tokenSmartContract];
+    }
 
     function bridgeIn(address tokenSmartContract, uint8 decimals, string memory symbol, string memory name, address to, uint256 amount) public onlyTrustedSmartContract {
         address bridge = findOrCreateBridge(tokenSmartContract, decimals, symbol, name);

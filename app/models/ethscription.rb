@@ -198,7 +198,9 @@ class Ethscription < ApplicationRecord
         #   function: 'bridgeDumbContractToTokenSmartContract',
         #   args: [data['args']['bridgeDumbContract']]
         # )
-        args[0] = calculate_to_address(args[0])
+        if TransactionHelper.code_at_address(args[0]) == "0x"
+          args[0] = calculate_to_address(args[0])
+        end
       elsif ['addLiquidity', 'removeLiquidity'].include?(data['function'])
         token_a = args[0].downcase
         token_b = args[1].downcase
@@ -291,9 +293,9 @@ class Ethscription < ApplicationRecord
     def calculate_to_address(legacy_to)
       legacy_to = legacy_to.downcase
       
-      if legacy_to == "0xf9d5202287cef92d34eae7d0a046705e9ec76543"
-        return "0xfaa11f6380ed233a2a7f99940046b853f632c128"
-      end
+      # if legacy_to == "0xf9d5202287cef92d34eae7d0a046705e9ec76543"
+      #   return "0xfaa11f6380ed233a2a7f99940046b853f632c128"
+      # end
       
       EthscriptionsImporter.facet_transaction_receipts_in_current_batch&.each do |receipt|
         if receipt.legacy_contract_address_map.key?(legacy_to)
