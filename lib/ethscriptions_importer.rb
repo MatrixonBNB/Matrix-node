@@ -33,7 +33,7 @@ module EthscriptionsImporter
     # SolidityCompiler.compile_all_legacy_files
     
     SolidityCompiler.reset_checksum
-    SolidityCompiler.compile_all_legacy_files
+    # SolidityCompiler.compile_all_legacy_files
     ensure_genesis_blocks
     raise if in_v2?(next_block_to_import)
     
@@ -334,6 +334,15 @@ module EthscriptionsImporter
         legacy_buyer = legacy_event.dig('data', 'buyer')
         facet_buyer = facet_event.dig('data', 'buyer')
         if legacy_event['data'].except('buyer') == facet_event['data'].except('buyer') && legacy_buyer != facet_buyer
+          return
+        end
+      end
+      
+      if legacy_event['contractType'] == 'ERC20BatchTransfer' && event_name == 'BatchTransfer'
+        legacy_token_address = legacy_event.dig('data', 'tokenAddress')
+        facet_token_address = facet_event.dig('data', 'tokenAddress')
+
+        if legacy_event['data'].except('tokenAddress') == facet_event['data'].except('tokenAddress')
           return
         end
       end

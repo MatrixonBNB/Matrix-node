@@ -1,6 +1,9 @@
 module BaseFeeGetter
   extend self
 
+  MAX_RETRIES = 5
+  RETRY_DELAY = 2
+
   def ethereum_client
     @_ethereum_client ||= begin
       client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
@@ -27,7 +30,9 @@ module BaseFeeGetter
       block_numbers = (current_block...(current_block + fetch_batch_size)).to_a
       block_promises = block_numbers.map do |block_number|
         Concurrent::Promise.execute do
-          [block_number, ethereum_client.get_block(block_number)]
+          retry_with_backoff do
+            [block_number, ethereum_client.get_block(block_number)]
+          end
         end
       end
 
@@ -98,6 +103,7 @@ module BaseFeeGetter
 
     puts "First block: #{first_block}"
     puts "Last block: #{last_block}"
+    puts "Block count: #{all_blocks.count}"
 
     all_blocks.each_cons(2) do |block1, block2|
       if block1 + 1 != block2
@@ -128,10 +134,27 @@ module BaseFeeGetter
     match ? match[2].to_i : nil
   end
 
-  def run(start_block = nil)
-    start_block ||= last_saved_block || (20441267 - 1000)
-    puts "Starting fetch from block #{start_block}"
-    fetch_base_fees(start_block)
+  def run
+    initial_block = last_saved_block || start_block
+    puts "Starting fetch from block #{initial_block}"
+    fetch_base_fees(initial_block)
     puts "Base fees fetched and saved in batches."
+  end
+
+  private
+
+  def retry_with_backoff(max_retries = MAX_RETRIES, delay = RETRY_DELAY)
+    retries = 0
+    begin
+      yield
+    rescue Net::ReadTimeout, Errno::ECONNRESET => e
+      retries += 1
+      if retries <= max_retries
+        sleep delay ** retries
+        retry
+      else
+        raise "Failed after #{max_retries} retries: #{e.message}"
+      end
+    end
   end
 end

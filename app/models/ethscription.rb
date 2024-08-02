@@ -219,6 +219,10 @@ class Ethscription < ApplicationRecord
         end
         
         args[2] = path
+      elsif data['function'] == 'batchTransfer'
+        if TransactionHelper.code_at_address(args[0]) == "0x"
+          args[0] = calculate_to_address(args[0])
+        end
       end
       clear_caches_if_upgrade!
 
