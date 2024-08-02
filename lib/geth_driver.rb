@@ -17,7 +17,16 @@ module GethDriver
     sleep 1
   end
   
-  # make geth && \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --http.port 9545 --authrpc.port 9551 --discovery.port 40303 --port 40303 --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --cache 64000 --cache.preimages=true --maxpeers 0 --verbosity 2 --syncmode full --gcmode archive --history.state 0 --history.transactions 0 --nocompaction --rollup.disabletxpoolgossip=true console
+  def init_command
+    http_port = ENV.fetch('NON_AUTH_GETH_RPC_URL').split(':').last
+    authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
+    discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
+    
+    puts %{
+      make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --cache 64000 --cache.preimages=true --maxpeers 0 --verbosity 2 --syncmode full --gcmode archive --history.state 0 --history.transactions 0 --nocompaction --rollup.disabletxpoolgossip=true console
+    }.strip
+  end
+  
   def self.teardown_rspec_geth
     system("pkill -f geth")
   end
