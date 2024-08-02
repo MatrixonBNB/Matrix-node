@@ -58,7 +58,18 @@ class Ethscription < ApplicationRecord
     if content['op'] == 'create'
       predeploy_address = "0x" + data['init_code_hash'].last(40)
       
-      contract_name = local_from_predeploy(predeploy_address)
+      begin
+        contract_name = local_from_predeploy(predeploy_address)
+      rescue KeyError => e
+        if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+          return predeploy_address
+        else
+          ap content
+          binding.irb
+          raise
+        end
+      end
+      
       args = convert_args(contract_name, 'initialize', data['args'])
       
       initialize_calldata = TransactionHelper.get_function_calldata(
@@ -84,8 +95,11 @@ class Ethscription < ApplicationRecord
       implementation_address = get_implementation(to_address)
       
       unless implementation_address
-        # binding.irb
-        raise "No implementation address for #{to_address}"
+        if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+          return to_address
+        else
+          raise "No implementation address for #{to_address}"
+        end
       end
       
       contract_name = local_from_predeploy(implementation_address)
@@ -243,10 +257,6 @@ class Ethscription < ApplicationRecord
     message.bytes_to_hex
   rescue ContractMissing => e
     data['to']
-  rescue KeyError => e
-    ap content
-    binding.irb
-    raise
   rescue => e
     binding.irb
     raise
