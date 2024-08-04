@@ -21,6 +21,15 @@ module TransactionHelper
     client.call("eth_getCode", [address, "latest"])
   end
   
+  def get_feth_balance(address = "0xC2172a6315c1D7f6855768F843c420EbB36eDa97".downcase)
+    feth_address = '0x1673540243e793b0e77c038d4a88448eff524dce'
+    function = 'balanceOf'
+    args = [address]
+    contract = "legacy/FacetERC20"
+    
+    static_call(contract: contract, address: feth_address, function: function, args: args)
+  end
+  
   def static_call(contract:, address:, function:, args:)
     contract_object = get_contract(contract, address)
     

@@ -80,7 +80,7 @@ module EthRbExtensions
       else
         Eth::Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
       end
-    rescue Eth::Abi::EncodingError, Eth::Abi::ValueOutOfBounds => e
+    rescue Eth::Abi::EncodingError, Eth::Abi::ValueOutOfBounds, Ethscription::InvalidArgValue => e
       puts "Error in get_call_data: #{e.message.inspect}"
       puts "Types: #{types.inspect}"
       puts "Args: #{args.inspect}"
@@ -111,6 +111,8 @@ module EthRbExtensions
         else
           arg_value
         end
+      elsif arg_value.is_a?(Float)
+        raise Ethscription::InvalidArgValue, "Float value not supported for type: #{type.inspect}"
       elsif arg_value.is_a?(Hash) && type.base_type == "tuple"
         type.components.each_with_object({}) do |c, normalized_hash|
           normalized_hash[c.name] = normalize_arg_value(arg_value[c.name], c)

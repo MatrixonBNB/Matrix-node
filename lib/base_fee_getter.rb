@@ -20,8 +20,8 @@ module BaseFeeGetter
     network == "eth-mainnet" ? 18684900 : 5193575
   end
   
-  def fetch_base_fees(fetch_batch_size = 100, save_batch_size = 10000)
-    current_block = start_block
+  def fetch_base_fees(initial_block, fetch_batch_size = 100, save_batch_size = 10000)
+    current_block = initial_block
     base_fees = {}
 
     loop do
@@ -112,6 +112,25 @@ module BaseFeeGetter
     puts "No gaps detected in block ranges."
   end
   
+  def fill_gaps_and_save
+    all_base_fees = read_and_verify_json_files
+
+    all_blocks = all_base_fees.keys.sort
+    first_block = all_blocks.first
+    last_block = all_blocks.last
+
+    (first_block..last_block).each do |block_number|
+      unless all_base_fees.key?(block_number)
+        puts "Fetching missing base fee for block #{block_number}"
+        base_fee = retry_with_backoff { ethereum_client.get_block(block_number)['result']['baseFeePerGas'] }
+        all_base_fees[block_number] = base_fee if base_fee
+      end
+    end
+
+    save_to_json(all_base_fees, "base_fees_complete.json")
+    puts "All base fees saved to base_fees_complete.json"
+  end
+  
   def save_to_json(data, file_path)
     dir = Rails.root.join("base_fees")
     file_path = dir.join(file_path)
@@ -126,10 +145,13 @@ module BaseFeeGetter
     dir = Rails.root.join("base_fees")
     files = Dir.glob(dir.join("base_fees_*.json"))
     return nil if files.empty?
-
-    last_file = files.max_by { |f| File.mtime(f) }
-    match = last_file.match(/base_fees_(\d+)_to_(\d+)\.json/)
-    match ? match[2].to_i : nil
+  
+    highest_block = files.map do |file|
+      match = file.match(/base_fees_(\d+)_to_(\d+)\.json/)
+      match[2].to_i if match
+    end.compact.max
+  
+    highest_block
   end
 
   def run
