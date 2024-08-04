@@ -222,6 +222,9 @@ module EthscriptionsImporter
     puts "Gas per second: #{gas_per_second_millions} million / s"
     
     block_numbers
+  rescue => e
+    binding.irb
+    raise
   end
   
   def global_special_cases
@@ -239,7 +242,11 @@ module EthscriptionsImporter
       "0x124385850e3997f9d91f2fc8c28082cd3162f6e50cfb84a36e13da24821cb0fc",
       "0xd11ff44f9b44d6fc9b118b336447e08028a642db9dd14b6cc155c1e67e9fbd42",
       "0xdad5e47c73dec1ba0e4b7943e588a3deb290ed3b85b9f40d11a9edd3799135ab",
-      "0xb5cf66fbaeb93b876a3cb3c6126b16bb73d8897e407ee0d712e52410f18d3542"
+      "0xb5cf66fbaeb93b876a3cb3c6126b16bb73d8897e407ee0d712e52410f18d3542",
+      
+      # Where do these comes from?
+      "0x8d3cf03f51c9813dffb2f804e2ec6f8f187b687b0e3374bf44936adc15d938f8",
+      "0xabea86865dc24c3719ebe2c0d75ff8b81f4124449a66b2a15dc6dcff75cf44d7",
     ]
   end
   
