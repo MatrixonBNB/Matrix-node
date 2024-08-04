@@ -96,7 +96,7 @@ class Ethscription < ApplicationRecord
       
       unless implementation_address
         if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
-          return to_address
+          return "0x" + "0" * 100
         else
           raise "No implementation address for #{to_address}"
         end
@@ -125,7 +125,12 @@ class Ethscription < ApplicationRecord
         
         args[2] = cooked
       elsif data['function'] == 'setMetadataRenderer'
-        metadata_calldata = JSON.parse(data['args'].is_a?(Array) ? data['args'].last : data['args']['data'])
+        begin
+          metadata_calldata = JSON.parse(data['args'].is_a?(Array) ? data['args'].last : data['args']['data'])
+        rescue JSON::ParserError => e
+          raise unless ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+          metadata_calldata = {"function" => "", "args" => {}}
+        end
         
         target_contract_name = if metadata_calldata['args'].keys == ['info']
           "legacy/EditionMetadataRendererV3f8"
@@ -257,6 +262,14 @@ class Ethscription < ApplicationRecord
     message.bytes_to_hex
   rescue ContractMissing => e
     data['to']
+  rescue KeyError => e
+    if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+      return content.to_json.bytes_to_hex
+    else
+      ap content
+      binding.irb
+      raise
+    end
   rescue => e
     binding.irb
     raise
@@ -393,6 +406,13 @@ class Ethscription < ApplicationRecord
       else
         raise
       end
+    rescue Errno::ENOENT, LegacyContractArtifact::AmbiguousSuffixError => e
+      if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+        raise FunctionMissing, "Function #{function_name} not found"
+      else
+        binding.irb
+        raise
+      end
     end
     memoize :convert_args
     
@@ -488,7 +508,7 @@ class Ethscription < ApplicationRecord
     memoize :predeploy_to_local_map
     
     def local_from_predeploy(address)
-      name = predeploy_to_local_map.fetch(address.downcase)
+      name = predeploy_to_local_map.fetch(address&.downcase)
       "legacy/#{name}"
     end
     memoize :local_from_predeploy

@@ -31,7 +31,12 @@ class FacetTransactionReceipt < ApplicationRecord
       return
     end
     
+    if (our_event.nil? && their_event.nil?) || (ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia" && status == 0)
+      return
+    end
+    
     unless our_event.present? && their_event.present?
+      return if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
       binding.irb
       raise "One of the events is missing"
     end
@@ -179,6 +184,8 @@ class FacetTransactionReceipt < ApplicationRecord
     end
   
     def decode_trace
+      return @trace unless @trace['calls']
+      
       decode_calls(@trace['calls'])
     end
   

@@ -36,7 +36,7 @@ module EVMHelpers
         contract
       end
     rescue => e
-      binding.irb
+      binding.irb unless ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
       raise
     end
     
