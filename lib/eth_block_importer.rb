@@ -141,9 +141,9 @@ module EthBlockImporter
       end
     end
     
-    block_by_number_responses = block_by_number_promises.map(&:value!).sort_by(&:first)
-    trace_responses = trace_promises&.map(&:value!)&.sort_by(&:first) || []
-    receipts_responses = receipts_promises&.map(&:value!)&.sort_by(&:first) || []
+    block_by_number_responses = Benchmark.msr("blocks") {block_by_number_promises.map(&:value!).sort_by(&:first)}
+    trace_responses = Benchmark.msr("traces") { trace_promises&.map(&:value!)&.sort_by(&:first) || [] }
+    receipts_responses = Benchmark.msr("receipts") { receipts_promises&.map(&:value!)&.sort_by(&:first) || [] }
   
     eth_blocks = []
     eth_transactions = []
@@ -161,8 +161,8 @@ module EthBlockImporter
     
     # Initialize in-memory representation of blocks
     in_memory_blocks = FacetBlock.where(number: (current_max_facet_block_number - 64 - block_numbers.size)..current_max_facet_block_number).index_by(&:number)
-    
     ActiveRecord::Base.transaction do
+      Benchmark.msr("loop") {
       block_by_number_responses.zip(trace_responses).each_with_index do |((block_number1, block_by_number_response), (block_number2, trace_response)), index|
         unless (block_number1 == block_number2) || trace_responses.blank?
           raise "Mismatched block numbers: #{block_number1} and #{block_number2}"
@@ -207,10 +207,11 @@ module EthBlockImporter
         
         if trace_result
           new_eth_calls = EthCall.from_trace_result(trace_result, eth_block)
+          # binding.irb if new_eth_calls.nil?
           eth_calls.concat(new_eth_calls)
         end
   
-        facet_block, facet_txs, facet_receipts = propose_facet_block(
+        facet_block, facet_txs, facet_receipts = Benchmark.msr("propose") {propose_facet_block(
           eth_block,
           eth_calls: new_eth_calls,
           eth_transactions: new_eth_transactions,
@@ -219,7 +220,7 @@ module EthBlockImporter
           head_block: head_block,
           safe_block: safe_block,
           finalized_block: finalized_block
-        )
+        )}
 
         facet_blocks << facet_block
         all_facet_txs.concat(facet_txs)
@@ -238,11 +239,22 @@ module EthBlockImporter
           receipts_imported: facet_receipts
         )
       end
-
+    }
+      
+      eth_tx_hashes_to_save = all_facet_txs.map(&:eth_transaction_hash).to_set
+      
+      eth_transactions_to_save = eth_transactions.select do |tx|
+        eth_tx_hashes_to_save.include?(tx.hash)
+      end
+      
+      eth_calls_to_save = eth_calls.select do |call|
+        eth_tx_hashes_to_save.include?(call.transaction_hash)
+      end
+    
       # Parallelize the bulk import operations
       eth_block_import = Concurrent::Promises.future { EthBlock.import!(eth_blocks) }
-      eth_transaction_import = Concurrent::Promises.future { EthTransaction.import!(eth_transactions) }
-      eth_call_import = Concurrent::Promises.future { EthCall.import!(eth_calls) }
+      eth_transaction_import = Concurrent::Promises.future { EthTransaction.import!(eth_transactions_to_save) }
+      eth_call_import = Concurrent::Promises.future { EthCall.import!(eth_calls_to_save) }
       facet_block_import = Concurrent::Promises.future { FacetBlock.import!(facet_blocks) }
       facet_transaction_import = Concurrent::Promises.future { FacetTransaction.import!(all_facet_txs) }
       facet_receipt_import = Concurrent::Promises.future { FacetTransactionReceipt.import!(all_receipts) }
@@ -319,9 +331,10 @@ module EthBlockImporter
 
   def facet_txs_from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls)
     facet_txs = eth_calls.map do |call|
+      next unless call.to_address == FacetTransaction::FACET_INBOX_ADDRESS
       next if call.error.present?
       
-      eth_tx = eth_transactions.detect { |tx| tx.hash == call.transaction_hash }
+      eth_tx = eth_transactions.detect { |tx| tx.tx_hash == call.transaction_hash }
       
       facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
         
@@ -331,7 +344,9 @@ module EthBlockImporter
     facet_txs.group_by(&:eth_transaction).each do |eth_tx, grouped_facet_txs|
       in_tx_count = grouped_facet_txs.count
       
-      outer_call = eth_tx.eth_calls.sort_by(&:call_index).first
+      outer_call = eth_calls.select do |c|
+        c.transaction_hash == eth_tx.tx_hash
+      end.sort_by(&:call_index).first
       
       gas_used = outer_call.gas_used
       base_fee = eth_block.base_fee_per_gas
