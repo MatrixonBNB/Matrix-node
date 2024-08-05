@@ -244,7 +244,7 @@ module EthBlockImporter
       eth_tx_hashes_to_save = all_facet_txs.map(&:eth_transaction_hash).to_set
       
       eth_transactions_to_save = eth_transactions.select do |tx|
-        eth_tx_hashes_to_save.include?(tx.hash)
+        eth_tx_hashes_to_save.include?(tx.tx_hash)
       end
       
       eth_calls_to_save = eth_calls.select do |call|
