@@ -41,7 +41,7 @@ module EthBlockImporter
   
   def uncached_global_block_number
     ethereum_client.get_block_number.tap do |block_number|
-      Rails.cache.write('global_block_number', block_number, expires_in: 1.second)
+      Rails.cache.write('global_block_number', block_number, expires_in: 12.seconds)
     end
   end
   
@@ -51,11 +51,10 @@ module EthBlockImporter
   
   def import_blocks_until_done
     SolidityCompiler.reset_checksum
+    # SolidityCompiler.compile_all_legacy_files
     
-    unless in_v2?(next_block_to_import)
-      return EthscriptionsImporter.import_blocks_until_done
-    end
-    
+    ensure_genesis_blocks
+
     loop do
       begin
         block_numbers = next_blocks_to_import(import_batch_size)
@@ -88,104 +87,195 @@ module EthBlockImporter
       eth_block = EthBlock.from_rpc_result(genesis_eth_block)
       eth_block.save!
       
-      facet_block = FacetBlock.from_eth_block(eth_block)
+      current_max_block_number = FacetBlock.maximum(:number).to_i
+
+      facet_block = FacetBlock.from_eth_block(eth_block, current_max_block_number + 1)
       facet_block.from_rpc_response(facet_genesis_block)
       facet_block.save!
     end
+  end
+  
+  def facet_transaction_receipts_in_current_batch
+    @facet_transaction_receipts_cache
+  end
+  
+  def facet_transactions_in_current_batch
+    @facet_transactions_cache
   end
   
   def import_blocks(block_numbers)
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
+    @facet_transaction_receipts_cache = []
+    @facet_transactions_cache = []
+    
     block_by_number_promises = block_numbers.map do |block_number|
       Concurrent::Promise.execute do
         [block_number, ethereum_client.get_block(block_number, true)]
       end
     end
+  
+    if in_v2?(block_numbers.first)
+      trace_promises = block_numbers.map do |block_number|
+        Concurrent::Promise.execute do
+          [
+            block_number,
+            ethereum_client.debug_trace_block_by_number(block_number)
+          ]
+        end
+      end
+    end
     
-    trace_promises = block_numbers.map do |block_number|
-      Concurrent::Promise.execute do
-        [
-          block_number,
-          ethereum_client.debug_trace_block_by_number(block_number)
-        ]
+    unless in_v2?(block_numbers.first)
+      receipts_promises = block_numbers.map do |block_number|
+        Concurrent::Promise.execute do
+          [
+            block_number,
+            ethereum_client.get_transaction_receipts(
+              block_number,
+              blocks_behind: 1_000
+            )
+          ]
+        end
       end
     end
     
     block_by_number_responses = block_by_number_promises.map(&:value!).sort_by(&:first)
-    trace_responses = trace_promises.map(&:value!).sort_by(&:first)
-    
-    res = []
-    
-    block_by_number_responses.zip(trace_responses).each do |(block_number1, block_by_number_response), (block_number2, trace_response)|
-      raise "Mismatched block numbers: #{block_number1} and #{block_number2}" unless block_number1 == block_number2
-      res << import_block(block_by_number_response, trace_response)
-    end
-    
-    blocks_per_second = (block_numbers.length / (Time.current - start)).round(2)
-    puts "Imported #{res.map(&:transactions_imported).flatten.count} transactions"
-    puts "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
-    
-    block_numbers
-  end
+    trace_responses = trace_promises&.map(&:value!)&.sort_by(&:first) || []
+    receipts_responses = receipts_promises&.map(&:value!)&.sort_by(&:first) || []
   
-  def import_block(block_by_number_response, trace_response, timestamp: nil)
+    eth_blocks = []
+    eth_transactions = []
+    eth_calls = []
+    facet_blocks = []
+    all_facet_txs = []
+    all_receipts = []
+    res = []
+  
+    # Initialize in-memory representation of blocks
+    current_max_facet_block_number = FacetBlock.maximum(:number).to_i
+    
+    # Get the earliest block
+    earliest = FacetBlock.order(number: :asc).first
+    
+    # Initialize in-memory representation of blocks
+    in_memory_blocks = FacetBlock.where(number: (current_max_facet_block_number - 64 - block_numbers.size)..current_max_facet_block_number).index_by(&:number)
+    
     ActiveRecord::Base.transaction do
-      ensure_genesis_blocks
-      validate_ready_to_import!(block_by_number_response, trace_response)
-      
-      trace_result = trace_response['result']
-      block_result = block_by_number_response['result']
-      transactions_result = block_result['transactions']
-      block_number = block_result['number'].to_i(16)
-      
-      parent_block = EthBlock.find_by!(number: block_number - 1)
-      
-      if parent_block.block_hash != block_result['parentHash']
-        EthBlock.where("number >= ?", parent_block.number).delete_all
+      block_by_number_responses.zip(trace_responses).each_with_index do |((block_number1, block_by_number_response), (block_number2, trace_response)), index|
+        unless (block_number1 == block_number2) || trace_responses.blank?
+          raise "Mismatched block numbers: #{block_number1} and #{block_number2}"
+        end
+  
+        block_result = block_by_number_response['result']
+        trace_result = trace_response&.dig('result')
+        receipt_result = receipts_responses.detect{|el| el.first == block_number1 }&.last&.dig('result')
         
-        Airbrake.notify("
-          Reorg detected: #{block_number},
-          #{parent_block.block_hash},
-          #{block_result['parentHash']},
-          Deleting block(s): #{EthBlock.where("number >= ?", parent_block.number).pluck(:number).join(', ')}
-        ")
+        facet_block_number = current_max_facet_block_number + index + 1
         
-        OpenStruct.new(
-          block_number: block_number,
-          transactions_imported: [],
-          receipts_imported: []
-        )        
+        parent_block = in_memory_blocks[facet_block_number - 1]
+  
+        # if parent_block.nil? || parent_block.block_hash != block_result['parentHash']
+        #   EthBlock.where("number >= ?", block_number - 1).each(&:destroy)
+  
+        #   Airbrake.notify("
+        #     Reorg detected: #{block_number},
+        #     #{parent_block&.block_hash},
+        #     #{block_result['parentHash']},
+        #     Deleting block(s): #{EthBlock.where("number >= ?", block_number - 1).pluck(:number).join(', ')}
+        #   ")
+  
+        #   # res << OpenStruct.new(
+        #   #   block_number: eth_block_number,
+        #   #   transactions_imported: [],
+        #   #   receipts_imported: []
+        #   # )
+        #   next
+        # end
+          
+        # Determine the head, safe, and finalized blocks
+        head_block = in_memory_blocks[facet_block_number - 1] || earliest
+        safe_block = in_memory_blocks[facet_block_number - 32] || earliest
+        finalized_block = in_memory_blocks[facet_block_number - 64] || earliest
+  
+        eth_block = EthBlock.from_rpc_result(block_by_number_response)
+        eth_blocks << eth_block
+  
+        new_eth_transactions = EthTransaction.from_rpc_result(block_by_number_response, receipt_result)
+        eth_transactions.concat(new_eth_transactions)
+        
+        if trace_result
+          new_eth_calls = EthCall.from_trace_result(trace_result, eth_block)
+          eth_calls.concat(new_eth_calls)
+        end
+  
+        facet_block, facet_txs, facet_receipts = propose_facet_block(
+          eth_block,
+          eth_calls: new_eth_calls,
+          eth_transactions: new_eth_transactions,
+          facet_block_number: facet_block_number,
+          earliest: earliest,
+          head_block: head_block,
+          safe_block: safe_block,
+          finalized_block: finalized_block
+        )
+
+        facet_blocks << facet_block
+        all_facet_txs.concat(facet_txs)
+        all_receipts.concat(facet_receipts)
+  
+        in_memory_blocks[facet_block_number] = facet_block
+        
+        @facet_transaction_receipts_cache.concat(facet_receipts)
+        @facet_transactions_cache.concat(facet_txs)
+        
+        # block_ethscriptions.each(&:clear_caches_if_upgrade!)
+        
+        res << OpenStruct.new(
+          facet_block: facet_block,
+          transactions_imported: facet_txs,
+          receipts_imported: facet_receipts
+        )
       end
-      
-      eth_block = EthBlock.from_rpc_result(block_by_number_response)
 
-      eth_block.save!
-
-      eth_transactions = EthTransaction.from_rpc_result(block_by_number_response)
-
-      EthTransaction.import!(eth_transactions)
-      
-      traces = EthCall.from_trace_result(trace_result, eth_block)
-      
-      EthCall.import!(traces)
-      
-      facet_txs, facet_receipts = propose_facet_block(eth_block, timestamp: timestamp)
-      
-      OpenStruct.new(
-        block_number: block_number,
-        transactions_imported: facet_txs,
-        receipts_imported: facet_receipts
-      )
+      # Parallelize the bulk import operations
+      eth_block_import = Concurrent::Promises.future { EthBlock.import!(eth_blocks) }
+      eth_transaction_import = Concurrent::Promises.future { EthTransaction.import!(eth_transactions) }
+      eth_call_import = Concurrent::Promises.future { EthCall.import!(eth_calls) }
+      facet_block_import = Concurrent::Promises.future { FacetBlock.import!(facet_blocks) }
+      facet_transaction_import = Concurrent::Promises.future { FacetTransaction.import!(all_facet_txs) }
+      facet_receipt_import = Concurrent::Promises.future { FacetTransactionReceipt.import!(all_receipts) }
+  
+      # Wait for all futures to complete together
+      Concurrent::Promises.zip(
+        eth_block_import,
+        eth_transaction_import,
+        eth_call_import,
+        facet_block_import,
+        facet_transaction_import,
+        facet_receipt_import
+      ).value!
     end
-  rescue ActiveRecord::RecordNotUnique => e
-    if e.message.include?("eth_blocks") && e.message.include?("number")
-      logger.info "Block Importer: Block #{block_number} already exists"
-      raise ActiveRecord::Rollback
-    else
-      raise
-    end
+  
+    elapsed_time = Time.current - start
+  
+    blocks = res.map(&:facet_block)
+    total_gas = blocks.sum(&:gas_used)
+    total_transactions = res.map(&:transactions_imported).flatten.count
+    blocks_per_second = (blocks.length / elapsed_time).round(2)
+    transactions_per_second = (total_transactions / elapsed_time).round(2)
+    total_gas_millions = (total_gas / 1_000_000.0).round(2)
+    average_gas_per_block_millions = (total_gas / blocks.length / 1_000_000.0).round(2)
+    gas_per_second_millions = (total_gas / elapsed_time / 1_000_000.0).round(2)
+  
+    puts "Time elapsed: #{elapsed_time.round(2)} s"
+    puts "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
+    puts "Imported #{total_transactions} transactions (#{transactions_per_second} / s)"
+    puts "Total gas used: #{total_gas_millions} million (avg: #{average_gas_per_block_millions} million / block)"
+    puts "Gas per second: #{gas_per_second_millions} million / s"
+  
+    block_numbers
   end
   
   def validate_ready_to_import!(block_by_number_response, trace_response)
@@ -205,6 +295,7 @@ module EthBlockImporter
   end
   
   def import_next_block
+    ensure_genesis_blocks
     block_number = next_block_to_import
     
     import_blocks([block_number])
@@ -215,8 +306,6 @@ module EthBlockImporter
   end
   
   def next_blocks_to_import(n)
-    ensure_genesis_blocks
-    
     max_db_block = EthBlock.maximum(:number)
     
     unless max_db_block
@@ -228,18 +317,15 @@ module EthBlockImporter
     (start_block...(start_block + n)).to_a
   end
 
-  def facet_txs_from_eth_transactions_in_block(eth_block)
-    facet_txs = eth_block.eth_transactions.includes(:eth_calls).map do |tx|
-      tx.eth_calls.map do |call|
-        next if call.error.present?
-
-        facet_tx = FacetTransaction.from_eth_call_and_tx(call, tx)
+  def facet_txs_from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls)
+    facet_txs = eth_calls.map do |call|
+      next if call.error.present?
+      
+      eth_tx = eth_transactions.detect { |tx| tx.hash == call.transaction_hash }
+      
+      facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
         
-        next unless facet_tx
-        next unless facet_tx.chain_id == facet_chain_id
-        
-        facet_tx
-      end
+      facet_tx
     end.flatten.compact
     
     facet_txs.group_by(&:eth_transaction).each do |eth_tx, grouped_facet_txs|
@@ -260,27 +346,57 @@ module EthBlockImporter
     facet_txs
   end
   
-  def propose_facet_block(eth_block, timestamp: nil)
-    eth_block.reload
+  def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions)
+    results = Parallel.map(ethscriptions.sort_by(&:transaction_index).each_with_index, in_threads: 10) do |(ethscription, idx)|
+      ethscription.clear_caches_if_upgrade!
+      
+      facet_tx = FacetTransaction.from_eth_tx_and_ethscription(
+        ethscription,
+        idx,
+        eth_block,
+        ethscriptions.count
+      )
+      
+      [idx, facet_tx]
+    end
+  
+    results.sort_by { |idx, _| idx }.map { |_, facet_tx| facet_tx }
+  rescue => e
+    binding.irb
+  end
+  
+  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, timestamp: nil, facet_block_number:, earliest:, head_block:, safe_block:, finalized_block:)
+    facet_block = FacetBlock.from_eth_block(eth_block, facet_block_number, timestamp: timestamp)
     
-    facet_block = FacetBlock.from_eth_block(eth_block, timestamp: timestamp)
-    
-    facet_txs = facet_txs_from_eth_transactions_in_block(eth_block)
-        
+    facet_txs = if in_v2?(eth_block.number)
+      facet_txs_from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls)
+    else
+      ethscriptions = Ethscription.from_eth_transactions(eth_transactions)
+      
+      facet_txs_from_ethscriptions_in_block(
+        eth_block,
+        ethscriptions
+      )
+    end
+
     payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
     
     response = geth_driver.propose_block(
       payload,
-      facet_block
+      facet_block,
+      earliest,
+      head_block,
+      safe_block,
+      finalized_block
     )
+  
+    geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
+    receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
 
-    geth_block = geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true])
+    # Wait for both futures to complete
+    geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
     
     facet_block.from_rpc_response(geth_block)
-
-    facet_block.save!
-    
-    receipts_data = geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']])
     receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
     
     facet_txs_by_source_hash = facet_txs.index_by(&:source_hash)
@@ -293,7 +409,7 @@ module EthBlockImporter
       facet_tx = facet_txs_by_source_hash[tx['sourceHash']]
       raise unless facet_tx
 
-      facet_tx.update!(
+      facet_tx.assign_attributes(
         tx_hash: tx['hash'],
         block_hash: response['blockHash'],
         block_number: response['blockNumber'].to_i(16),
@@ -301,11 +417,9 @@ module EthBlockImporter
         deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
         gas: tx['gas'].to_i(16),
         tx_type: tx['type']
-        # gas_limit: tx['gasLimit'].to_i(16),
-        # gas_used: receipt_details['gasUsed'].to_i(16),
       )
-
-      receipts << FacetTransactionReceipt.create!(
+      
+      facet_receipt = FacetTransactionReceipt.new(
         transaction_hash: tx['hash'],
         block_hash: response['blockHash'],
         block_number: response['blockNumber'].to_i(16),
@@ -323,16 +437,17 @@ module EthBlockImporter
         transaction_index: receipt_details['transactionIndex'].to_i(16),
         tx_type: tx['type']
       )
+      
+      receipts << facet_receipt
     end
     
-    [facet_txs, receipts]
+    [facet_block, facet_txs, receipts]
+  rescue => e
+    binding.irb
+    raise
   end
   
   def geth_driver
     @_geth_driver ||= GethDriver
-  end
-  
-  def facet_chain_id
-    FacetTransaction::FACET_CHAIN_ID
   end
 end
