@@ -254,7 +254,7 @@ CREATE TABLE public.facet_blocks (
     receipts_root character varying NOT NULL,
     size integer NOT NULL,
     state_root character varying NOT NULL,
-    "timestamp" integer NOT NULL,
+    "timestamp" bigint NOT NULL,
     transactions_root character varying NOT NULL,
     prev_randao character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,

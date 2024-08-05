@@ -17,6 +17,53 @@ module TransactionHelper
     GethDriver.client
   end
   
+  def calculate_next_base_fee(prev_block_number)
+    prev_block = get_block(prev_block_number)
+    prev_block_gas_used = prev_block['gasUsed'].to_i(16)
+    prev_block_gas_limit = prev_block['gasLimit'].to_i(16)
+    prev_block_base_fee = prev_block['baseFeePerGas'].to_i(16)
+  
+    elasticity_multiplier = 2
+    base_fee_change_denominator = 8
+  
+    parent_gas_target = prev_block_gas_limit / elasticity_multiplier
+  
+    if prev_block_gas_used == parent_gas_target
+      return prev_block_base_fee
+    end
+  
+    num = 0
+    denom = parent_gas_target * base_fee_change_denominator
+  
+    if prev_block_gas_used > parent_gas_target
+      num = prev_block_base_fee * (prev_block_gas_used - parent_gas_target)
+      base_fee_delta = [num / denom, 1].max
+      next_base_fee = prev_block_base_fee + base_fee_delta
+    else
+      num = prev_block_base_fee * (parent_gas_target - prev_block_gas_used)
+      base_fee_delta = num / denom
+      next_base_fee = [prev_block_base_fee - base_fee_delta, 0].max
+    end
+  
+    next_base_fee
+  end
+  
+  def get_block(number, get_transactions = false)
+    if number.is_a?(String)
+      return client.call("eth_getBlockByNumber", [number, get_transactions])
+    end
+    
+    client.call("eth_getBlockByNumber", ["0x" + number.to_s(16), get_transactions])
+  end
+  
+  def balance(address)
+    client.call("eth_getBalance", [address, "latest"]).to_i(16)
+  end
+  
+  def call(payload)
+    client.call("eth_call", [payload, "latest"])
+  end
+  
   def code_at_address(address)
     client.call("eth_getCode", [address, "latest"])
   end

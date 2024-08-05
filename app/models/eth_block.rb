@@ -43,6 +43,7 @@ class EthBlock < ApplicationRecord
       parent_hash: legacy_block.parent_blockhash,
       timestamp: legacy_block.timestamp,
       parent_beacon_block_root: legacy_block.parent_blockhash,
+      base_fee_per_gas: BaseFeeGetter.get_base_fee(legacy_block.block_number)
     )
   end
 end

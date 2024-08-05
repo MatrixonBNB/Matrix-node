@@ -127,15 +127,15 @@ module BaseFeeGetter
       end
     end
 
-    save_to_json(all_base_fees, "base_fees_complete.json")
-    puts "All base fees saved to base_fees_complete.json"
+    save_to_json(all_base_fees, "mainnet_base_fees_complete.json")
+    puts "All base fees saved to mainnet_base_fees_complete.json"
   end
   
   def cached_complete_base_fees
     return @_cached_complete_base_fees if defined?(@_cached_complete_base_fees)
     
     dir = Rails.root.join("base_fees")
-    file_path = dir.join("base_fees_complete.json")
+    file_path = dir.join("mainnet_base_fees_complete.json")
     raise "Base fees file not found" unless File.exist?(file_path)
     
     hsh = JSON.parse(File.read(file_path))
@@ -146,7 +146,7 @@ module BaseFeeGetter
   end
   
   def get_base_fee(block_number)
-    cached_complete_base_fees[block_number]
+    cached_complete_base_fees.fetch(block_number)
   end
   
   def save_to_json(data, file_path)

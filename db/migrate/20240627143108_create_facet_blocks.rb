@@ -15,7 +15,7 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       t.string :receipts_root, null: false
       t.integer :size, null: false
       t.string :state_root, null: false
-      t.integer :timestamp, null: false
+      t.bigint :timestamp, null: false
       t.string :transactions_root, null: false
       t.string :prev_randao, null: false
       

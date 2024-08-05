@@ -12,13 +12,17 @@ class FacetTransaction < ApplicationRecord
   FACET_CHAIN_ID = 1
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
   
-  def self.from_eth_tx_and_ethscription(ethscription, idx, legacy_receipt)
+  def self.from_eth_tx_and_ethscription(
+    ethscription,
+    idx,
+    legacy_receipt,
+    eth_block,
+    tx_count_in_block
+  )
     tx = new
     tx.chain_id = FACET_CHAIN_ID
     tx.to_address = ethscription.facet_tx_to
     tx.value = 0
-    tx.max_fee_per_gas = 100.gwei
-    tx.gas_limit = 100e6.to_i
     tx.input = ethscription.facet_tx_input
     
     tx.eth_transaction_hash = ethscription.transaction_hash
@@ -29,6 +33,30 @@ class FacetTransaction < ApplicationRecord
     )
     
     tx.source_hash = FacetTransaction.compute_source_hash(ethscription, tx.eth_call)
+    
+    latest_block_future = Concurrent::Promises.future { TransactionHelper.get_block("latest") }
+    user_current_balance_future = Concurrent::Promises.future { TransactionHelper.balance(tx.from_address) }
+    
+    latest_block, user_current_balance = Concurrent::Promises.zip(
+      latest_block_future,
+      user_current_balance_future
+    ).value!
+
+    latest_block_number = latest_block['number'].to_i(16)
+    next_block_base_fee = TransactionHelper.calculate_next_base_fee(latest_block_number)
+    
+    eth_gas_used = ethscription.gas_used
+    eth_base_fee = eth_block.base_fee_per_gas
+    mint_amount = eth_gas_used * eth_base_fee
+    
+    user_next_balance = user_current_balance + mint_amount
+    
+    block_gas_limit = FacetBlock::GAS_LIMIT
+    per_tx_avg_gas_limit = block_gas_limit / tx_count_in_block
+    
+    tx.max_fee_per_gas = next_block_base_fee
+    tx.gas_limit = [user_next_balance / tx.max_fee_per_gas, per_tx_avg_gas_limit].min
+    tx.mint = mint_amount
     
     tx
   end
@@ -92,7 +120,7 @@ class FacetTransaction < ApplicationRecord
   
   def to_facet_payload
     tx_data = []
-    tx_data.push Eth::Util.serialize_int_to_big_endian chain_id
+    tx_data.push Eth::Util.serialize_int_to_big_endian chain_id || FACET_CHAIN_ID
     tx_data.push Eth::Util.hex_to_bin source_hash
     tx_data.push Eth::Util.hex_to_bin from_address
     tx_data.push Eth::Util.hex_to_bin to_address.to_s
@@ -105,6 +133,21 @@ class FacetTransaction < ApplicationRecord
 
     tx_type = Eth::Util.serialize_int_to_big_endian FACET_TX_TYPE
     "#{tx_type}#{tx_encoded}".bytes_to_hex
+  end
+  
+  def estimate_gas
+    _input = input.starts_with?("0x") ? input : "0x" + input
+    
+    geth_params = {
+      from: from_address,
+      to: to_address,
+      data: _input
+    }
+    
+    TransactionHelper.client.call("eth_estimateGas", [geth_params, "latest"])
+  rescue => e
+    binding.irb
+    raise
   end
   
   def self.tx_decode_errors

@@ -84,7 +84,7 @@ module GethDriver
       withdrawals: [],
       noTxPool: true,
       transactions: transactions,
-      gasLimit: "0x" + 300e6.to_i.to_s(16),
+      gasLimit: "0x" + FacetBlock::GAS_LIMIT.to_s(16),
     }
     
     fork_choice_response = client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, payload_attributes])
