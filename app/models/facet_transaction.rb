@@ -8,9 +8,21 @@ class FacetTransaction < ApplicationRecord
   
   attr_accessor :chain_id, :eth_call
   
-  FACET_TX_TYPE = 0x0F
-  FACET_CHAIN_ID = 1
+  FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
+  
+  def self.current_chain_id
+    if ENV['CUSTOM_CHAIN_ID']
+      return ENV['CUSTOM_CHAIN_ID'].to_i
+    end
+    
+    network = ENV.fetch('ETHEREUM_NETWORK')
+    
+    return 0xface7 if network == "eth-mainnet"
+    return 0xface7a if network == "eth-sepolia"
+    
+    raise "Invalid network: #{network}"
+  end
   
   def self.from_eth_tx_and_ethscription(
     ethscription,
@@ -19,7 +31,7 @@ class FacetTransaction < ApplicationRecord
     tx_count_in_block
   )
     tx = new
-    tx.chain_id = FACET_CHAIN_ID
+    tx.chain_id = current_chain_id
     tx.to_address = ethscription.facet_tx_to
     tx.value = 0
     tx.input = ethscription.facet_tx_input
@@ -81,6 +93,11 @@ class FacetTransaction < ApplicationRecord
     end
 
     chain_id = Eth::Util.deserialize_big_endian_to_int tx[0]
+    
+    unless chain_id == current_chain_id
+      raise Eth::Tx::ParameterError, "Invalid chain ID #{chain_id}!"
+    end
+    
     to = tx[1].blank? ? nil : tx[1].bytes_to_hex
     value = Eth::Util.deserialize_big_endian_to_int tx[2]
     max_gas_fee = Eth::Util.deserialize_big_endian_to_int tx[3]
@@ -120,7 +137,7 @@ class FacetTransaction < ApplicationRecord
   
   def to_facet_payload
     tx_data = []
-    tx_data.push Eth::Util.serialize_int_to_big_endian chain_id || FACET_CHAIN_ID
+    tx_data.push Eth::Util.serialize_int_to_big_endian chain_id
     tx_data.push Eth::Util.hex_to_bin source_hash
     tx_data.push Eth::Util.hex_to_bin from_address
     tx_data.push Eth::Util.hex_to_bin to_address.to_s

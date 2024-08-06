@@ -4,14 +4,17 @@ module GethDriver
   
   def self.setup_rspec_geth
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
-
+    http_port = ENV.fetch('NON_AUTH_GETH_RPC_URL').split(':').last
+    authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
+    discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
+    
     EthBlock.delete_all
     
     Ethscription.write_alloc_to_genesis
     
     system("cd #{geth_dir} && make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json")
     
-    pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --authrpc.port 8551 --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > geth.log 2>&1})
+    pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug' --http.vhosts="*" --authrpc.jwtsecret /tmp/jwtsecret -http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > geth.log 2>&1})
     Process.detach(pid)
     
     sleep 1
@@ -23,7 +26,7 @@ module GethDriver
     discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
     
     puts %{
-      make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug,engine' --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --cache 64000 --cache.preimages=true --maxpeers 0 --verbosity 2 --syncmode full --gcmode archive --history.state 0 --history.transactions 0 --nocompaction --rollup.disabletxpoolgossip=true console
+      make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug' --http.vhosts="*" --authrpc.jwtsecret /tmp/jwtsecret --http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --cache 64000 --cache.preimages=true --maxpeers 0 --verbosity 2 --syncmode full --gcmode archive --history.state 0 --history.transactions 0 --nocompaction --rollup.disabletxpoolgossip=true console
     }.strip
   end
   
