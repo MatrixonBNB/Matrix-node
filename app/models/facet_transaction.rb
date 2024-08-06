@@ -198,7 +198,9 @@ class FacetTransaction < ApplicationRecord
   end
   
   def self.validated_address(str)
-    return nil if str.empty?
+    if str.nil? || str.empty?
+      return nil
+    end
     
     if str.match?(/\A0x[0-9a-f]{40}\z/)
       str
