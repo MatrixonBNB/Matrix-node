@@ -50,6 +50,7 @@ module EthBlockImporter
   end
   
   def import_blocks_until_done
+    MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
     # SolidityCompiler.compile_all_legacy_files
     
@@ -116,7 +117,7 @@ module EthBlockImporter
       end
     end
   
-    if in_v2?(block_numbers.first)
+    if block_numbers.any? { |block_number| in_v2?(block_number) }
       trace_promises = block_numbers.map do |block_number|
         Concurrent::Promise.execute do
           [
@@ -127,7 +128,7 @@ module EthBlockImporter
       end
     end
     
-    unless in_v2?(block_numbers.first)
+    unless block_numbers.any? { |block_number| in_v2?(block_number) }
       receipts_promises = block_numbers.map do |block_number|
         Concurrent::Promise.execute do
           [
