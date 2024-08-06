@@ -378,6 +378,7 @@ module EthBlockImporter
     results.sort_by { |idx, _| idx }.map { |_, facet_tx| facet_tx }
   rescue => e
     binding.irb
+    raise
   end
   
   def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, timestamp: nil, facet_block_number:, earliest:, head_block:, safe_block:, finalized_block:)
@@ -386,12 +387,17 @@ module EthBlockImporter
     facet_txs = if in_v2?(eth_block.number)
       facet_txs_from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls)
     else
-      ethscriptions = Ethscription.from_eth_transactions(eth_transactions)
-      
-      facet_txs_from_ethscriptions_in_block(
-        eth_block,
-        ethscriptions
-      )
+      begin
+        ethscriptions = Ethscription.from_eth_transactions(eth_transactions)
+        
+        facet_txs_from_ethscriptions_in_block(
+          eth_block,
+          ethscriptions
+        )
+      rescue => e
+        binding.irb
+        raise
+      end
     end
 
     payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)

@@ -301,4 +301,40 @@ class FacetTransactionReceipt < ApplicationRecord
       call.replace(reordered_call)
     end
   end
+  
+  def self.address_mapping_file_path
+    prefix = ENV.fetch('ETHEREUM_NETWORK').underscore
+    
+    Rails.root.join("#{prefix}_legacy_address_mapping.json")
+  end
+  
+  def self.write_legacy_address_mapping(force: false)
+    merged_address_map = {}
+  
+    FacetTransactionReceipt.where("legacy_contract_address_map::text != '{}'").each do |receipt|
+      merged_address_map.merge!(receipt.legacy_contract_address_map)
+    end
+  
+    json = JSON.pretty_generate(merged_address_map)
+    
+    if File.exist?(address_mapping_file_path) && !force
+      raise "Address mapping file already exists (pass force: true to overwrite)"
+    end
+    
+    File.write(address_mapping_file_path, json)
+  end
+  
+  def self.cached_legacy_address_mapping
+    return @_cached_legacy_address_mapping if defined?(@_cached_legacy_address_mapping)
+      
+    @_cached_legacy_address_mapping = if File.exist?(address_mapping_file_path)
+      JSON.parse(File.read(address_mapping_file_path)).transform_keys(&:downcase).transform_values(&:downcase)
+    else
+      {}
+    end
+  end
+  
+  def self.map_legacy_address(address)
+    cached_legacy_address_mapping[address.downcase]
+  end
 end

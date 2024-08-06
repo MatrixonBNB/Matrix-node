@@ -44,11 +44,12 @@ module EthscriptionsImporter
     SolidityCompiler.reset_checksum
     # SolidityCompiler.compile_all_legacy_files
     ensure_genesis_blocks
-    raise if in_v2?(next_block_to_import)
     
     loop do
       begin
         block_numbers = next_blocks_to_import(import_batch_size)
+        
+        raise if in_v2?(block_numbers.first)
         
         if block_numbers.blank?
           raise BlockNotReadyToImportError.new("Block not ready")
@@ -443,7 +444,6 @@ module EthscriptionsImporter
       facet_tx = FacetTransaction.from_eth_tx_and_ethscription(
         ethscription,
         idx,
-        legacy_tx_receipt,
         eth_block,
         ethscriptions.count
       )

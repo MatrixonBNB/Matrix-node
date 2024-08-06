@@ -7,11 +7,11 @@ class CreateEthscriptions < ActiveRecord::Migration[7.1]
       t.bigint :transaction_index, null: false
       t.string :creator, null: false
       t.string :initial_owner, null: false
-      t.bigint :block_timestamp, null: false
+      t.bigint :block_timestamp#, null: false
       t.text :content_uri, null: false
       t.string :mimetype, null: false
       t.datetime :processed_at
-      t.string :processing_state, null: false
+      t.string :processing_state#, null: false
       t.string :processing_error
       t.bigint :gas_price
       t.bigint :gas_used

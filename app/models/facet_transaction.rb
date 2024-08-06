@@ -15,7 +15,6 @@ class FacetTransaction < ApplicationRecord
   def self.from_eth_tx_and_ethscription(
     ethscription,
     idx,
-    legacy_receipt,
     eth_block,
     tx_count_in_block
   )
@@ -27,7 +26,7 @@ class FacetTransaction < ApplicationRecord
     
     tx.eth_transaction_hash = ethscription.transaction_hash
     tx.eth_call_index = idx
-    tx.from_address = legacy_receipt.from_address
+    tx.from_address = ethscription.creator
     tx.eth_call = EthCall.new(
       call_index: idx
     )
@@ -63,6 +62,7 @@ class FacetTransaction < ApplicationRecord
   
   def self.from_eth_call_and_tx(eth_call, eth_tx)
     return unless eth_call.to_address == FACET_INBOX_ADDRESS
+    return if eth_call.error.present?
     
     hex = eth_call.input
     
@@ -136,6 +136,8 @@ class FacetTransaction < ApplicationRecord
   end
   
   def estimate_gas
+    # Should use this unless it fails
+    
     _input = input.starts_with?("0x") ? input : "0x" + input
     
     geth_params = {

@@ -5,15 +5,16 @@ class EthTransaction < ApplicationRecord
   has_many :facet_transactions, -> { order(eth_call_index: :asc) },
     primary_key: :tx_hash, foreign_key: :eth_transaction_hash, dependent: :destroy
     
-    
-  def self.from_rpc_result(block_by_number_response)
+  attr_accessor :initialized_ethscription
+  
+  def self.from_rpc_result(block_by_number_response, receipt_result = nil)
     block_result = block_by_number_response['result']
     
     block_hash = block_result['hash']
     block_number = block_result['number'].to_i(16)
     
     block_result['transactions'].map do |tx|
-      EthTransaction.new(
+      tx = EthTransaction.new(
         block_hash: block_hash,
         block_number: block_number,
         tx_hash: tx['hash'],
@@ -35,6 +36,17 @@ class EthTransaction < ApplicationRecord
         value: tx['value'].to_i(16),
         gas_price: tx['gasPrice'].to_i(16)
       )
+      
+      if receipt_result.present?
+        receipts = receipt_result['receipts']
+        current_receipt = receipts.detect{|el| el['transactionHash'] == tx.tx_hash}
+        
+        tx.status = current_receipt['status'].to_i(16)
+        tx.logs = current_receipt['logs']
+        tx.gas_used = current_receipt['gasUsed'].to_i(16)
+      end
+      
+      tx
     end
   end
   
@@ -51,5 +63,108 @@ class EthTransaction < ApplicationRecord
       gas: ethscription.gas_used,
       value: ethscription.transaction_fee,
     )
+  end
+  
+  def utf8_input
+    HexDataProcessor.hex_to_utf8(
+      input,
+      support_gzip: self.class.esip7_enabled?(block_number)
+    )
+  end
+  
+  def self.event_signature(event_name)
+    "0x" + Eth::Util.bin_to_hex(Eth::Util.keccak256(event_name))
+  end
+  
+  def ethscription_creation_events
+    ordered_events.select do |log|
+      CreateEthscriptionEventSig == log['topics'].first
+    end
+  end
+  
+  def ordered_events
+    logs.select do |log|
+      !log['removed']
+    end.sort_by do |log|
+      log['logIndex'].to_i(16)
+    end
+  end
+    
+  def self.esip7_enabled?(block_number)
+    on_testnet? || block_number >= 19376500
+  end
+  
+  CreateEthscriptionEventSig = event_signature("ethscriptions_protocol_CreateEthscription(address,string)")
+  
+  # def possibly_creates_ethscription?
+  #   (DataUri.valid?(utf8_input) && to_address.present?) ||
+  #   ethscription_creation_events.present?
+  # end
+  
+  def init_ethscription_from_input
+    potentially_valid = Ethscription.new(
+      {
+        creator: from_address,
+        initial_owner: to_address,
+        content_uri: utf8_input,
+      }.merge(ethscription_attrs)
+    )
+    
+    init_if_valid_and_no_ethscription_initialized(potentially_valid)
+  end
+  
+  def init_ethscription_from_events
+    ethscription_creation_events.each do |creation_event|
+      next if creation_event['topics'].length != 2
+    
+      begin
+        initial_owner = Eth::Abi.decode(['address'], creation_event['topics'].second).first
+        
+        content_uri_data = Eth::Abi.decode(['string'], creation_event['data']).first
+        content_uri = HexDataProcessor.clean_utf8(content_uri_data)
+      rescue Eth::Abi::DecodingError
+        next
+      end
+          
+      potentially_valid = Ethscription.new(
+        {
+          creator: creation_event['address'],
+          initial_owner: initial_owner,
+          content_uri: content_uri
+        }.merge(ethscription_attrs)
+      )
+      
+      init_if_valid_and_no_ethscription_initialized(potentially_valid)
+    end
+  end
+  
+  def init_ethscription
+    return unless status == 1
+    init_ethscription_from_input
+    init_ethscription_from_events
+    
+    initialized_ethscription
+  end
+  
+  def init_if_valid_and_no_ethscription_initialized(potentially_valid)
+    return if initialized_ethscription.present?
+    return unless potentially_valid.valid_ethscription?
+    
+    self.initialized_ethscription = potentially_valid
+    initialized_ethscription
+  end
+  
+  def ethscription_attrs
+    {
+      transaction_hash: tx_hash,
+      block_number: block_number,
+      block_blockhash: block_hash,
+      transaction_index: transaction_index,
+      gas_used: gas_used
+    }
+  end
+  
+  def self.on_testnet?
+    ENV['ETHEREUM_NETWORK'] != "eth-mainnet"
   end
 end
