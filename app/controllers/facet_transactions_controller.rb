@@ -19,7 +19,7 @@ class FacetTransactionsController < ApplicationController
     render json: res
   end
   
-  def rpc_proxy
+  def rpc
     res = GethDriver.client.call(params[:method], params[:params])
     
     render json: { result: res }
