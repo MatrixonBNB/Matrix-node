@@ -121,7 +121,8 @@ class FacetTransaction < ApplicationRecord
     tx.source_hash = FacetTransaction.compute_source_hash(eth_tx, eth_call)
     
     tx
-  rescue *tx_decode_errors
+  rescue *tx_decode_errors, InvalidAddress => e
+    Rails.logger.error(e.message)
     nil
   end
   
@@ -197,7 +198,7 @@ class FacetTransaction < ApplicationRecord
   end
   
   def self.validated_address(str)
-    return nil if str.blank?
+    return nil if str.empty?
     
     if str.match?(/\A0x[0-9a-f]{40}\z/)
       str
