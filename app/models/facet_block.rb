@@ -1,17 +1,17 @@
 class FacetBlock < ApplicationRecord
-  belongs_to :eth_block, primary_key: :block_hash, foreign_key: :eth_block_hash
+  belongs_to :eth_block, primary_key: :block_hash, foreign_key: :eth_block_hash, optional: true
   has_many :facet_transactions, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   
   GAS_LIMIT = 300e6.to_i
   
-  def self.from_eth_block(eth_block, block_number, timestamp: nil)
+  def self.from_eth_block(eth_block, block_number)
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
       eth_block_number: eth_block.number,
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
       number: block_number,
-      timestamp: timestamp || eth_block.timestamp,
+      timestamp: eth_block.timestamp,
       prev_randao: FacetBlock.calculate_prev_randao(eth_block.block_hash)
     )
   end

@@ -163,7 +163,11 @@ module EthBlockImporter
     # Initialize in-memory representation of blocks
     in_memory_blocks = FacetBlock.where(number: (current_max_facet_block_number - 64 - block_numbers.size)..current_max_facet_block_number).index_by(&:number)
     ActiveRecord::Base.transaction do
-      Benchmark.msr("loop") {
+      return unless FacetBlock.where(number: current_max_facet_block_number).
+        limit(1).
+        lock("FOR UPDATE SKIP LOCKED").
+        first
+      
       block_by_number_responses.zip(trace_responses).each_with_index do |((block_number1, block_by_number_response), (block_number2, trace_response)), index|
         unless (block_number1 == block_number2) || trace_responses.blank?
           raise "Mismatched block numbers: #{block_number1} and #{block_number2}"
@@ -208,7 +212,6 @@ module EthBlockImporter
         
         if trace_result
           new_eth_calls = EthCall.from_trace_result(trace_result, eth_block)
-          # binding.irb if new_eth_calls.nil?
           eth_calls.concat(new_eth_calls)
         end
   
@@ -240,7 +243,6 @@ module EthBlockImporter
           receipts_imported: facet_receipts
         )
       end
-    }
       
       eth_tx_hashes_to_save = all_facet_txs.map(&:eth_transaction_hash).to_set
       
@@ -382,8 +384,8 @@ module EthBlockImporter
     raise
   end
   
-  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, timestamp: nil, facet_block_number:, earliest:, head_block:, safe_block:, finalized_block:)
-    facet_block = FacetBlock.from_eth_block(eth_block, facet_block_number, timestamp: timestamp)
+  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, facet_block_number:, earliest:, head_block:, safe_block:, finalized_block:)
+    facet_block = FacetBlock.from_eth_block(eth_block, facet_block_number)
     
     facet_txs = if in_v2?(eth_block.number)
       facet_txs_from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls)
