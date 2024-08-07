@@ -163,10 +163,15 @@ module EthBlockImporter
     # Initialize in-memory representation of blocks
     in_memory_blocks = FacetBlock.where(number: (current_max_facet_block_number - 64 - block_numbers.size)..current_max_facet_block_number).index_by(&:number)
     ActiveRecord::Base.transaction do
-      return unless FacetBlock.where(number: current_max_facet_block_number).
-        limit(1).
-        lock("FOR UPDATE SKIP LOCKED").
-        first
+      locked_blocks = FacetBlock.where("number >= ?", current_max_facet_block_number).
+        order(:number).
+        limit(import_batch_size + 1).
+        lock("FOR UPDATE SKIP LOCKED").to_a
+
+      if locked_blocks.size != 1
+        logger.info "More than one block is locked or no block is locked. Another process is ahead or no blocks to process. Aborting import."
+        return
+      end
       
       block_by_number_responses.zip(trace_responses).each_with_index do |((block_number1, block_by_number_response), (block_number2, trace_response)), index|
         unless (block_number1 == block_number2) || trace_responses.blank?
@@ -405,22 +410,20 @@ module EthBlockImporter
 
     payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
     
-    Benchmark.msr("talking to geth") do
-      response = geth_driver.propose_block(
-        payload,
-        facet_block,
-        earliest,
-        head_block,
-        safe_block,
-        finalized_block
-      )
-    
-      geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
-      receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
+    response = geth_driver.propose_block(
+      payload,
+      facet_block,
+      earliest,
+      head_block,
+      safe_block,
+      finalized_block
+    )
   
-      # Wait for both futures to complete
-      geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
-    end
+    geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
+    receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
+
+    # Wait for both futures to complete
+    geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
 
     facet_block.from_rpc_response(geth_block)
     receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
