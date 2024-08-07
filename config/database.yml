@@ -1,7 +1,7 @@
 default: &default
   adapter: postgresql
   encoding: unicode
-  pool: 30
+  pool: 50
   username:
   password:
 
@@ -16,6 +16,7 @@ test:
 production:
   <<: *default
   database: evm_facet_production
+  pool: 100
 
 secondary:
   <<: *default
