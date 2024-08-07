@@ -405,21 +405,23 @@ module EthBlockImporter
 
     payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
     
-    response = geth_driver.propose_block(
-      payload,
-      facet_block,
-      earliest,
-      head_block,
-      safe_block,
-      finalized_block
-    )
-  
-    geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
-    receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
-
-    # Wait for both futures to complete
-    geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
+    Benchmark.msr("talking to geth") do
+      response = geth_driver.propose_block(
+        payload,
+        facet_block,
+        earliest,
+        head_block,
+        safe_block,
+        finalized_block
+      )
     
+      geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
+      receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
+  
+      # Wait for both futures to complete
+      geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
+    end
+
     facet_block.from_rpc_response(geth_block)
     receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
     
