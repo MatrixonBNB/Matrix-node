@@ -105,6 +105,13 @@ module EthBlockImporter
   end
   
   def import_blocks(block_numbers)
+    orphaned_facet_blocks = FacetBlock.where.not(eth_block_hash: EthBlock.select(:block_hash))
+    
+    if orphaned_facet_blocks.any?
+      orphaned_facet_blocks.each(&:destroy!)
+      return
+    end
+    
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
