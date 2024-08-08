@@ -255,12 +255,12 @@ module EthBlockImporter
         )
       end
       
-      Parallel.each(proposed_blocks, in_threads: proposed_blocks.length) do |proposed_block|
-        facet_block, facet_txs, facet_receipts = fill_in_block_data(
-          proposed_block[:facet_block],
-          proposed_block[:facet_txs]
-        )
-        
+      results = Parallel.map(proposed_blocks, in_threads: proposed_blocks.length) do |proposed_block|
+        fill_in_block_data(proposed_block[:facet_block], proposed_block[:facet_txs])
+      end
+      
+      # Mutate shared data structures in the main thread
+      results.each do |facet_block, facet_txs, facet_receipts|
         facet_blocks << facet_block
         all_facet_txs.concat(facet_txs)
         all_receipts.concat(facet_receipts)
