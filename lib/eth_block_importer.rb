@@ -119,8 +119,8 @@ module EthBlockImporter
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
-    @facet_transaction_receipts_cache = Concurrent::Array.new
-    @facet_transactions_cache = Concurrent::Array.new
+    @facet_transaction_receipts_cache = []
+    @facet_transactions_cache = []
     
     block_by_number_promises = block_numbers.map do |block_number|
       Concurrent::Promise.execute do
@@ -160,9 +160,9 @@ module EthBlockImporter
     eth_blocks = []
     eth_transactions = []
     eth_calls = []
-    facet_blocks = Concurrent::Array.new
-    all_facet_txs = Concurrent::Array.new
-    all_receipts = Concurrent::Array.new
+    facet_blocks = []
+    all_facet_txs = []
+    all_receipts = []
     res = []
     proposed_blocks = []
     

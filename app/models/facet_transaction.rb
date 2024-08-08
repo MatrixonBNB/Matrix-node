@@ -100,7 +100,7 @@ class FacetTransaction < ApplicationRecord
     
     to = tx[1].blank? ? nil : tx[1].bytes_to_hex
     value = Eth::Util.deserialize_big_endian_to_int tx[2]
-    max_gas_fee = Eth::Util.deserialize_big_endian_to_int tx[3]
+    max_gas_fee = tx[3].blank? ? nil : Eth::Util.deserialize_big_endian_to_int(tx[3])
     gas_limit = Eth::Util.deserialize_big_endian_to_int tx[4]
     data = tx[5].bytes_to_hex
 
@@ -136,6 +136,8 @@ class FacetTransaction < ApplicationRecord
   end
   
   def to_facet_payload
+    max_fee_per_gas_val = max_fee_per_gas.nil? ? "" : max_fee_per_gas
+    
     tx_data = []
     tx_data.push Eth::Util.serialize_int_to_big_endian chain_id
     tx_data.push Eth::Util.hex_to_bin source_hash
@@ -143,7 +145,7 @@ class FacetTransaction < ApplicationRecord
     tx_data.push Eth::Util.hex_to_bin to_address.to_s
     tx_data.push Eth::Util.serialize_int_to_big_endian mint
     tx_data.push Eth::Util.serialize_int_to_big_endian value
-    tx_data.push Eth::Util.serialize_int_to_big_endian max_fee_per_gas
+    tx_data.push Eth::Util.serialize_int_to_big_endian max_fee_per_gas_val
     tx_data.push Eth::Util.serialize_int_to_big_endian gas_limit
     tx_data.push Eth::Util.hex_to_bin input
     tx_encoded = Eth::Rlp.encode tx_data
