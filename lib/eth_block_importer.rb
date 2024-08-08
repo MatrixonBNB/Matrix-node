@@ -31,6 +31,10 @@ module EthBlockImporter
     v2_fork_block.blank? || block_number >= v2_fork_block
   end
   
+  def in_v1?(block_number)
+    !in_v2?(block_number)
+  end
+  
   def blocks_behind
     (cached_global_block_number - next_block_to_import) + 1
   end
@@ -135,7 +139,7 @@ module EthBlockImporter
       end
     end
     
-    unless block_numbers.any? { |block_number| in_v2?(block_number) }
+    if block_numbers.any? { |block_number| in_v1?(block_number) }
       receipts_promises = block_numbers.map do |block_number|
         Concurrent::Promise.execute do
           [
@@ -169,6 +173,7 @@ module EthBlockImporter
     
     # Initialize in-memory representation of blocks
     in_memory_blocks = FacetBlock.where(number: (current_max_facet_block_number - 64 - block_numbers.size)..current_max_facet_block_number).index_by(&:number)
+    
     ActiveRecord::Base.transaction do
       locked_blocks = FacetBlock.where("number >= ?", current_max_facet_block_number).
         order(:number).
@@ -191,26 +196,23 @@ module EthBlockImporter
         
         facet_block_number = current_max_facet_block_number + index + 1
         
-        parent_block = in_memory_blocks[facet_block_number - 1]
-  
-        # if parent_block.nil? || parent_block.block_hash != block_result['parentHash']
-        #   EthBlock.where("number >= ?", block_number - 1).each(&:destroy)
-  
-        #   Airbrake.notify("
-        #     Reorg detected: #{block_number},
-        #     #{parent_block&.block_hash},
-        #     #{block_result['parentHash']},
-        #     Deleting block(s): #{EthBlock.where("number >= ?", block_number - 1).pluck(:number).join(', ')}
-        #   ")
-  
-        #   # res << OpenStruct.new(
-        #   #   block_number: eth_block_number,
-        #   #   transactions_imported: [],
-        #   #   receipts_imported: []
-        #   # )
-        #   next
-        # end
+        if index == 0
+          reorg_happened = handle_potential_reorg(
+            block_number1,
+            block_result['parentHash']
+          )
           
+          if reorg_happened
+            res << OpenStruct.new(
+              facet_block: [],
+              transactions_imported: [],
+              receipts_imported: []
+            )
+            
+            return
+          end
+        end
+
         # Determine the head, safe, and finalized blocks
         head_block = in_memory_blocks[facet_block_number - 1] || earliest
         safe_block = in_memory_blocks[facet_block_number - 32] || earliest
@@ -326,6 +328,32 @@ module EthBlockImporter
     block_number = next_block_to_import
     
     import_blocks([block_number])
+  end
+  
+  def handle_potential_reorg(next_block_number, parent_hash)
+    parent_block = EthBlock.find_by_number(next_block_number - 1)
+      
+    unless parent_block
+      raise "No last imported eth block found"
+    end
+    
+    if parent_block.block_hash != parent_hash
+      blocks_to_delete = EthBlock.where("number >= ?", last_imported_eth_block.number - 1).to_a
+      deleted_message = "Deleting block(s): #{blocks_to_delete.map(&:number).join(', ')}"
+      
+      blocks_to_delete.each(&:destroy)
+
+      Airbrake.notify("
+        Reorg detected: #{last_imported_eth_block.number},
+        #{parent_block.block_hash},
+        #{parent_hash},
+        #{deleted_message}
+      ")
+      
+      return true
+    end
+    
+    return false
   end
   
   def next_block_to_import

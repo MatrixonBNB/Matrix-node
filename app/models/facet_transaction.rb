@@ -122,7 +122,6 @@ class FacetTransaction < ApplicationRecord
     
     tx
   rescue *tx_decode_errors, InvalidAddress => e
-    Rails.logger.error(e.message)
     nil
   end
   
