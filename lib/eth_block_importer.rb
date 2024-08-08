@@ -119,8 +119,8 @@ module EthBlockImporter
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
-    @facet_transaction_receipts_cache = []
-    @facet_transactions_cache = []
+    @facet_transaction_receipts_cache = Concurrent::Array.new
+    @facet_transactions_cache = Concurrent::Array.new
     
     block_by_number_promises = block_numbers.map do |block_number|
       Concurrent::Promise.execute do
@@ -160,11 +160,12 @@ module EthBlockImporter
     eth_blocks = []
     eth_transactions = []
     eth_calls = []
-    facet_blocks = []
-    all_facet_txs = []
-    all_receipts = []
+    facet_blocks = Concurrent::Array.new
+    all_facet_txs = Concurrent::Array.new
+    all_receipts = Concurrent::Array.new
     res = []
-  
+    proposed_blocks = []
+    
     # Initialize in-memory representation of blocks
     current_max_facet_block_number = FacetBlock.maximum(:number).to_i
     
@@ -205,8 +206,7 @@ module EthBlockImporter
           if reorg_happened
             res << OpenStruct.new(
               facet_block: [],
-              transactions_imported: [],
-              receipts_imported: []
+              transactions_imported: []
             )
             
             return
@@ -229,7 +229,7 @@ module EthBlockImporter
           eth_calls.concat(new_eth_calls)
         end
   
-        facet_block, facet_txs, facet_receipts = Benchmark.msr("propose") {propose_facet_block(
+        facet_block, facet_txs = Benchmark.msr("propose") {propose_facet_block(
           eth_block,
           eth_calls: new_eth_calls,
           eth_transactions: new_eth_transactions,
@@ -240,22 +240,33 @@ module EthBlockImporter
           finalized_block: finalized_block
         )}
 
-        facet_blocks << facet_block
-        all_facet_txs.concat(facet_txs)
-        all_receipts.concat(facet_receipts)
-  
-        in_memory_blocks[facet_block_number] = facet_block
+        proposed_blocks << {
+          facet_block: facet_block,
+          facet_txs: facet_txs
+        }
         
-        @facet_transaction_receipts_cache.concat(facet_receipts)
-        @facet_transactions_cache.concat(facet_txs)
+        in_memory_blocks[facet_block_number] = facet_block
         
         # block_ethscriptions.each(&:clear_caches_if_upgrade!)
         
         res << OpenStruct.new(
           facet_block: facet_block,
-          transactions_imported: facet_txs,
-          receipts_imported: facet_receipts
+          transactions_imported: facet_txs
         )
+      end
+      
+      Parallel.each(proposed_blocks, in_threads: proposed_blocks.length) do |proposed_block|
+        facet_block, facet_txs, facet_receipts = fill_in_block_data(
+          proposed_block[:facet_block],
+          proposed_block[:facet_txs]
+        )
+        
+        facet_blocks << facet_block
+        all_facet_txs.concat(facet_txs)
+        all_receipts.concat(facet_receipts)
+        
+        @facet_transaction_receipts_cache.concat(facet_receipts)
+        @facet_transactions_cache.concat(facet_txs)
       end
       
       eth_tx_hashes_to_save = all_facet_txs.map(&:eth_transaction_hash).to_set
@@ -424,6 +435,70 @@ module EthBlockImporter
     raise
   end
   
+  def fill_in_block_data(facet_block, facet_txs)
+    geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", ["0x" + facet_block.number.to_s(16), true]) }
+    
+    if facet_txs.present?
+      receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", ["0x" + facet_block.number.to_s(16)]) }
+    end
+
+    geth_block = geth_block_future.value!
+    
+    if facet_txs.present?
+      receipts_data = receipts_data_future.value!
+    end
+    
+    facet_block.from_rpc_response(geth_block)
+    
+    if facet_txs.blank?
+      return [facet_block, facet_txs, []]
+    end
+    
+    receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
+    
+    facet_txs_by_source_hash = facet_txs.index_by(&:source_hash)
+    
+    receipts = []
+    
+    geth_block['transactions'].each do |tx|
+      receipt_details = receipts_data_by_hash[tx['hash']]
+      
+      facet_tx = facet_txs_by_source_hash[tx['sourceHash']]
+      raise unless facet_tx
+
+      facet_tx.assign_attributes(
+        tx_hash: tx['hash'],
+        transaction_index: receipt_details['transactionIndex'].to_i(16),
+        deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
+        gas: tx['gas'].to_i(16),
+        tx_type: tx['type']
+      )
+      
+      facet_receipt = FacetTransactionReceipt.new(
+        transaction_hash: tx['hash'],
+        block_hash: facet_block.block_hash,
+        block_number: facet_block.number,
+        contract_address: receipt_details['contractAddress'],
+        cumulative_gas_used: receipt_details['cumulativeGasUsed'].to_i(16),
+        deposit_nonce: tx['nonce'].to_i(16),
+        deposit_receipt_version: tx['type'].to_i(16),
+        effective_gas_price: receipt_details['effectiveGasPrice'].to_i(16),
+        from_address: tx['from'],
+        gas_used: receipt_details['gasUsed'].to_i(16),
+        logs: receipt_details['logs'],
+        logs_bloom: receipt_details['logsBloom'],
+        status: receipt_details['status'].to_i(16),
+        to_address: tx['to'],
+        transaction_index: receipt_details['transactionIndex'].to_i(16),
+        tx_type: tx['type']
+      )
+      
+      receipts << facet_receipt
+    end
+    
+    [facet_block, facet_txs, receipts]
+  end
+  
   def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, facet_block_number:, earliest:, head_block:, safe_block:, finalized_block:)
     facet_block = FacetBlock.from_eth_block(eth_block, facet_block_number)
     
@@ -453,59 +528,20 @@ module EthBlockImporter
       safe_block,
       finalized_block
     )
-  
-    geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
-    receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
-
-    # Wait for both futures to complete
-    geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
-
-    facet_block.from_rpc_response(geth_block)
-    receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
     
-    facet_txs_by_source_hash = facet_txs.index_by(&:source_hash)
+    facet_block.assign_attributes(
+      block_hash: response['blockHash'],
+      number: response['blockNumber'].to_i(16),
+    )
     
-    receipts = []
-    
-    geth_block['transactions'].each do |tx|
-      receipt_details = receipts_data_by_hash[tx['hash']]
-      
-      facet_tx = facet_txs_by_source_hash[tx['sourceHash']]
-      raise unless facet_tx
-
+    facet_txs.each do |facet_tx|
       facet_tx.assign_attributes(
-        tx_hash: tx['hash'],
-        block_hash: response['blockHash'],
-        block_number: response['blockNumber'].to_i(16),
-        transaction_index: receipt_details['transactionIndex'].to_i(16),
-        deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
-        gas: tx['gas'].to_i(16),
-        tx_type: tx['type']
+        block_hash: facet_block.block_hash,
+        block_number: facet_block.number,
       )
-      
-      facet_receipt = FacetTransactionReceipt.new(
-        transaction_hash: tx['hash'],
-        block_hash: response['blockHash'],
-        block_number: response['blockNumber'].to_i(16),
-        contract_address: receipt_details['contractAddress'],
-        cumulative_gas_used: receipt_details['cumulativeGasUsed'].to_i(16),
-        deposit_nonce: tx['nonce'].to_i(16),
-        deposit_receipt_version: tx['type'].to_i(16),
-        effective_gas_price: receipt_details['effectiveGasPrice'].to_i(16),
-        from_address: tx['from'],
-        gas_used: receipt_details['gasUsed'].to_i(16),
-        logs: receipt_details['logs'],
-        logs_bloom: receipt_details['logsBloom'],
-        status: receipt_details['status'].to_i(16),
-        to_address: tx['to'],
-        transaction_index: receipt_details['transactionIndex'].to_i(16),
-        tx_type: tx['type']
-      )
-      
-      receipts << facet_receipt
     end
     
-    [facet_block, facet_txs, receipts]
+    return [facet_block, facet_txs]
   rescue => e
     binding.irb
     raise
