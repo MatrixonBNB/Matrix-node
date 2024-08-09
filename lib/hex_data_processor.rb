@@ -17,8 +17,7 @@ module HexDataProcessor
   end
 
   def self.hex_string_to_binary(hex_string)
-    ary = hex_string.scan(/../).map { |pair| pair.to_i(16) }
-    ary.pack('C*')
+    [hex_string].pack('H*')
   end
 
   def self.gzip_compressed?(data)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.24;
 
 import "./FacetERC20.sol";
 import "./Upgradeable.sol";
@@ -216,7 +216,7 @@ contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
     }
 
     function sqrt(uint input) public view returns (uint) {
-        address pre = 0xf8F50DB43a2b7Dace8D24C481e0FE45459A0966D;
+        address pre = 0x00050db43a2b7dACe8D24c481E0Fe45459a09000;
         (bool success, bytes memory output) = pre.staticcall(abi.encode(input));
         require(success, "Failed to call sqrt precompile contract");
         return abi.decode(output, (uint));

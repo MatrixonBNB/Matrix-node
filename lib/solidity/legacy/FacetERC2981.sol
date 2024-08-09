@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.24;
 
 abstract contract FacetERC2981 {
     event DefaultRoyaltyUpdated(address indexed receiver, uint96 feeNumerator);

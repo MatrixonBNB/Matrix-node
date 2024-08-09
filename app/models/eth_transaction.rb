@@ -13,6 +13,10 @@ class EthTransaction < ApplicationRecord
     block_hash = block_result['hash']
     block_number = block_result['number'].to_i(16)
     
+    if receipt_result.present?
+      indexed_receipts = receipt_result['receipts'].index_by{|el| el['transactionHash']}
+    end
+    
     block_result['transactions'].map do |tx|
       tx = EthTransaction.new(
         block_hash: block_hash,
@@ -37,9 +41,8 @@ class EthTransaction < ApplicationRecord
         gas_price: tx['gasPrice'].to_i(16)
       )
       
-      if receipt_result.present?
-        receipts = receipt_result['receipts']
-        current_receipt = receipts.detect{|el| el['transactionHash'] == tx.tx_hash}
+      if indexed_receipts.present?
+        current_receipt = indexed_receipts[tx.tx_hash]
         
         tx.status = current_receipt['status'].to_i(16)
         tx.logs = current_receipt['logs']
@@ -77,17 +80,9 @@ class EthTransaction < ApplicationRecord
   end
   
   def ethscription_creation_events
-    ordered_events.select do |log|
-      CreateEthscriptionEventSig == log['topics'].first
-    end
-  end
-  
-  def ordered_events
     logs.select do |log|
-      !log['removed']
-    end.sort_by do |log|
-      log['logIndex'].to_i(16)
-    end
+      !log['removed'] && CreateEthscriptionEventSig == log['topics'].first
+    end.sort_by { |log| log['logIndex'].to_i(16) }
   end
     
   def self.esip7_enabled?(block_number)
@@ -96,12 +91,11 @@ class EthTransaction < ApplicationRecord
   
   CreateEthscriptionEventSig = event_signature("ethscriptions_protocol_CreateEthscription(address,string)")
   
-  # def possibly_creates_ethscription?
-  #   (DataUri.valid?(utf8_input) && to_address.present?) ||
-  #   ethscription_creation_events.present?
-  # end
-  
   def init_ethscription_from_input
+    unless to_address == Ethscription.required_initial_owner
+      return
+    end
+    
     potentially_valid = Ethscription.new(
       {
         creator: from_address,

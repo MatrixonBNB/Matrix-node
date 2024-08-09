@@ -57,7 +57,7 @@ module BaseFeeGetter
       # Save if the accumulated base fees reach the save batch size
       if base_fees.size >= save_batch_size
         puts "Saving base fees for blocks #{current_block - base_fees.size} to #{current_block - 1}"
-        save_to_json(base_fees, "base_fees_#{current_block - base_fees.size}_to_#{current_block - 1}.json")
+        save_to_json(base_fees, incremental_filename(current_block, base_fees.size))
         base_fees.clear # Clear the hash to free up memory after each batch
       end
     end
@@ -65,7 +65,7 @@ module BaseFeeGetter
     # Save any remaining base fees
     unless base_fees.empty?
       puts "Saving remaining base fees for blocks #{current_block - base_fees.size} to #{current_block - 1}"
-      save_to_json(base_fees, "base_fees_#{current_block - base_fees.size}_to_#{current_block - 1}.json")
+      save_to_json(base_fees, incremental_filename(current_block, base_fees.size))
     end
   end
   
@@ -73,7 +73,7 @@ module BaseFeeGetter
 
   def read_and_verify_json_files
     dir = Rails.root.join("base_fees")
-    files = Dir.glob(dir.join("base_fees_*.json"))
+    files = Dir.glob(dir.join("#{underscored_network}_base_fees_*.json"))
 
     all_base_fees = {}
 
@@ -127,15 +127,27 @@ module BaseFeeGetter
       end
     end
 
-    save_to_json(all_base_fees, "mainnet_base_fees_complete.json")
-    puts "All base fees saved to mainnet_base_fees_complete.json"
+    save_to_json(all_base_fees, complete_filename)
+    puts "All base fees saved to #{complete_filename}"
+  end
+  
+  def underscored_network
+    ENV.fetch('ETHEREUM_NETWORK').underscore
+  end
+  
+  def incremental_filename(current_block, batch_size)
+    "#{underscored_network}_base_fees_#{current_block - batch_size}_to_#{current_block - 1}.json"
+  end
+  
+  def complete_filename
+    "#{underscored_network}_base_fees_complete.json"
   end
   
   def cached_complete_base_fees
     return @_cached_complete_base_fees if defined?(@_cached_complete_base_fees)
     
     dir = Rails.root.join("base_fees")
-    file_path = dir.join("mainnet_base_fees_complete.json")
+    file_path = dir.join(complete_filename)
     raise "Base fees file not found" unless File.exist?(file_path)
     
     hsh = JSON.parse(File.read(file_path))
@@ -161,11 +173,11 @@ module BaseFeeGetter
 
   def last_saved_block
     dir = Rails.root.join("base_fees")
-    files = Dir.glob(dir.join("base_fees_*.json"))
+    files = Dir.glob(dir.join("#{underscored_network}_base_fees_*.json"))
     return nil if files.empty?
   
     highest_block = files.map do |file|
-      match = file.match(/base_fees_(\d+)_to_(\d+)\.json/)
+      match = file.match(/#{underscored_network}_base_fees_(\d+)_to_(\d+)\.json/)
       match[2].to_i if match
     end.compact.max
   

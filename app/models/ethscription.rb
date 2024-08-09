@@ -165,6 +165,7 @@ class Ethscription < ApplicationRecord
         if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
           return "0x" + "0" * 100
         else
+          binding.irb
           raise "No implementation address for #{to_address}"
         end
       end
@@ -369,14 +370,12 @@ class Ethscription < ApplicationRecord
   
   class << self
     def get_implementation(to_address)
-      Rails.cache.fetch([to_address, '__getImplementation', Rails.env]) do
-        TransactionHelper.static_call(
-          contract: 'legacy/ERC1967Proxy',
-          address: to_address,
-          function: '__getImplementation',
-          args: []
-        )
-      end
+      TransactionHelper.static_call(
+        contract: 'legacy/ERC1967Proxy',
+        address: to_address,
+        function: '__getImplementation',
+        args: []
+      ).freeze
     end
     memoize :get_implementation
     
@@ -387,7 +386,7 @@ class Ethscription < ApplicationRecord
       
       return map_version if map_version
       
-      EthscriptionsImporter.facet_transaction_receipts_in_current_batch&.each do |receipt|
+      BlockImportBatchContext.imported_facet_transaction_receipts&.each do |receipt|
         if receipt.legacy_contract_address_map.key?(legacy_to)
           return receipt.legacy_contract_address_map[legacy_to]
         end
@@ -396,6 +395,7 @@ class Ethscription < ApplicationRecord
       deploy_receipt = FacetTransactionReceipt.find_by("legacy_contract_address_map ? :legacy_to", legacy_to: legacy_to)
       
       unless deploy_receipt
+        # binding.irb
         raise ContractMissing, "Contract #{legacy_to} not found"
       end
       
@@ -505,21 +505,23 @@ class Ethscription < ApplicationRecord
     
     def real_withdrawal_id(user_withdrawal_id)
       # Check in-memory cache first
-      transaction = EthscriptionsImporter.facet_transactions_in_current_batch&.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
+      transaction = BlockImportBatchContext.imported_facet_transactions&.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
       
       if transaction
-        receipt = EthscriptionsImporter.facet_transaction_receipts_in_current_batch.find { |r| r.transaction_hash == transaction.tx_hash }
+        receipt = BlockImportBatchContext.imported_facet_transaction_receipts.find { |r| r.transaction_hash == transaction.tx_hash }
       else
         # Fallback to database query
         transaction = FacetTransaction.find_by(eth_transaction_hash: user_withdrawal_id)
         if transaction
           receipt = transaction.facet_transaction_receipt
         else
+          # binding.irb
           raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
         end
       end
       
       unless receipt
+        # binding.irb
         raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
       end
       
@@ -569,6 +571,7 @@ class Ethscription < ApplicationRecord
       end 
       
       map["0x00000000000000000000000000000000000000c5"] = "NonExistentContractShim"
+      map["0x4200000000000000000000000000000000000015"] = "L1Block"
       
       map
     end
@@ -610,6 +613,7 @@ class Ethscription < ApplicationRecord
   
   def self.write_alloc_to_genesis
     Rails.cache.clear
+    MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
     SolidityCompiler.compile_all_legacy_files
     

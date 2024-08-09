@@ -11,6 +11,12 @@ class FacetTransaction < ApplicationRecord
   FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
   
+  USER_DEPOSIT_SOURCE_DOMAIN = 0
+  L1_INFO_DEPOSIT_SOURCE_DOMAIN = 1
+  
+  SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
+  L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
+  
   def self.current_chain_id
     if ENV['CUSTOM_CHAIN_ID']
       return ENV['CUSTOM_CHAIN_ID'].to_i
@@ -28,9 +34,11 @@ class FacetTransaction < ApplicationRecord
     ethscription,
     idx,
     eth_block,
-    tx_count_in_block
+    tx_count_in_block,
+    facet_block
   )
     tx = new
+    tx.facet_block = facet_block
     tx.chain_id = current_chain_id
     tx.to_address = ethscription.facet_tx_to
     tx.value = 0
@@ -43,18 +51,14 @@ class FacetTransaction < ApplicationRecord
       call_index: idx
     )
     
-    tx.source_hash = FacetTransaction.compute_source_hash(ethscription, tx.eth_call)
+    tx.source_hash = FacetTransaction.compute_source_hash(
+      ethscription.block_hash,
+      tx.eth_call.call_index,
+      USER_DEPOSIT_SOURCE_DOMAIN
+    )
     
-    latest_block_future = Concurrent::Promises.future { TransactionHelper.get_block("latest") }
-    user_current_balance_future = Concurrent::Promises.future { TransactionHelper.balance(tx.from_address) }
-    
-    latest_block, user_current_balance = Concurrent::Promises.zip(
-      latest_block_future,
-      user_current_balance_future
-    ).value!
-
-    latest_block_number = latest_block['number'].to_i(16)
-    next_block_base_fee = TransactionHelper.calculate_next_base_fee(latest_block_number)
+    user_current_balance = TransactionHelper.balance(tx.from_address)
+    next_block_base_fee = facet_block.calculated_base_fee_per_gas
     
     eth_gas_used = ethscription.gas_used
     eth_base_fee = eth_block.base_fee_per_gas
@@ -63,7 +67,7 @@ class FacetTransaction < ApplicationRecord
     user_next_balance = user_current_balance + mint_amount
     
     block_gas_limit = FacetBlock::GAS_LIMIT
-    per_tx_avg_gas_limit = block_gas_limit / tx_count_in_block
+    per_tx_avg_gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
     
     tx.max_fee_per_gas = next_block_base_fee
     tx.gas_limit = [user_next_balance / tx.max_fee_per_gas, per_tx_avg_gas_limit].min
@@ -152,19 +156,52 @@ class FacetTransaction < ApplicationRecord
     tx.from_address = eth_call.from_address
     tx.eth_call = eth_call
     
-    tx.source_hash = FacetTransaction.compute_source_hash(eth_tx, eth_call)
+    tx.source_hash = FacetTransaction.compute_source_hash(
+      eth_tx.block_hash,
+      eth_call.call_index,
+      USER_DEPOSIT_SOURCE_DOMAIN
+    )
     
     tx
   rescue *tx_decode_errors, InvalidAddress => e
     nil
   end
   
-  def self.compute_source_hash(eth_tx, eth_call)
+  def self.l1_attributes_tx_from_blocks(eth_block, facet_block)
+    calldata = L1AttributesTxCalldata.build(
+      timestamp: eth_block.timestamp,
+      number: eth_block.number,
+      base_fee: eth_block.base_fee_per_gas,
+      hash: eth_block.block_hash
+    )
+    
+    tx = new
+    tx.chain_id = current_chain_id
+    tx.to_address = L1_INFO_ADDRESS
+    tx.value = 0
+    tx.mint = 0
+    tx.max_fee_per_gas = 0
+    tx.gas_limit = 1_000_000
+    tx.input = calldata
+    tx.from_address = SYSTEM_ADDRESS
+    
+    tx.facet_block = facet_block
+    
+    tx.source_hash = FacetTransaction.compute_source_hash(
+      eth_block.block_hash,
+      0,
+      L1_INFO_DEPOSIT_SOURCE_DOMAIN
+    )
+    
+    tx
+  end
+  
+  def self.compute_source_hash(block_hash, index, source_domain)
     Eth::Util.keccak256(
-      Eth::Util.int_to_big_endian(0) +
+      Eth::Util.zpad_int(source_domain, 32) +
       Eth::Util.keccak256(
-        eth_tx.block_hash.hex_to_bytes +
-        Eth::Util.int_to_big_endian(eth_call.call_index)
+        block_hash.hex_to_bytes +
+        Eth::Util.zpad_int(index, 32)
       )
     ).bytes_to_hex
   end

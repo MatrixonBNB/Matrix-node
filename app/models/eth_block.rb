@@ -25,7 +25,7 @@ class EthBlock < ApplicationRecord
       difficulty: block_result['difficulty'].to_i(16),
       gas_limit: block_result['gasLimit'].to_i(16),
       gas_used: block_result['gasUsed'].to_i(16),
-      parent_beacon_block_root: block_result['parentBeaconBlockRoot'] || block_result['parentHash'],
+      parent_beacon_block_root: block_result['parentBeaconBlockRoot'],
       size: block_result['size'].to_i(16),
       transactions_root: block_result['transactionsRoot'],
       state_root: block_result['stateRoot'],
@@ -33,17 +33,6 @@ class EthBlock < ApplicationRecord
       parent_hash: block_result['parentHash'],
       blob_gas_used: block_result['blobGasUsed']&.to_i(16),
       timestamp: block_result['timestamp'].to_i(16)
-    )
-  end
-  
-  def self.from_legacy_eth_block(legacy_block)
-    EthBlock.new(
-      number: legacy_block.block_number,
-      block_hash: legacy_block.blockhash,
-      parent_hash: legacy_block.parent_blockhash,
-      timestamp: legacy_block.timestamp,
-      parent_beacon_block_root: legacy_block.parent_blockhash,
-      base_fee_per_gas: BaseFeeGetter.get_base_fee(legacy_block.block_number)
     )
   end
 end

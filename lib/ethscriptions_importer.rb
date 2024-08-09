@@ -2,7 +2,18 @@ module EthscriptionsImporter
   extend self
   
   class BlockNotReadyToImportError < StandardError; end
-    
+  
+  def ethereum_client
+    @_ethereum_client ||= begin
+      client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
+      
+      client_class.new(
+        api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
+        base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
+      )
+    end
+  end
+  
   def logger
     Rails.logger
   end
@@ -45,6 +56,8 @@ module EthscriptionsImporter
     # SolidityCompiler.compile_all_legacy_files
     ensure_genesis_blocks
     
+    alchemy_responses = {}
+    
     loop do
       begin
         block_numbers = next_blocks_to_import(import_batch_size)
@@ -55,7 +68,21 @@ module EthscriptionsImporter
           raise BlockNotReadyToImportError.new("Block not ready")
         end
         
-        import_blocks(block_numbers)
+        next_start_block = block_numbers.last + 1
+        next_block_numbers = (next_start_block...(next_start_block + import_batch_size * 2)).to_a
+        
+        blocks_to_import = block_numbers + next_block_numbers
+        
+        blocks_to_import -= alchemy_responses.keys
+        
+        alchemy_responses.reverse_merge!(get_blocks_promises(blocks_to_import))
+        
+        BlockImportBatchContext.set(
+          imported_facet_transactions: [],
+          imported_facet_transaction_receipts: []
+        ) do
+          import_blocks(block_numbers, alchemy_responses)
+        end
       rescue BlockNotReadyToImportError => e
         puts "#{e.message}. Stopping import."
         break
@@ -74,9 +101,9 @@ module EthscriptionsImporter
         raise "Facet genesis block is not the same as the latest block on geth"
       end
       
-      genesis_eth_block = LegacyEthBlock.reading{ LegacyEthBlock.find_by!(block_number: genesis_block) }
+      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + genesis_block.to_s(16), false])
       
-      eth_block = EthBlock.from_legacy_eth_block(genesis_eth_block)
+      eth_block = EthBlock.from_rpc_result(genesis_eth_block)
       eth_block.save!
       
       current_max_block_number = FacetBlock.maximum(:number).to_i
@@ -87,21 +114,20 @@ module EthscriptionsImporter
     end
   end
   
-  def facet_transaction_receipts_in_current_batch
-    @facet_transaction_receipts_cache
+  def get_blocks_promises(block_numbers)
+    block_numbers.map do |block_number|
+      promise = Concurrent::Promise.execute do
+         ethereum_client.get_block(block_number)
+      end
+      
+      [block_number, promise]
+    end.to_h
   end
   
-  def facet_transactions_in_current_batch
-    @facet_transactions_cache
-  end
-  
-  def import_blocks(block_numbers)
+  def import_blocks(block_numbers, alchemy_responses)
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
-    @facet_transaction_receipts_cache = []
-    @facet_transactions_cache = []
-
     legacy_blocks_future, ethscriptions_future, legacy_tx_receipts_future = ApplicationRecord.reading do
       [
         LegacyEthBlock.where(block_number: block_numbers).load_async,
@@ -109,6 +135,14 @@ module EthscriptionsImporter
         LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
       ]
     end
+    
+    block_by_number_responses = Benchmark.msr("blocks") do
+      alchemy_responses.select do |block_number, promise|
+        block_numbers.include?(block_number)
+      end.to_h.transform_values!(&:value!)
+    end
+    
+    alchemy_responses.reject! { |block_number, promise| block_by_number_responses.key?(block_number) }
     
     legacy_blocks = legacy_blocks_future.to_a
     ethscriptions = ethscriptions_future.to_a.select(&:contract_transaction?)
@@ -136,7 +170,7 @@ module EthscriptionsImporter
     
     ActiveRecord::Base.transaction do
       legacy_blocks.each_with_index do |block, index|
-        eth_block = EthBlock.from_legacy_eth_block(block)
+        eth_block = EthBlock.from_rpc_result(block_by_number_responses[block.block_number])
         eth_blocks << eth_block
         
         block_ethscriptions = Array.wrap(ethscriptions_by_block[block.block_number]).sort_by(&:transaction_index)
@@ -170,8 +204,8 @@ module EthscriptionsImporter
         all_facet_txs.concat(facet_txs)
         all_receipts.concat(receipts)
         
-        @facet_transaction_receipts_cache.concat(receipts)
-        @facet_transactions_cache.concat(facet_txs)
+        BlockImportBatchContext.imported_facet_transaction_receipts.concat(receipts)
+        BlockImportBatchContext.imported_facet_transactions.concat(facet_txs)
 
         receipts.each(&:set_legacy_contract_address_map)
         
@@ -186,23 +220,12 @@ module EthscriptionsImporter
         )
       end
       
-      # Parallelize the bulk import operations
-      eth_block_import = Concurrent::Promises.future { EthBlock.import!(eth_blocks) }
-      eth_transaction_import = Concurrent::Promises.future { EthTransaction.import!(eth_transactions) }
-      # ethscription_import = Concurrent::Promises.future { Ethscription.import!(all_ethscriptions) }
-      facet_block_import = Concurrent::Promises.future { FacetBlock.import!(facet_blocks) }
-      facet_transaction_import = Concurrent::Promises.future { FacetTransaction.import!(all_facet_txs) }
-      facet_receipt_import = Concurrent::Promises.future { FacetTransactionReceipt.import!(all_receipts) }
-
-      # Wait for all futures to complete together
-      Concurrent::Promises.zip(
-        eth_block_import,
-        eth_transaction_import,
-        # ethscription_import,
-        facet_block_import,
-        facet_transaction_import,
-        facet_receipt_import
-      ).value!
+      EthBlock.import!(eth_blocks)
+      EthTransaction.import!(eth_transactions)
+      
+      FacetBlock.import!(facet_blocks)
+      FacetTransaction.import!(all_facet_txs)
+      FacetTransactionReceipt.import!(all_receipts)
     end
     
     elapsed_time = Time.current - start
@@ -252,8 +275,14 @@ module EthscriptionsImporter
   end
   
   def validate_receipts(legacy_tx_receipts, facet_receipts)
-    unless legacy_tx_receipts.size == facet_receipts.size
+    l1_attributes_tx_receipt = facet_receipts.shift
+    
+    unless l1_attributes_tx_receipt.status == 1
       binding.irb
+      raise "L1 attributes transaction failed"
+    end
+    
+    unless legacy_tx_receipts.size == facet_receipts.size
       raise "Mismatched number of legacy and facet receipts"
     end
     
@@ -435,8 +464,7 @@ module EthscriptionsImporter
     (start_block...(start_block + n)).to_a
   end
 
-  def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, legacy_tx_receipts)
-    # Use Parallel.map to process the ethscription in parallel
+  def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, legacy_tx_receipts, facet_block)
     results = Parallel.map(ethscriptions.sort_by(&:transaction_index).each_with_index, in_threads: 10) do |(ethscription, idx)|
       ethscription.clear_caches_if_upgrade!
       
@@ -445,7 +473,8 @@ module EthscriptionsImporter
         ethscription,
         idx,
         eth_block,
-        ethscriptions.count
+        ethscriptions.count,
+        facet_block
       )
       
       [idx, facet_tx] # Return the index and the result to preserve order
@@ -455,16 +484,20 @@ module EthscriptionsImporter
     results.sort_by { |idx, _| idx }.map { |_, facet_tx| facet_tx }
   end
   
-  def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, timestamp: nil, block_number:, earliest:, head_block:, safe_block:, finalized_block:)
-    facet_block = FacetBlock.from_eth_block(eth_block, block_number, timestamp: timestamp)
+  def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, earliest:, head_block:, safe_block:, finalized_block:)
+    facet_block = FacetBlock.from_eth_block(eth_block, block_number)
     
     facet_txs = facet_txs_from_ethscriptions_in_block(
       eth_block,
       ethscriptions,
-      legacy_tx_receipts
+      legacy_tx_receipts,
+      facet_block
     )
-        
-    payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
+    
+    attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(eth_block, facet_block)
+    
+    facet_txs = facet_txs.sort_by(&:eth_call_index).unshift(attributes_tx)
+    payload = facet_txs.map(&:to_facet_payload)
     
     response = geth_driver.propose_block(
       payload,

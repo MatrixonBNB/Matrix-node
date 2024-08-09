@@ -8,13 +8,14 @@ module GethDriver
     authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
     discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
     
-    EthBlock.delete_all
+    EthBlock.all.each(&:destroy)
+    FacetBlock.all.each(&:destroy)
     
     Ethscription.write_alloc_to_genesis
     
     system("cd #{geth_dir} && make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json")
     
-    pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug' --http.vhosts="*" --authrpc.jwtsecret /tmp/jwtsecret -http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > geth.log 2>&1})
+    pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug' --http.vhosts="*" --authrpc.jwtsecret /tmp/jwtsecret -http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > g.log 2>&1})
     Process.detach(pid)
     
     sleep 1
@@ -81,7 +82,6 @@ module GethDriver
     
     payload_attributes = {
       timestamp: "0x" + new_facet_block.timestamp.to_s(16),
-      parentBeaconBlockRoot: new_facet_block.parent_beacon_block_root,
       prevRandao: new_facet_block.prev_randao,
       suggestedFeeRecipient: "0x0000000000000000000000000000000000000000",
       withdrawals: [],
@@ -90,25 +90,40 @@ module GethDriver
       gasLimit: "0x" + FacetBlock::GAS_LIMIT.to_s(16),
     }
     
-    fork_choice_response = client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, payload_attributes])
+    if new_facet_block.parent_beacon_block_root
+      version = 3
+      payload_attributes[:parentBeaconBlockRoot] = new_facet_block.parent_beacon_block_root
+    else
+      version = 2
+    end
+    
+    fork_choice_response = client.call("engine_forkchoiceUpdatedV#{version}", [fork_choice_state, payload_attributes])
     raise "Fork choice update failed: #{fork_choice_response['error']}" if fork_choice_response['error']
     
     payload_id = fork_choice_response['payloadId']
-    raise "Fork choice update did not return a payload ID" unless payload_id
+    unless payload_id
+      binding.irb
+      raise "Fork choice update did not return a payload ID"
+    end
 
-    # Step 2: Get the payload
-    get_payload_response = client.call("engine_getPayloadV3", [payload_id])
+    get_payload_response = client.call("engine_getPayloadV#{version}", [payload_id])
     raise "Get payload failed: #{get_payload_response['error']}" if get_payload_response['error']
 
     payload = get_payload_response['executionPayload']
     
+    # Should this already be there?
     payload['transactions'] = transactions
 
-    new_payload_response = client.call("engine_newPayloadV3", [
-      payload,
-      [],
-      new_facet_block.parent_beacon_block_root
-    ])
+    new_payload_request = [
+      payload
+    ]
+    
+    if version == 3
+      new_payload_request << []
+      new_payload_request << new_facet_block.parent_beacon_block_root
+    end
+    
+    new_payload_response = client.call("engine_newPayloadV#{version}", new_payload_request)
     
     status = new_payload_response['status']
     unless status == 'VALID'
@@ -134,3 +149,30 @@ module GethDriver
     payload
   end
 end
+
+# func sanityCheckPayload(payload *eth.ExecutionPayload) error {
+# 	// Sanity check payload before inserting it
+# 	if len(payload.Transactions) == 0 {
+# 		return errors.New("no transactions in returned payload")
+# 	}
+# 	if payload.Transactions[0][0] != types.DepositTxType {
+# 		return fmt.Errorf("first transaction was not deposit tx. Got %v", payload.Transactions[0][0])
+# 	}
+# 	// Ensure that the deposits are first
+# 	lastDeposit, err := lastDeposit(payload.Transactions)
+# 	if err != nil {
+# 		return fmt.Errorf("failed to find last deposit: %w", err)
+# 	}
+# 	// Ensure no deposits after last deposit
+# 	for i := lastDeposit + 1; i < len(payload.Transactions); i++ {
+# 		tx := payload.Transactions[i]
+# 		deposit, err := isDepositTx(tx)
+# 		if err != nil {
+# 			return fmt.Errorf("failed to decode transaction idx %d: %w", i, err)
+# 		}
+# 		if deposit {
+# 			return fmt.Errorf("deposit tx (%d) after other tx in l2 block with prev deposit at idx %d", i, lastDeposit)
+# 		}
+# 	}
+# 	return nil
+# }

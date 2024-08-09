@@ -1,8 +1,8 @@
 class CreateFacetTransactions < ActiveRecord::Migration[7.1]
   def change
     create_table :facet_transactions do |t|
-      t.string :eth_transaction_hash, null: false
-      t.integer :eth_call_index, null: false
+      t.string :eth_transaction_hash#, null: false
+      t.integer :eth_call_index#, null: false
       t.string :block_hash, null: false
       t.bigint :block_number, null: false
       t.string :deposit_receipt_version, null: false
@@ -42,6 +42,6 @@ class CreateFacetTransactions < ActiveRecord::Migration[7.1]
     add_index :facet_transactions, :eth_transaction_hash
 
     # add_foreign_key :facet_transactions, :eth_transactions, column: :eth_transaction_hash, primary_key: :tx_hash, on_delete: :cascade
-    # add_foreign_key :facet_transactions, :facet_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
+    add_foreign_key :facet_transactions, :facet_blocks, column: :block_hash, primary_key: :block_hash, on_delete: :cascade
   end
 end

@@ -3,7 +3,7 @@
 import "@openzeppelin/contracts/proxy/Proxy.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
-pragma solidity 0.8.26;
+pragma solidity 0.8.24;
 
 contract ERC1967Proxy is Proxy {
     event Upgraded(address indexed implementation);

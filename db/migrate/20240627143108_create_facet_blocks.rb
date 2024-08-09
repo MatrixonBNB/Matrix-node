@@ -21,6 +21,7 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       
       t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "parent_hash ~ '^0x[a-f0-9]{64}$'"
+      t.check_constraint "prev_randao ~ '^0x[a-f0-9]{64}$'"
 
       t.timestamps
     end
@@ -30,27 +31,27 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
     add_index :facet_blocks, :eth_block_hash, unique: true
     add_index :facet_blocks, :eth_block_number, unique: true
 
-    # add_foreign_key :facet_blocks, :eth_blocks, column: :eth_block_hash, primary_key: :block_hash, on_delete: :cascade
+    add_foreign_key :facet_blocks, :eth_blocks, column: :eth_block_hash, primary_key: :block_hash, on_delete: :cascade
     
-    # reversible do |dir|
-    #   dir.up do
-    #     execute <<-SQL
-    #     CREATE OR REPLACE FUNCTION check_facet_block_order()
-    #     RETURNS TRIGGER AS $$
-    #     BEGIN
-    #       IF (SELECT MAX(number) FROM facet_blocks) IS NOT NULL AND (NEW.number <> (SELECT MAX(number) + 1 FROM facet_blocks) OR NEW.parent_hash <> (SELECT block_hash FROM facet_blocks WHERE number = NEW.number - 1)) THEN
-    #         RAISE EXCEPTION 'New block number must be equal to max block number + 1, or this must be the first block. Provided: new number = %, expected number = %, new parent hash = %, expected parent hash = %',
-    #         NEW.number, (SELECT MAX(number) + 1 FROM facet_blocks), NEW.parent_hash, (SELECT block_hash FROM facet_blocks WHERE number = NEW.number - 1);
-    #       END IF;
-    #       RETURN NEW;
-    #     END;
-    #     $$ LANGUAGE plpgsql;
+    reversible do |dir|
+      dir.up do
+        execute <<-SQL
+        CREATE OR REPLACE FUNCTION check_facet_block_order()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          IF (SELECT MAX(number) FROM facet_blocks) IS NOT NULL AND (NEW.number <> (SELECT MAX(number) + 1 FROM facet_blocks) OR NEW.parent_hash <> (SELECT block_hash FROM facet_blocks WHERE number = NEW.number - 1)) THEN
+            RAISE EXCEPTION 'New block number must be equal to max block number + 1, or this must be the first block. Provided: new number = %, expected number = %, new parent hash = %, expected parent hash = %',
+            NEW.number, (SELECT MAX(number) + 1 FROM facet_blocks), NEW.parent_hash, (SELECT block_hash FROM facet_blocks WHERE number = NEW.number - 1);
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
         
-    #       CREATE TRIGGER trigger_check_facet_block_order
-    #       BEFORE INSERT ON facet_blocks
-    #       FOR EACH ROW EXECUTE FUNCTION check_facet_block_order();
-    #     SQL
-    #   end
-    # end
+          CREATE TRIGGER trigger_check_facet_block_order
+          BEFORE INSERT ON facet_blocks
+          FOR EACH ROW EXECUTE FUNCTION check_facet_block_order();
+        SQL
+      end
+    end
   end
 end

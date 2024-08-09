@@ -14,7 +14,7 @@ class FacetBlock < ApplicationRecord
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
       number: block_number,
       timestamp: eth_block.timestamp,
-      prev_randao: FacetBlock.calculate_prev_randao(eth_block.block_hash)
+      prev_randao: eth_block.mix_hash
     )
   end
   
@@ -30,7 +30,7 @@ class FacetBlock < ApplicationRecord
       gas_used: resp['gasUsed'].to_i(16),
       timestamp: resp['timestamp'].to_i(16),
       base_fee_per_gas: resp['baseFeePerGas'].to_i(16),
-      prev_randao: FacetBlock.calculate_prev_randao(resp['hash']),
+      prev_randao: resp['mixHash'],
       extra_data: resp['extraData'],
       size: resp['size'].to_i(16),
       transactions_root: resp['transactionsRoot'],
@@ -43,8 +43,4 @@ class FacetBlock < ApplicationRecord
     TransactionHelper.calculate_next_base_fee(number - 1)
   end
   memoize :calculated_base_fee_per_gas
-  
-  def self.calculate_prev_randao(block_hash)
-    Eth::Util.keccak256(block_hash.hex_to_bytes + 'prevRandao').bytes_to_hex
-  end
 end

@@ -22,19 +22,17 @@ module EVMHelpers
     end
     
     def memoized_compile_contract(contract_path, checksum)
-      Rails.cache.fetch(['memoized_compile_contract', contract_path, checksum]) do
-        contract_name = contract_path.split('/').last
-        contract_path += ".sol" unless contract_path.ends_with?(".sol")
-        contract_file = Rails.root.join('lib', 'solidity', contract_path)
-        
-        contract_compiled = SolidityCompiler.compile(contract_file)
-        contract_bytecode = contract_compiled[contract_name]['bytecode']
-        contract_abi = contract_compiled[contract_name]['abi']
-        contract_bin_runtime = contract_compiled[contract_name]['bin_runtime']
-        contract = Eth::Contract.from_bin(name: contract_name, bin: contract_bytecode, abi: contract_abi)
-        contract.parent.bin_runtime = contract_bin_runtime
-        contract.freeze
-      end
+      contract_name = contract_path.split('/').last
+      contract_path += ".sol" unless contract_path.ends_with?(".sol")
+      contract_file = Rails.root.join('lib', 'solidity', contract_path)
+      
+      contract_compiled = SolidityCompiler.compile(contract_file)
+      contract_bytecode = contract_compiled[contract_name]['bytecode']
+      contract_abi = contract_compiled[contract_name]['abi']
+      contract_bin_runtime = contract_compiled[contract_name]['bin_runtime']
+      contract = Eth::Contract.from_bin(name: contract_name, bin: contract_bytecode, abi: contract_abi)
+      contract.parent.bin_runtime = contract_bin_runtime
+      contract.freeze
     rescue => e
       binding.irb unless ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
       raise

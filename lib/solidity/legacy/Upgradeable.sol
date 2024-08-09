@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "solady/src/utils/LibString.sol";

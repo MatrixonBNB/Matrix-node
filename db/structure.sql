@@ -9,6 +9,40 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: check_eth_block_order(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_eth_block_order() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+        BEGIN
+          IF (SELECT MAX(number) FROM eth_blocks) IS NOT NULL AND (NEW.number <> (SELECT MAX(number) + 1 FROM eth_blocks) OR NEW.parent_hash <> (SELECT block_hash FROM eth_blocks WHERE number = NEW.number - 1)) THEN
+            RAISE EXCEPTION 'New block number must be equal to max block number + 1, or this must be the first block. Provided: new number = %, expected number = %, new parent hash = %, expected parent hash = %',
+            NEW.number, (SELECT MAX(number) + 1 FROM eth_blocks), NEW.parent_hash, (SELECT block_hash FROM eth_blocks WHERE number = NEW.number - 1);
+          END IF;
+          RETURN NEW;
+        END;
+        $$;
+
+
+--
+-- Name: check_facet_block_order(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_facet_block_order() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+        BEGIN
+          IF (SELECT MAX(number) FROM facet_blocks) IS NOT NULL AND (NEW.number <> (SELECT MAX(number) + 1 FROM facet_blocks) OR NEW.parent_hash <> (SELECT block_hash FROM facet_blocks WHERE number = NEW.number - 1)) THEN
+            RAISE EXCEPTION 'New block number must be equal to max block number + 1, or this must be the first block. Provided: new number = %, expected number = %, new parent hash = %, expected parent hash = %',
+            NEW.number, (SELECT MAX(number) + 1 FROM facet_blocks), NEW.parent_hash, (SELECT block_hash FROM facet_blocks WHERE number = NEW.number - 1);
+          END IF;
+          RETURN NEW;
+        END;
+        $$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -45,7 +79,7 @@ CREATE TABLE public.eth_blocks (
     difficulty bigint,
     gas_limit bigint,
     gas_used bigint,
-    parent_beacon_block_root character varying NOT NULL,
+    parent_beacon_block_root character varying,
     size integer,
     transactions_root character varying,
     state_root character varying,
@@ -56,7 +90,9 @@ CREATE TABLE public.eth_blocks (
     imported_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT chk_rails_4a3f27d5e8 CHECK (((mix_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_69f1818bcd CHECK (((parent_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
+    CONSTRAINT chk_rails_a5a0dc024d CHECK (((parent_beacon_block_root)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_d242b421f4 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text))
 );
 
@@ -153,8 +189,11 @@ CREATE TABLE public.eth_transactions (
     from_address character varying,
     to_address character varying,
     max_fee_per_gas numeric(78,0),
-    value numeric(78,0) NOT NULL,
+    value numeric(78,0) DEFAULT 0.0 NOT NULL,
     gas_price numeric(78,0),
+    gas_used bigint,
+    status integer,
+    logs jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_33391faf33 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
@@ -195,11 +234,11 @@ CREATE TABLE public.ethscriptions (
     transaction_index bigint NOT NULL,
     creator character varying NOT NULL,
     initial_owner character varying NOT NULL,
-    block_timestamp bigint NOT NULL,
+    block_timestamp bigint,
     content_uri text NOT NULL,
     mimetype character varying NOT NULL,
     processed_at timestamp(6) without time zone,
-    processing_state character varying NOT NULL,
+    processing_state character varying,
     processing_error character varying,
     gas_price bigint,
     gas_used bigint,
@@ -260,6 +299,7 @@ CREATE TABLE public.facet_blocks (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_e289f61f63 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
+    CONSTRAINT chk_rails_e8cae93f42 CHECK (((prev_randao)::text ~ '^0x[a-f0-9]{64}$'::text)),
     CONSTRAINT chk_rails_fa69e55fa7 CHECK (((parent_hash)::text ~ '^0x[a-f0-9]{64}$'::text))
 );
 
@@ -713,6 +753,84 @@ CREATE UNIQUE INDEX index_facet_transactions_on_source_hash ON public.facet_tran
 --
 
 CREATE UNIQUE INDEX index_facet_transactions_on_tx_hash ON public.facet_transactions USING btree (tx_hash);
+
+
+--
+-- Name: eth_blocks trigger_check_eth_block_order; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_check_eth_block_order BEFORE INSERT ON public.eth_blocks FOR EACH ROW EXECUTE FUNCTION public.check_eth_block_order();
+
+
+--
+-- Name: facet_blocks trigger_check_facet_block_order; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_check_facet_block_order BEFORE INSERT ON public.facet_blocks FOR EACH ROW EXECUTE FUNCTION public.check_facet_block_order();
+
+
+--
+-- Name: eth_calls fk_rails_2bd24c7340; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eth_calls
+    ADD CONSTRAINT fk_rails_2bd24c7340 FOREIGN KEY (transaction_hash) REFERENCES public.eth_transactions(tx_hash) ON DELETE CASCADE;
+
+
+--
+-- Name: facet_transactions fk_rails_3134e9c482; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.facet_transactions
+    ADD CONSTRAINT fk_rails_3134e9c482 FOREIGN KEY (eth_transaction_hash) REFERENCES public.eth_transactions(tx_hash) ON DELETE CASCADE;
+
+
+--
+-- Name: facet_blocks fk_rails_31974ea46f; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.facet_blocks
+    ADD CONSTRAINT fk_rails_31974ea46f FOREIGN KEY (eth_block_hash) REFERENCES public.eth_blocks(block_hash) ON DELETE CASCADE;
+
+
+--
+-- Name: facet_transactions fk_rails_46cb0d70d8; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.facet_transactions
+    ADD CONSTRAINT fk_rails_46cb0d70d8 FOREIGN KEY (block_hash) REFERENCES public.facet_blocks(block_hash) ON DELETE CASCADE;
+
+
+--
+-- Name: facet_transaction_receipts fk_rails_bf9deceb3b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.facet_transaction_receipts
+    ADD CONSTRAINT fk_rails_bf9deceb3b FOREIGN KEY (transaction_hash) REFERENCES public.facet_transactions(tx_hash) ON DELETE CASCADE;
+
+
+--
+-- Name: eth_calls fk_rails_c8d48557a6; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eth_calls
+    ADD CONSTRAINT fk_rails_c8d48557a6 FOREIGN KEY (block_hash) REFERENCES public.eth_blocks(block_hash) ON DELETE CASCADE;
+
+
+--
+-- Name: eth_transactions fk_rails_db1761e6d4; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eth_transactions
+    ADD CONSTRAINT fk_rails_db1761e6d4 FOREIGN KEY (block_hash) REFERENCES public.eth_blocks(block_hash) ON DELETE CASCADE;
+
+
+--
+-- Name: facet_transaction_receipts fk_rails_ed7d5973ff; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.facet_transaction_receipts
+    ADD CONSTRAINT fk_rails_ed7d5973ff FOREIGN KEY (block_hash) REFERENCES public.facet_blocks(block_hash) ON DELETE CASCADE;
 
 
 --
