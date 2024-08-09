@@ -1,4 +1,6 @@
 class FacetBlock < ApplicationRecord
+  include Memery
+  
   belongs_to :eth_block, primary_key: :block_hash, foreign_key: :eth_block_hash, optional: true
   has_many :facet_transactions, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
@@ -34,6 +36,13 @@ class FacetBlock < ApplicationRecord
       transactions_root: resp['transactionsRoot'],
     )
   end
+  
+  def calculated_base_fee_per_gas
+    return base_fee_per_gas if base_fee_per_gas
+    
+    TransactionHelper.calculate_next_base_fee(number - 1)
+  end
+  memoize :calculated_base_fee_per_gas
   
   def self.calculate_prev_randao(block_hash)
     Eth::Util.keccak256(block_hash.hex_to_bytes + 'prevRandao').bytes_to_hex

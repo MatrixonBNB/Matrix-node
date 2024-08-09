@@ -7,7 +7,7 @@ RSpec.describe GethDriver do
   describe 'block and deposit transaction' do
     it 'deploys a contract with a deposit tx' do
       initial_count = 5
-      facet_data = get_deploy_data('contracts/Counter', [initial_count])
+      facet_data = EVMHelpers.get_deploy_data('contracts/Counter', [initial_count])
       
       from_address = "0x" + "0" * 39 + 'a'
       to_address = nil

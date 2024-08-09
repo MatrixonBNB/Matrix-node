@@ -8,7 +8,7 @@ RSpec.describe "Reverts" do
   let(:from_address) { "0x000000000000000000000000000000000000000a" }
   
   let!(:counter_address) {
-    facet_data = get_deploy_data('contracts/Counter', [1])
+    facet_data = EVMHelpers.get_deploy_data('contracts/Counter', [1])
             
     res = create_and_import_block(
       facet_data: facet_data,
@@ -82,7 +82,11 @@ RSpec.describe "Reverts" do
   end
   
   it 'calls with wrong args' do
-    data = get_function_calldata(contract: 'contracts/Counter', function: 'createRevert', args: [false])
+    data = TransactionHelper.get_function_calldata(
+      contract: 'contracts/Counter',
+      function: 'createRevert',
+      args: [false]
+    ).dup
     data[-1] = 'a'
     
     create_and_import_block(
@@ -112,7 +116,7 @@ RSpec.describe "Reverts" do
         from_address: from_address,
         expect_failure: true
       )
-    }.to raise_error(FacetTransaction::InvalidAddress)
+    }.to raise_error(TransactionHelper::NoValidFacetTransactions)
   end
   
   it 'is underpriced' do
@@ -122,7 +126,6 @@ RSpec.describe "Reverts" do
       from: from_address,
       function: 'createRevert',
       args: [false],
-      max_fee_per_gas: 100.gwei,
     )
     
     call_contract_function(
@@ -131,7 +134,7 @@ RSpec.describe "Reverts" do
       from: from_address,
       function: 'createRevert',
       args: [false],
-      max_fee_per_gas: 0,
+      max_fee_per_gas: 1,
       expect_failure: true
     )
   end

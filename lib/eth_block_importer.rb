@@ -78,8 +78,17 @@ module EthBlockImporter
   
   def ensure_genesis_blocks
     ActiveRecord::Base.transaction do
-      return if FacetBlock.exists?
-    
+      facet_block_exists = FacetBlock.exists?
+      eth_block_exists = EthBlock.exists?
+      
+      if facet_block_exists && eth_block_exists
+        return
+      end
+      
+      unless !facet_block_exists && !eth_block_exists
+        raise "Inconsistent state"
+      end
+      
       facet_genesis_block = GethDriver.client.call("eth_getBlockByNumber", ["0x0", false])
       facet_latest_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])
       
@@ -349,13 +358,13 @@ module EthBlockImporter
     end
     
     if parent_block.block_hash != parent_hash
-      blocks_to_delete = EthBlock.where("number >= ?", last_imported_eth_block.number - 1).to_a
+      blocks_to_delete = EthBlock.where("number >= ?", parent_block.number - 1).to_a
       deleted_message = "Deleting block(s): #{blocks_to_delete.map(&:number).join(', ')}"
       
       blocks_to_delete.each(&:destroy)
 
       Airbrake.notify("
-        Reorg detected: #{last_imported_eth_block.number},
+        Reorg detected: #{parent_block.number},
         #{parent_block.block_hash},
         #{parent_hash},
         #{deleted_message}
@@ -381,38 +390,6 @@ module EthBlockImporter
     start_block = max_db_block + 1
     
     (start_block...(start_block + n)).to_a
-  end
-
-  def facet_txs_from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls)
-    facet_txs = eth_calls.map do |call|
-      next unless call.to_address == FacetTransaction::FACET_INBOX_ADDRESS
-      next if call.error.present?
-      
-      eth_tx = eth_transactions.detect { |tx| tx.tx_hash == call.transaction_hash }
-      
-      facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
-        
-      facet_tx
-    end.flatten.compact
-    
-    facet_txs.group_by(&:eth_transaction).each do |eth_tx, grouped_facet_txs|
-      in_tx_count = grouped_facet_txs.count
-      
-      outer_call = eth_calls.select do |c|
-        c.transaction_hash == eth_tx.tx_hash
-      end.sort_by(&:call_index).first
-      
-      gas_used = outer_call.gas_used
-      base_fee = eth_block.base_fee_per_gas
-      total_mint_amount = gas_used * base_fee
-      mint_amount_per_tx = total_mint_amount / in_tx_count
-      
-      grouped_facet_txs.each do |facet_tx|
-        facet_tx.mint = mint_amount_per_tx
-      end
-    end
-    
-    facet_txs
   end
   
   def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions)
@@ -503,7 +480,12 @@ module EthBlockImporter
     facet_block = FacetBlock.from_eth_block(eth_block, facet_block_number)
     
     facet_txs = if in_v2?(eth_block.number)
-      facet_txs_from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls)
+      FacetTransaction.from_eth_transactions_in_block(
+        eth_block,
+        eth_transactions,
+        eth_calls,
+        facet_block
+      )
     else
       begin
         ethscriptions = Ethscription.from_eth_transactions(eth_transactions)

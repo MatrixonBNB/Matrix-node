@@ -7,6 +7,8 @@ module TransactionHelper
   end
   extend self
   
+  class NoValidFacetTransactions < StandardError; end
+  
   @contract_addresses = {}
   
   class << self
@@ -100,7 +102,7 @@ module TransactionHelper
       contract_object = compile_contract(contract)
       
       function_obj = contract_object.parent.function_hash[function]
-      function_obj.get_call_data(*args)
+      function_obj.get_call_data(*args).freeze
     end
     memoize :get_function_calldata
   end
@@ -116,7 +118,7 @@ module TransactionHelper
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
-    data = get_function_calldata(contract: contract, function: function, args: args)
+    data = TransactionHelper.get_function_calldata(contract: contract, function: function, args: args)
     
     create_and_import_block(
       facet_data: data,
@@ -138,7 +140,7 @@ module TransactionHelper
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
-    data = get_deploy_data(contract, args)
+    data = EVMHelpers.get_deploy_data(contract, args)
     
     res = create_and_import_block(
       facet_data: data,
@@ -179,7 +181,7 @@ module TransactionHelper
       ).contract_address  
     end
   
-    initialize_calldata = get_function_calldata(
+    initialize_calldata = TransactionHelper.get_function_calldata(
       contract: implementation,
       function: 'initialize',
       args: args
@@ -209,7 +211,7 @@ module TransactionHelper
     gas_limit: 10_000_000,
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
-    chain_id: FacetTransaction::FACET_CHAIN_ID,
+    chain_id: FacetTransaction.current_chain_id,
     expect_failure: false
   )
     ActiveRecord::Base.transaction do
@@ -279,7 +281,7 @@ module TransactionHelper
         }
       }
     
-      trace_response = {
+      trace_result = {
         'result' => [
           {
             'txHash' => eth_transaction['hash'],
@@ -294,54 +296,57 @@ module TransactionHelper
           }
         ]
       }
-    
-      res = EthBlockImporter.import_block(block_by_number_response, trace_response)
       
-      unless res.receipts_imported.map(&:status) == [1]
-        trace = GethDriver.non_auth_client.call("debug_traceTransaction", [res.receipts_imported.last.transaction_hash, {
-          enableMemory: true,
-          disableStack: false,
-          disableStorage: false,
-          enableReturnData: true,
-          debug: true,
-          tracer: "callTracer"
-        }])
-        
-        trace = GethDriver.non_auth_client.call("debug_traceBlockByNumber", ["0x" + res.receipts_imported.last.block_number.to_s(16), {
-          enableMemory: true,
-          disableStack: false,
-          disableStorage: false,
-          enableReturnData: true,
-          debug: true,
-          tracer: "callTracer"
-        }])
-        
-        trace.each do |call|
-          if call['result']['calls']
-            call['result']['calls'].each do |sub_call|
-              if sub_call['to'] == '0x000000000000000000636f6e736f6c652e6c6f67'
-                data = sub_call['input'][10..-1]
-                
-                decoded_data = Eth::Abi.decode(['string'], [data].pack('H*')) rescue [data]
-                
-                decoded_log = decoded_data.first
-                sub_call['console.log'] = decoded_log
-                sub_call.delete('input')
-                sub_call.delete('gas')
-                sub_call.delete('gasUsed')
-                sub_call.delete('to')
-                sub_call.delete('type')
-              end
-            end
-          end
-        end
-        
-        ap trace
+      current_max_facet_block_number = FacetBlock.maximum(:number).to_i
+      facet_block_number = current_max_facet_block_number + 1
+      
+      # Get the earliest block
+      earliest = FacetBlock.order(number: :asc).first
+      in_memory_blocks = FacetBlock.where(number: (current_max_facet_block_number - 64 - 1)..current_max_facet_block_number).index_by(&:number)
+      head_block = in_memory_blocks[facet_block_number - 1] || earliest
+      safe_block = in_memory_blocks[facet_block_number - 32] || earliest
+      finalized_block = in_memory_blocks[facet_block_number - 64] || earliest
+      
+      eth_block = EthBlock.from_rpc_result(block_by_number_response)
+      new_eth_transactions = EthTransaction.from_rpc_result(block_by_number_response)
+      # binding.irb
+      new_eth_calls = EthCall.from_trace_result(trace_result['result'], eth_block)
+      
+      facet_block, facet_txs = EthBlockImporter.propose_facet_block(
+        eth_block,
+        eth_calls: new_eth_calls,
+        eth_transactions: new_eth_transactions,
+        facet_block_number: facet_block_number,
+        earliest: earliest,
+        head_block: head_block,
+        safe_block: safe_block,
+        finalized_block: finalized_block
+      )
+      
+      if facet_txs.blank?
+        raise NoValidFacetTransactions
+      end
+      
+      facet_block, facet_txs, facet_receipts = EthBlockImporter.fill_in_block_data(facet_block, facet_txs)
+
+      res = OpenStruct.new
+      res.receipts_imported = facet_receipts
+      res.transactions_imported = facet_txs
+      
+      if facet_receipts.map(&:status) != [1] && facet_receipts.present?
+        ap facet_txs.first
+        ap facet_receipts.first
+        ap facet_receipts.first.trace
       end
       
       expected = expect_failure ? [0] : [1]
       
-      expect(res.receipts_imported.map(&:status).uniq).to eq(expected)
+      eth_block.save!
+      facet_block.save!
+      FacetTransaction.import!(facet_txs)
+      FacetTransactionReceipt.import!(facet_receipts)
+      
+      expect(facet_receipts.map(&:status).uniq).to eq(expected)
       res
     end
   end

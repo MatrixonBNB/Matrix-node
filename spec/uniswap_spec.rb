@@ -5,20 +5,11 @@ RSpec.describe "Uniswap" do
   let(:client) { GethClient.new(node_url) }
   let(:engine_api) { GethDriver }
   
-  # \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json
-  
-  # ./build/bin/geth --datadir ./datadir --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
-  
-  
-  # \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
-  
-  # make geth && \rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api "eth,net,web3,debug,engine" --http.vhosts=* --authrpc.jwtsecret /tmp/jwtsecret --nodiscover --maxpeers 0 console
-  
   describe 'block and deposit transaction' do
     it "deploys uniswap" do
       mint_amount = 1e18.to_i
       
-      facet_data = get_deploy_data('contracts/MyToken', [])
+      facet_data = EVMHelpers.get_deploy_data('contracts/MyToken', [])
             
       from_address = "0x000000000000000000000000000000000000000a"
       
@@ -54,7 +45,7 @@ RSpec.describe "Uniswap" do
         args: [from_address, mint_amount]
       )
       
-      facet_data = get_deploy_data('uniswap-v2/contracts/UniswapV2Factory', [from_address])
+      facet_data = EVMHelpers.get_deploy_data('uniswap-v2/contracts/UniswapV2Factory', [from_address])
       
       res = create_and_import_block(
         facet_data: facet_data,
@@ -67,7 +58,7 @@ RSpec.describe "Uniswap" do
       
       factory = get_contract('uniswap-v2/contracts/UniswapV2Factory', factory_address)
       
-      facet_data = get_deploy_data('uniswap-v2/contracts/UniswapV2Router02', [factory_address, weth_address])
+      facet_data = EVMHelpers.get_deploy_data('uniswap-v2/contracts/UniswapV2Router02', [factory_address, weth_address])
       
       res = create_and_import_block(
         facet_data: facet_data,

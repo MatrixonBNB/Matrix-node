@@ -541,6 +541,6 @@ module EthscriptionsImporter
   end
   
   def facet_chain_id
-    FacetTransaction::FACET_CHAIN_ID
+    FacetTransaction.current_chain_id
   end
 end
