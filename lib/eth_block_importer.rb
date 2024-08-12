@@ -480,7 +480,10 @@ module EthBlockImporter
       )
     end
 
-    payload = facet_txs.sort_by(&:eth_call_index).map(&:to_facet_payload)
+    attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(eth_block, facet_block)
+    facet_txs = facet_txs.sort_by(&:eth_call_index).unshift(attributes_tx)
+
+    payload = facet_txs.map(&:to_facet_payload)
     
     response = geth_driver.propose_block(
       payload,
