@@ -7,9 +7,7 @@ class EthTransaction < ApplicationRecord
     
   attr_accessor :initialized_ethscription
   
-  def self.from_rpc_result(block_by_number_response, receipt_result = nil)
-    block_result = block_by_number_response['result']
-    
+  def self.from_rpc_result(block_result, receipt_result = nil)
     block_hash = block_result['hash']
     block_number = block_result['number'].to_i(16)
     

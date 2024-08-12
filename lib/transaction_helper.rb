@@ -308,7 +308,7 @@ module TransactionHelper
       finalized_block = in_memory_blocks[facet_block_number - 64] || earliest
       
       eth_block = EthBlock.from_rpc_result(block_by_number_response)
-      new_eth_transactions = EthTransaction.from_rpc_result(block_by_number_response)
+      new_eth_transactions = EthTransaction.from_rpc_result(block_by_number_response['result'])
       # binding.irb
       new_eth_calls = EthCall.from_trace_result(trace_result['result'], eth_block)
       

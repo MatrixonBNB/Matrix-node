@@ -58,6 +58,8 @@ module EthBlockImporter
     # SolidityCompiler.compile_all_legacy_files
     
     ensure_genesis_blocks
+    
+    alchemy_responses = {}
 
     loop do
       begin
@@ -67,11 +69,20 @@ module EthBlockImporter
           raise BlockNotReadyToImportError.new("Block not ready")
         end
         
+        next_start_block = block_numbers.last + 1
+        next_block_numbers = (next_start_block...(next_start_block + import_batch_size)).to_a
+        
+        blocks_to_import = block_numbers + next_block_numbers
+        
+        blocks_to_import -= alchemy_responses.keys
+        
+        alchemy_responses.reverse_merge!(get_blocks_promises(blocks_to_import))
+        
         BlockImportBatchContext.set(
           imported_facet_transactions: [],
           imported_facet_transaction_receipts: []
         ) do
-          import_blocks(block_numbers)
+          import_blocks(block_numbers, alchemy_responses)
         end
       rescue BlockNotReadyToImportError => e
         puts "#{e.message}. Stopping import."
@@ -113,45 +124,49 @@ module EthBlockImporter
     end
   end
   
-  def import_blocks(block_numbers)
+  def get_blocks_promises(block_numbers)
+    block_numbers.map do |block_number|
+      block_promise = Concurrent::Promise.execute do
+         ethereum_client.get_block(block_number, true)
+      end
+      
+      if block_numbers.any? { |block_number| in_v2?(block_number) }
+        trace_promise = Concurrent::Promise.execute do
+          ethereum_client.debug_trace_block_by_number(block_number)
+        end
+      end
+      
+      if block_numbers.any? { |block_number| in_v1?(block_number) }
+        receipt_promise = Concurrent::Promise.execute do
+          ethereum_client.get_transaction_receipts(
+            block_number,
+            blocks_behind: 1_000
+          )
+        end
+      end
+      
+      empty_promise = Concurrent::Promise.execute { {} }
+      
+      [block_number, {
+        block: block_promise,
+        trace: trace_promise || empty_promise,
+        receipts: receipt_promise || empty_promise
+      }.with_indifferent_access]
+    end.to_h
+  end
+  
+  def import_blocks(block_numbers, alchemy_responses)
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
-    
-    block_by_number_promises = block_numbers.map do |block_number|
-      Concurrent::Promise.execute do
-        [block_number, ethereum_client.get_block(block_number, true)]
-      end
-    end
+
+    block_responses = Benchmark.msr("block_responses") { alchemy_responses.select do |block_number, _|
+      block_numbers.include?(block_number)
+    end.to_h.transform_values! do |hsh|
+      hsh.transform_values!(&:value!)
+    end }
   
-    if block_numbers.any? { |block_number| in_v2?(block_number) }
-      trace_promises = block_numbers.map do |block_number|
-        Concurrent::Promise.execute do
-          [
-            block_number,
-            ethereum_client.debug_trace_block_by_number(block_number)
-          ]
-        end
-      end
-    end
+    alchemy_responses.reject! { |block_number, _| block_responses.key?(block_number) }
     
-    if block_numbers.any? { |block_number| in_v1?(block_number) }
-      receipts_promises = block_numbers.map do |block_number|
-        Concurrent::Promise.execute do
-          [
-            block_number,
-            ethereum_client.get_transaction_receipts(
-              block_number,
-              blocks_behind: 1_000
-            )
-          ]
-        end
-      end
-    end
-    
-    block_by_number_responses = Benchmark.msr("blocks") {block_by_number_promises.map(&:value!).sort_by(&:first)}
-    trace_responses = Benchmark.msr("traces") { trace_promises&.map(&:value!)&.sort_by(&:first) || [] }
-    receipts_responses = Benchmark.msr("receipts") { receipts_promises&.map(&:value!)&.sort_by(&:first) || [] }
-  
     eth_blocks = []
     eth_transactions = []
     eth_calls = []
@@ -181,20 +196,18 @@ module EthBlockImporter
         return
       end
       
-      block_by_number_responses.zip(trace_responses).each_with_index do |((block_number1, block_by_number_response), (block_number2, trace_response)), index|
-        unless (block_number1 == block_number2) || trace_responses.blank?
-          raise "Mismatched block numbers: #{block_number1} and #{block_number2}"
-        end
-  
-        block_result = block_by_number_response['result']
-        trace_result = trace_response&.dig('result')
-        receipt_result = receipts_responses.detect{|el| el.first == block_number1 }&.last&.dig('result')
+      block_numbers.each.with_index do |block_number, index|
+        block_response = block_responses[block_number]
+        
+        block_result = block_response['block']['result']
+        trace_result = block_response['trace']['result']
+        receipt_result = block_response['receipts']['result']
         
         facet_block_number = current_max_facet_block_number + index + 1
         
         if index == 0
           reorg_happened = handle_potential_reorg(
-            block_number1,
+            block_number,
             block_result['parentHash']
           )
           
@@ -213,10 +226,10 @@ module EthBlockImporter
         safe_block = in_memory_blocks[facet_block_number - 32] || earliest
         finalized_block = in_memory_blocks[facet_block_number - 64] || earliest
   
-        eth_block = EthBlock.from_rpc_result(block_by_number_response)
+        eth_block = EthBlock.from_rpc_result(block_response['block'])
         eth_blocks << eth_block
   
-        new_eth_transactions = EthTransaction.from_rpc_result(block_by_number_response, receipt_result)
+        new_eth_transactions = EthTransaction.from_rpc_result(block_result, receipt_result)
         eth_transactions.concat(new_eth_transactions)
         
         if trace_result
