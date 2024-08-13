@@ -8,7 +8,7 @@ class CreateLegacyValueMappings < ActiveRecord::Migration[7.1]
       # t.string :created_by_eth_transaction_hash, null: false
       
       t.index [:mapping_type, :legacy_value], unique: true
-      t.index [:mapping_type, :new_value], unique: true
+      # t.index [:mapping_type, :new_value], unique: true
       
       t.check_constraint "mapping_type IN ('address', 'withdrawal_id')"
       

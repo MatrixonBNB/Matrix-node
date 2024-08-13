@@ -369,7 +369,7 @@ class Ethscription < ApplicationRecord
     
     LegacyValueMapping.create_or_find_by!(
       mapping_type: :address,
-      legacy_value: parsed_content['data']['to'],
+      legacy_value: parsed_content['data']['to'].downcase,
       new_value: shim_val
     )
     

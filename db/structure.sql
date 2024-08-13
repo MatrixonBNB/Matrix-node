@@ -291,10 +291,10 @@ CREATE TABLE public.facet_blocks (
     parent_beacon_block_root character varying,
     parent_hash character varying NOT NULL,
     receipts_root character varying NOT NULL,
-    size integer NOT NULL,
+    size integer,
     state_root character varying NOT NULL,
     "timestamp" bigint NOT NULL,
-    transactions_root character varying NOT NULL,
+    transactions_root character varying,
     prev_randao character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
@@ -381,8 +381,8 @@ ALTER SEQUENCE public.facet_transaction_receipts_id_seq OWNED BY public.facet_tr
 
 CREATE TABLE public.facet_transactions (
     id bigint NOT NULL,
-    eth_transaction_hash character varying NOT NULL,
-    eth_call_index integer NOT NULL,
+    eth_transaction_hash character varying,
+    eth_call_index integer,
     block_hash character varying NOT NULL,
     block_number bigint NOT NULL,
     deposit_receipt_version character varying NOT NULL,
@@ -427,6 +427,46 @@ CREATE SEQUENCE public.facet_transactions_id_seq
 --
 
 ALTER SEQUENCE public.facet_transactions_id_seq OWNED BY public.facet_transactions.id;
+
+
+--
+-- Name: legacy_value_mappings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.legacy_value_mappings (
+    id bigint NOT NULL,
+    mapping_type character varying NOT NULL,
+    legacy_value character varying NOT NULL,
+    new_value character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT chk_rails_48ee1bf62a CHECK (
+CASE
+    WHEN ((mapping_type)::text = 'withdrawal_id'::text) THEN (((legacy_value)::text ~ '^0x[a-f0-9]{64}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{64}$'::text))
+    WHEN ((mapping_type)::text = 'address'::text) THEN (((legacy_value)::text ~ '^0x[a-f0-9]{40}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{40}$'::text))
+    ELSE false
+END),
+    CONSTRAINT chk_rails_6862305fab CHECK (((mapping_type)::text = ANY ((ARRAY['address'::character varying, 'withdrawal_id'::character varying])::text[])))
+);
+
+
+--
+-- Name: legacy_value_mappings_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.legacy_value_mappings_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: legacy_value_mappings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.legacy_value_mappings_id_seq OWNED BY public.legacy_value_mappings.id;
 
 
 --
@@ -485,6 +525,13 @@ ALTER TABLE ONLY public.facet_transaction_receipts ALTER COLUMN id SET DEFAULT n
 --
 
 ALTER TABLE ONLY public.facet_transactions ALTER COLUMN id SET DEFAULT nextval('public.facet_transactions_id_seq'::regclass);
+
+
+--
+-- Name: legacy_value_mappings id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legacy_value_mappings ALTER COLUMN id SET DEFAULT nextval('public.legacy_value_mappings_id_seq'::regclass);
 
 
 --
@@ -549,6 +596,14 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 
 ALTER TABLE ONLY public.facet_transactions
     ADD CONSTRAINT facet_transactions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: legacy_value_mappings legacy_value_mappings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legacy_value_mappings
+    ADD CONSTRAINT legacy_value_mappings_pkey PRIMARY KEY (id);
 
 
 --
@@ -756,6 +811,13 @@ CREATE UNIQUE INDEX index_facet_transactions_on_tx_hash ON public.facet_transact
 
 
 --
+-- Name: index_legacy_value_mappings_on_mapping_type_and_legacy_value; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_legacy_value_mappings_on_mapping_type_and_legacy_value ON public.legacy_value_mappings USING btree (mapping_type, legacy_value);
+
+
+--
 -- Name: eth_blocks trigger_check_eth_block_order; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -775,14 +837,6 @@ CREATE TRIGGER trigger_check_facet_block_order BEFORE INSERT ON public.facet_blo
 
 ALTER TABLE ONLY public.eth_calls
     ADD CONSTRAINT fk_rails_2bd24c7340 FOREIGN KEY (transaction_hash) REFERENCES public.eth_transactions(tx_hash) ON DELETE CASCADE;
-
-
---
--- Name: facet_transactions fk_rails_3134e9c482; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.facet_transactions
-    ADD CONSTRAINT fk_rails_3134e9c482 FOREIGN KEY (eth_transaction_hash) REFERENCES public.eth_transactions(tx_hash) ON DELETE CASCADE;
 
 
 --
@@ -840,6 +894,9 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20240813150529'),
+('20240813133726'),
+('20240812202530'),
 ('20240703161720'),
 ('20240628125033'),
 ('20240627143934'),

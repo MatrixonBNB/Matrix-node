@@ -89,7 +89,7 @@ class EthBlockImporter
     latest_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", true])
     
     if latest_block['number'].to_i(16) == 0
-      @eth_start_block = genesis_block
+      @l1_start_block = genesis_block
       @l2_start_block = 0
       return
     end
