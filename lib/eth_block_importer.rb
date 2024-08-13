@@ -5,8 +5,8 @@ class EthBlockImporter
   attr_accessor :imported_eth_blocks, :imported_facet_blocks, :l1_start_block, :l1_rpc_results, :l2_start_block, :facet_block_cache
   
   def initialize
-    @imported_eth_blocks = []
-    @imported_facet_blocks = []
+    @imported_eth_blocks = {}
+    @imported_facet_blocks = {}
     @l1_rpc_results = {}
     
     set_eth_block_starting_points
@@ -14,15 +14,11 @@ class EthBlockImporter
   end
   
   def current_max_facet_block_number
-    imported_facet_blocks.max_by(&:number)&.number || l2_start_block
+    imported_facet_blocks.keys.max || l2_start_block
   end
   
   def current_max_eth_block_number
-    imported_eth_blocks.max_by(&:number)&.number || l1_start_block
-  end
-  
-  def parent_eth_block_of(block_number)
-    imported_eth_blocks.find { |block| block.number == block_number - 1 }
+    imported_eth_blocks.keys.max || l1_start_block
   end
   
   def populate_facet_block_cache
@@ -219,14 +215,14 @@ class EthBlockImporter
       trace_result = block_response['trace']['result']
       receipt_result = block_response['receipts']['result']
       
-      parent_eth_block = parent_eth_block_of(block_number)
+      parent_eth_block = imported_eth_blocks[block_number - 1]
       
       if parent_eth_block && parent_eth_block.block_hash != block_result['parentHash']
-        imported_eth_blocks.delete_if { |block| block.number >= parent_eth_block.number }
+        imported_eth_blocks.delete_if { |number, _| number >= parent_eth_block.number }
         
-        imported_facet_blocks.delete_if do |facet_block|
+        imported_facet_blocks.delete_if do |_, facet_block|
           facet_block.eth_block_number >= parent_eth_block.number
-        end  
+        end
         
         return
       end
@@ -261,8 +257,8 @@ class EthBlockImporter
       facet_block = FacetBlock.from_rpc_result(facet_block)
       
       facet_block_cache[facet_block_number] = facet_block
-      imported_eth_blocks << eth_block
-      imported_facet_blocks << facet_block
+      imported_eth_blocks[eth_block.number] = eth_block
+      imported_facet_blocks[facet_block_number] = facet_block  
       
       res << OpenStruct.new(
         facet_block: facet_block,
@@ -326,6 +322,7 @@ class EthBlockImporter
   
   def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, facet_block)
     results = Parallel.map_with_index(ethscriptions.sort_by(&:transaction_index), in_threads: 10) do |ethscription, idx|
+    # results = ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
       ethscription.clear_caches_if_upgrade!
       
       facet_tx = FacetTransaction.from_eth_tx_and_ethscription(
