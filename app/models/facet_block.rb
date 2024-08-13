@@ -53,4 +53,45 @@ class FacetBlock < ApplicationRecord
     TransactionHelper.calculate_next_base_fee(number - 1)
   end
   memoize :calculated_base_fee_per_gas
+  
+  def self.check_hashes(batch_size: 1000)
+    offset = 0
+
+    loop do
+      # Fetch block hashes from the other database in batches
+      other_db_hashes = OtherFacetBlock.order(:number).limit(batch_size).offset(offset).pluck(:block_hash)
+      break if other_db_hashes.empty?
+
+      # Fetch block hashes from the current database in the same batch
+      current_db_hashes = FacetBlock.order(:number).limit(batch_size).offset(offset).pluck(:block_hash)
+      break if current_db_hashes.empty?
+
+      # Compare the hashes
+      return unless compare_hashes(current_db_hashes, other_db_hashes, offset)
+
+      offset += batch_size
+    end
+  end
+
+  def self.compare_hashes(current_db_hashes, other_db_hashes, offset)
+    current_db_hashes.each_with_index do |hash, index|
+      if hash != other_db_hashes[index]
+        puts "Mismatch found at index #{index + offset}: #{hash} != #{other_db_hashes[index]}"
+        compare_transactions(hash, other_db_hashes[index])
+        return false
+      end
+    end
+    true
+  end
+
+  def self.compare_transactions(current_block_hash, other_block_hash)
+    current_txs = FacetTransaction.where(block_hash: current_block_hash).order(:transaction_index).pluck(:tx_hash)
+    other_txs = OtherFacetTransaction.where(block_hash: other_block_hash).order(:transaction_index).pluck(:tx_hash)
+
+    current_txs.each_with_index do |tx_hash, index|
+      if tx_hash != other_txs[index]
+        puts "Transaction mismatch found at index #{index}: #{tx_hash} != #{other_txs[index]}"
+      end
+    end
+  end
 end
