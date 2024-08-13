@@ -92,17 +92,30 @@ class AlchemyClient
 
     url = [base_url, api_key].join('/')
 
-    retries = 3
+    retries = 5
     begin
       response = HTTParty.post(url, body: data.to_json, headers: headers)
-      JSON.parse(response.body, max_nesting: false)
+      
+      if response.code != 200
+        raise "HTTP error: #{response.code} #{response.message}"
+      end
+
+      parsed_response = JSON.parse(response.body, max_nesting: false)
+      
+      if parsed_response['error']
+        raise "API error: #{parsed_response['error']['message']}"
+      end
+
+      parsed_response
     rescue StandardError => e
+      puts "Retrying #{retries} more times (last error: #{e.message.inspect})"
+      
       retries -= 1
       if retries > 0
-        sleep 1 # wait for 1 second before retrying
+        sleep 1
         retry
       else
-        raise "Failed after 3 retries: #{e.message}"
+        raise "Failed after #{retries} retries: #{e.message.inspect}"
       end
     end
   end

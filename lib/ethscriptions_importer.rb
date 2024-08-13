@@ -51,9 +51,9 @@ module EthscriptionsImporter
     # Rails.cache.clear
     # SolidityCompiler.reset_checksum
     # SolidityCompiler.compile_all_legacy_files
-    
+    MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
-    # SolidityCompiler.compile_all_legacy_files
+    SolidityCompiler.compile_all_legacy_files
     ensure_genesis_blocks
     
     alchemy_responses = {}
