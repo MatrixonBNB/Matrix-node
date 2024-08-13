@@ -111,8 +111,9 @@ module GethDriver
 
     payload = get_payload_response['executionPayload']
     
-    # Should this already be there?
-    # payload['transactions'] = transactions
+    if payload['transactions'].empty?
+      raise "no transactions in returned payload"
+    end
 
     new_payload_request = [
       payload
@@ -158,30 +159,3 @@ module GethDriver
     payload
   end
 end
-
-# func sanityCheckPayload(payload *eth.ExecutionPayload) error {
-# 	// Sanity check payload before inserting it
-# 	if len(payload.Transactions) == 0 {
-# 		return errors.New("no transactions in returned payload")
-# 	}
-# 	if payload.Transactions[0][0] != types.DepositTxType {
-# 		return fmt.Errorf("first transaction was not deposit tx. Got %v", payload.Transactions[0][0])
-# 	}
-# 	// Ensure that the deposits are first
-# 	lastDeposit, err := lastDeposit(payload.Transactions)
-# 	if err != nil {
-# 		return fmt.Errorf("failed to find last deposit: %w", err)
-# 	}
-# 	// Ensure no deposits after last deposit
-# 	for i := lastDeposit + 1; i < len(payload.Transactions); i++ {
-# 		tx := payload.Transactions[i]
-# 		deposit, err := isDepositTx(tx)
-# 		if err != nil {
-# 			return fmt.Errorf("failed to decode transaction idx %d: %w", i, err)
-# 		}
-# 		if deposit {
-# 			return fmt.Errorf("deposit tx (%d) after other tx in l2 block with prev deposit at idx %d", i, lastDeposit)
-# 		}
-# 	}
-# 	return nil
-# }

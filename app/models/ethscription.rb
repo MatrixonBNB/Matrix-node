@@ -552,6 +552,7 @@ class Ethscription < ApplicationRecord
         return parsed_response['new_value']
       end
     end
+    memoize :lookup_new_value
     
     def real_withdrawal_id(user_withdrawal_id)
       if ENV['LEGACY_VALUE_ORACLE_URL']
