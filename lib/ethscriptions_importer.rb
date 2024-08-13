@@ -466,7 +466,8 @@ module EthscriptionsImporter
   end
 
   def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, legacy_tx_receipts, facet_block)
-    results = Parallel.map(ethscriptions.sort_by(&:transaction_index).each_with_index, in_threads: 10) do |(ethscription, idx)|
+    # results = Parallel.map(ethscriptions.sort_by(&:transaction_index).each_with_index, in_threads: 10) do |(ethscription, idx)|
+    results = ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
       ethscription.clear_caches_if_upgrade!
       
       legacy_tx_receipt = legacy_tx_receipts.find { |r| r.transaction_hash == ethscription.transaction_hash }

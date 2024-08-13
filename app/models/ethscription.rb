@@ -368,7 +368,7 @@ class Ethscription < ApplicationRecord
     shim_val = "0x00000000000000000000000000000000000000c5"
     
     unless ENV['LEGACY_VALUE_ORACLE_URL']
-      LegacyValueMapping.create_or_find_by!(
+      LegacyValueMapping.find_or_create_by!(
         mapping_type: :address,
         legacy_value: parsed_content['data']['to'].downcase,
         new_value: shim_val
@@ -418,7 +418,7 @@ class Ethscription < ApplicationRecord
       
       new_to = deploy_receipt.legacy_contract_address_map[legacy_to]
       
-      LegacyValueMapping.create_or_find_by!(
+      LegacyValueMapping.find_or_create_by!(
         mapping_type: 'address',
         legacy_value: legacy_to,
         new_value: new_to,
@@ -589,11 +589,10 @@ class Ethscription < ApplicationRecord
       new_withdrawal_id = receipt.decoded_legacy_logs.
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
       
-      LegacyValueMapping.create_or_find_by!(
+      LegacyValueMapping.find_or_create_by!(
         mapping_type: 'withdrawal_id',
         legacy_value: user_withdrawal_id,
         new_value: new_withdrawal_id,
-        # created_by_eth_transaction_hash: self.transaction_hash
       )
       
       new_withdrawal_id
