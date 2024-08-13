@@ -10,6 +10,16 @@ class FacetTransactionReceipt < ApplicationRecord
     unless legacy_receipt
       self.legacy_contract_address_map[calculate_legacy_contract_address] = contract_address
       self.legacy_contract_address_map.compact!
+      
+      self.legacy_contract_address_map.each do |legacy_address, new_address|
+        LegacyValueMapping.create_or_find_by!(
+          mapping_type: 'address',
+          legacy_value: legacy_address,
+          new_value: new_address,
+          # created_by_eth_transaction_hash: self.transaction_hash
+        )
+      end
+      
       return
     end
   
@@ -20,6 +30,33 @@ class FacetTransactionReceipt < ApplicationRecord
     update_legacy_contract_address_map('BuddyCreated', 'buddy')
   
     self.legacy_contract_address_map.compact!
+    
+    self.legacy_contract_address_map.each do |legacy_address, new_address|
+      LegacyValueMapping.create_or_find_by!(
+        mapping_type: 'address',
+        legacy_value: legacy_address,
+        new_value: new_address,
+        # created_by_eth_transaction_hash: self.transaction_hash
+      )
+    end
+  end
+  
+  def update_real_withdrawal_id
+    initiate_event = decoded_legacy_logs.detect { |i| i['event'] == 'InitiateWithdrawal' }
+    
+    return unless initiate_event
+    
+    withdrawal_id = initiate_event['data']['withdrawalId']
+    
+    LegacyValueMapping.create_or_find_by!(
+      mapping_type: :withdrawal_id,
+      legacy_value: legacy_receipt.transaction_hash,
+      new_value: withdrawal_id,
+      # created_by_eth_transaction_hash: self.transaction_hash
+    )
+  rescue => e
+    binding.irb
+    raise
   end
   
   def update_legacy_contract_address_map(event_name, key_name)

@@ -208,6 +208,7 @@ module EthscriptionsImporter
         BlockImportBatchContext.imported_facet_transactions.concat(facet_txs)
 
         receipts.each(&:set_legacy_contract_address_map)
+        receipts.each(&:update_real_withdrawal_id)
         
         validate_receipts(block_legacy_tx_receipts, receipts) if validate_import?
         
