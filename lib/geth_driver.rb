@@ -112,7 +112,7 @@ module GethDriver
     payload = get_payload_response['executionPayload']
     
     # Should this already be there?
-    payload['transactions'] = transactions
+    # payload['transactions'] = transactions
 
     new_payload_request = [
       payload
@@ -129,13 +129,17 @@ module GethDriver
     unless status == 'VALID'
       raise "New payload was not valid: #{status}"
     end
+    
+    unless new_payload_response['latestValidHash'] == payload['blockHash']
+      raise "New payload was not valid: #{status}"
+    end
   
     new_safe_block = safe_block
     new_finalized_block = finalized_block
     
     fork_choice_state = {
       headBlockHash: payload['blockHash'],
-      safeBlockHash: new_safe_block.block_hash,
+      safeBlockHash: new_safe_block.block_hash, # should this also be payload blockhash?
       finalizedBlockHash: new_finalized_block.block_hash
     }
     
@@ -145,7 +149,12 @@ module GethDriver
     unless status == 'VALID'
       raise "Fork choice update was not valid: #{status}"
     end
-
+    
+    unless fork_choice_response['payloadStatus']['latestValidHash'] == payload['blockHash']
+      binding.irb
+      raise "New payload was not valid: #{status}"
+    end
+    
     payload
   end
 end

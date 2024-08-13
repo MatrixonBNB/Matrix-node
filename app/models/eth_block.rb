@@ -3,13 +3,7 @@ class EthBlock < ApplicationRecord
   has_many :eth_calls, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   has_one :facet_block, primary_key: :block_hash, foreign_key: :eth_block_hash, dependent: :destroy
   
-  def self.from_rpc_result(res)
-    block_result = res['result']
-    
-    unless block_result
-      raise "No block result"
-    end
-    
+  def self.from_rpc_result(block_result)
     EthBlock.new(
       number: block_result['number'].to_i(16),
       block_hash: block_result['hash'],

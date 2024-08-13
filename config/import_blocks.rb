@@ -22,6 +22,11 @@ module Clockwork
   end
 
   every(6.seconds, 'import_blocks_until_done') do
-    EthBlockImporter.import_blocks_until_done
+    BlockImportContext.set(
+      imported_eth_blocks: [],
+      imported_facet_blocks: []
+    ) do
+      EthBlockImporter.new.import_blocks_until_done
+    end
   end
 end

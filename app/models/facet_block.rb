@@ -6,6 +6,7 @@ class FacetBlock < ApplicationRecord
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   
   GAS_LIMIT = 300e6.to_i
+  attr_accessor :in_memory_txs
   
   def self.from_eth_block(eth_block, block_number)
     FacetBlock.new(
@@ -18,10 +19,16 @@ class FacetBlock < ApplicationRecord
     )
   end
   
+  def self.from_rpc_result(res)
+    fb = new
+    fb.from_rpc_response(res)
+    fb
+  end
+  
   def from_rpc_response(resp)
     assign_attributes(
-      number: resp['number'].to_i(16),
-      block_hash: resp['hash'],
+      number: (resp['blockNumber'] || resp['number']).to_i(16),
+      block_hash: (resp['hash'] || resp['blockHash']),
       parent_hash: resp['parentHash'],
       state_root: resp['stateRoot'],
       receipts_root: resp['receiptsRoot'],
@@ -30,11 +37,14 @@ class FacetBlock < ApplicationRecord
       gas_used: resp['gasUsed'].to_i(16),
       timestamp: resp['timestamp'].to_i(16),
       base_fee_per_gas: resp['baseFeePerGas'].to_i(16),
-      prev_randao: resp['mixHash'],
+      prev_randao: resp['prevRandao'] || resp['mixHash'],
       extra_data: resp['extraData'],
-      size: resp['size'].to_i(16),
-      transactions_root: resp['transactionsRoot'],
+      in_memory_txs: resp['transactions'],
+      # transactions_root: resp['transactionsRoot'],
     )
+  rescue => e
+    binding.irb
+    raise
   end
   
   def calculated_base_fee_per_gas

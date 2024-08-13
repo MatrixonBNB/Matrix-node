@@ -103,7 +103,7 @@ module EthscriptionsImporter
       
       genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + genesis_block.to_s(16), false])
       
-      eth_block = EthBlock.from_rpc_result(genesis_eth_block)
+      eth_block = EthBlock.from_rpc_result(genesis_eth_block['result'])
       eth_block.save!
       
       current_max_block_number = FacetBlock.maximum(:number).to_i
@@ -170,7 +170,7 @@ module EthscriptionsImporter
     
     ActiveRecord::Base.transaction do
       legacy_blocks.each_with_index do |block, index|
-        eth_block = EthBlock.from_rpc_result(block_by_number_responses[block.block_number])
+        eth_block = EthBlock.from_rpc_result(block_by_number_responses[block.block_number]['result'])
         eth_blocks << eth_block
         
         block_ethscriptions = Array.wrap(ethscriptions_by_block[block.block_number]).sort_by(&:transaction_index)
