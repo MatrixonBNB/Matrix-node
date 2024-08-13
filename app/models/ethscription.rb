@@ -367,11 +367,13 @@ class Ethscription < ApplicationRecord
   rescue ContractMissing => e
     shim_val = "0x00000000000000000000000000000000000000c5"
     
-    LegacyValueMapping.create_or_find_by!(
-      mapping_type: :address,
-      legacy_value: parsed_content['data']['to'].downcase,
-      new_value: shim_val
-    )
+    unless ENV['LEGACY_VALUE_ORACLE_URL']
+      LegacyValueMapping.create_or_find_by!(
+        mapping_type: :address,
+        legacy_value: parsed_content['data']['to'].downcase,
+        new_value: shim_val
+      )
+    end
     
     shim_val
   end
@@ -538,7 +540,13 @@ class Ethscription < ApplicationRecord
       response = HttpPartyWithRetry.get_with_retry("#{base_url}#{endpoint}", query: query_params)
       parsed_response = JSON.parse(response.body)
   
-      return parsed_response['new_value'] if parsed_response['new_value']
+      if parsed_response['new_value']
+        if parsed_response['new_value'] == "0x00000000000000000000000000000000000000c5"
+          raise ContractMissing, "Contract #{legacy_value} not found"
+        end
+        
+        return parsed_response['new_value']
+      end
     end
     
     def real_withdrawal_id(user_withdrawal_id)
