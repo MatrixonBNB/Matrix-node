@@ -13,7 +13,7 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       t.string :parent_beacon_block_root#, null: false
       t.string :parent_hash, null: false
       t.string :receipts_root, null: false
-      t.integer :size, null: false
+      t.integer :size#, null: false
       t.string :state_root, null: false
       t.bigint :timestamp, null: false
       t.string :transactions_root, null: false
