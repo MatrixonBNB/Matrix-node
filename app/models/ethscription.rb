@@ -382,9 +382,16 @@ class Ethscription < ApplicationRecord
     def calculate_to_address(legacy_to)
       legacy_to = legacy_to.downcase
       
-      map_version = FacetTransactionReceipt.map_legacy_address(legacy_to)
-      
-      return map_version if map_version
+      if ENV['LEGACY_VALUE_ORACLE_URL']
+        new_value = lookup_new_value(
+          type: :address,
+          legacy_value: legacy_to
+        )
+        
+        return new_value if new_value
+        
+        raise "Withdrawal ID not found: #{legacy_to}"
+      end
       
       BlockImportBatchContext.imported_facet_transaction_receipts&.each do |receipt|
         if receipt.legacy_contract_address_map.key?(legacy_to)
@@ -399,7 +406,16 @@ class Ethscription < ApplicationRecord
         raise ContractMissing, "Contract #{legacy_to} not found"
       end
       
-      deploy_receipt.legacy_contract_address_map[legacy_to]
+      new_to = deploy_receipt.legacy_contract_address_map[legacy_to]
+      
+      LegacyValueMapping.create_or_find_by!(
+        mapping_type: 'address',
+        legacy_value: legacy_to,
+        new_value: new_to,
+        # created_by_eth_transaction_hash: self.transaction_hash
+      )
+      
+      new_to
     end
     memoize :calculate_to_address
     
@@ -503,7 +519,32 @@ class Ethscription < ApplicationRecord
       end
     end
     
+    def self.lookup_new_value(type:, legacy_value:)
+      base_url = ENV.fetch('LEGACY_VALUE_ORACLE_URL')
+      endpoint = '/legacy_value_mappings/lookup'
+      query_params = {
+        mapping_type: type,
+        legacy_value: legacy_value
+      }
+  
+      response = HttpPartyWithRetry.get_with_retry("#{base_url}#{endpoint}", query: query_params)
+      parsed_response = JSON.parse(response.body)
+  
+      return parsed_response['new_value'] if parsed_response['new_value']
+    end
+    
     def real_withdrawal_id(user_withdrawal_id)
+      if ENV['LEGACY_VALUE_ORACLE_URL']
+        new_value = lookup_new_value(
+          type: :withdrawal_id,
+          legacy_value: user_withdrawal_id
+        )
+        
+        return new_value if new_value
+        
+        raise "Withdrawal ID not found: #{user_withdrawal_id}"
+      end
+      
       # Check in-memory cache first
       transaction = BlockImportBatchContext.imported_facet_transactions&.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
       
@@ -529,8 +570,17 @@ class Ethscription < ApplicationRecord
         return user_withdrawal_id
       end
       
-      receipt.decoded_legacy_logs.
+      new_withdrawal_id = receipt.decoded_legacy_logs.
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
+      
+      LegacyValueMapping.create_or_find_by!(
+        mapping_type: 'withdrawal_id',
+        legacy_value: user_withdrawal_id,
+        new_value: new_withdrawal_id,
+        # created_by_eth_transaction_hash: self.transaction_hash
+      )
+      
+      new_withdrawal_id
     rescue ActiveRecord::RecordNotFound => e
       raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
     end
