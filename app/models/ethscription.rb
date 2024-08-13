@@ -365,7 +365,15 @@ class Ethscription < ApplicationRecord
     return if parsed_content['op'] == 'create'
     calculate_to_address(parsed_content['data']['to'])
   rescue ContractMissing => e
-    "0x00000000000000000000000000000000000000c5"
+    shim_val = "0x00000000000000000000000000000000000000c5"
+    
+    LegacyValueMapping.create_or_find_by!(
+      mapping_type: :address,
+      legacy_value: parsed_content['data']['to'],
+      new_value: shim_val
+    )
+    
+    shim_val
   end
   
   class << self
@@ -519,7 +527,7 @@ class Ethscription < ApplicationRecord
       end
     end
     
-    def self.lookup_new_value(type:, legacy_value:)
+    def lookup_new_value(type:, legacy_value:)
       base_url = ENV.fetch('LEGACY_VALUE_ORACLE_URL')
       endpoint = '/legacy_value_mappings/lookup'
       query_params = {
