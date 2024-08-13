@@ -545,6 +545,10 @@ class Ethscription < ApplicationRecord
           raise ContractMissing, "Contract #{legacy_value} not found"
         end
         
+        if parsed_response['new_value'] == "0x" + "0" * 62 + "c5"
+          raise InvalidArgValue, "Withdrawal ID not found: #{legacy_value}"
+        end
+        
         return parsed_response['new_value']
       end
     end
@@ -572,13 +576,24 @@ class Ethscription < ApplicationRecord
         if transaction
           receipt = transaction.facet_transaction_receipt
         else
-          # binding.irb
+          LegacyValueMapping.find_or_create_by!(
+            mapping_type: 'withdrawal_id',
+            legacy_value: user_withdrawal_id,
+            new_value: "0x" + "0" * 62 + "c5",
+          )
+          
           raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
         end
       end
       
       unless receipt
         # binding.irb
+        LegacyValueMapping.find_or_create_by!(
+          mapping_type: 'withdrawal_id',
+          legacy_value: user_withdrawal_id,
+          new_value: "0x" + "0" * 62 + "c5",
+        )
+        
         raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
       end
       
@@ -597,6 +612,12 @@ class Ethscription < ApplicationRecord
       
       new_withdrawal_id
     rescue ActiveRecord::RecordNotFound => e
+      LegacyValueMapping.find_or_create_by!(
+        mapping_type: 'withdrawal_id',
+        legacy_value: user_withdrawal_id,
+        new_value: "0x" + "0" * 62 + "c5",
+      )
+      
       raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
     end
   end
