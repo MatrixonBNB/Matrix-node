@@ -599,6 +599,12 @@ class Ethscription < ApplicationRecord
       end
       
       if receipt.status == 0
+        LegacyValueMapping.find_or_create_by!(
+          mapping_type: 'withdrawal_id',
+          legacy_value: user_withdrawal_id,
+          new_value: user_withdrawal_id,
+        )
+        
         return user_withdrawal_id
       end
       
