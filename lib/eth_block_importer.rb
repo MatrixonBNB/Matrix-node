@@ -125,7 +125,7 @@ class EthBlockImporter
   def import_blocks_until_done
     MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
-    SolidityCompiler.compile_all_legacy_files
+    SolidityCompiler.compile_all_legacy_files unless Rails.env.production?
     
     loop do
       begin
