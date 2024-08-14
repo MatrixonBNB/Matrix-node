@@ -11,6 +11,8 @@ class FacetTransaction < ApplicationRecord
   FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
   
+  DEPOSIT_TX_TYPE = 0x7E
+  
   USER_DEPOSIT_SOURCE_DOMAIN = 0
   L1_INFO_DEPOSIT_SOURCE_DOMAIN = 1
   
@@ -210,7 +212,6 @@ class FacetTransaction < ApplicationRecord
     calculated_max_fee_per_gas = max_fee_per_gas > 0 ? max_fee_per_gas : facet_block.calculated_base_fee_per_gas
     
     tx_data = []
-    tx_data.push Eth::Util.serialize_int_to_big_endian(chain_id || self.class.current_chain_id)
     tx_data.push Eth::Util.hex_to_bin source_hash
     tx_data.push Eth::Util.hex_to_bin from_address
     tx_data.push Eth::Util.hex_to_bin to_address.to_s
@@ -218,10 +219,11 @@ class FacetTransaction < ApplicationRecord
     tx_data.push Eth::Util.serialize_int_to_big_endian value
     tx_data.push Eth::Util.serialize_int_to_big_endian(calculated_max_fee_per_gas)
     tx_data.push Eth::Util.serialize_int_to_big_endian gas_limit
+    tx_data.push ''
     tx_data.push Eth::Util.hex_to_bin input
     tx_encoded = Eth::Rlp.encode tx_data
 
-    tx_type = Eth::Util.serialize_int_to_big_endian FACET_TX_TYPE
+    tx_type = Eth::Util.serialize_int_to_big_endian DEPOSIT_TX_TYPE
     "#{tx_type}#{tx_encoded}".bytes_to_hex
   end
   

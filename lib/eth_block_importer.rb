@@ -106,7 +106,7 @@ class EthBlockImporter
       l2_block = GethDriver.client.call("eth_getBlockByNumber", ["0x#{l2_start_number_candidate.to_s(16)}", true])
       l2_attributes_tx = l2_block['transactions'].first
       l2_attributes = L1AttributesTxCalldata.decode(l2_attributes_tx['input'])
-      our_hash = "0x" + l2_attributes[:hash]
+      our_hash = l2_attributes[:hash]
       
       if l1_hash == our_hash
         @l1_start_block = start_number_candidate
@@ -138,7 +138,7 @@ class EthBlockImporter
         next_start_block = block_numbers.last + 1
         next_block_numbers = (next_start_block...(next_start_block + import_batch_size)).to_a
         
-        blocks_to_import = block_numbers + next_block_numbers
+        blocks_to_import = block_numbers + next_block_numbers * 2
         
         blocks_to_import -= l1_rpc_results.keys
         

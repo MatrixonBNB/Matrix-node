@@ -440,12 +440,6 @@ CREATE TABLE public.legacy_value_mappings (
     new_value character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT chk_rails_48ee1bf62a CHECK (
-CASE
-    WHEN ((mapping_type)::text = 'withdrawal_id'::text) THEN (((legacy_value)::text ~ '^0x[a-f0-9]{64}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{64}$'::text))
-    WHEN ((mapping_type)::text = 'address'::text) THEN (((legacy_value)::text ~ '^0x[a-f0-9]{40}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{40}$'::text))
-    ELSE false
-END),
     CONSTRAINT chk_rails_6862305fab CHECK (((mapping_type)::text = ANY ((ARRAY['address'::character varying, 'withdrawal_id'::character varying])::text[])))
 );
 
@@ -894,6 +888,7 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20240813181411'),
 ('20240813150529'),
 ('20240813133726'),
 ('20240812202530'),

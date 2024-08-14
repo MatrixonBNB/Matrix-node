@@ -1,75 +1,66 @@
 module L1AttributesTxCalldata
   extend self
   
-  FUNCTION_SELECTOR = Eth::Util.keccak256('setL1BlockValuesEcotone()').bytes_to_hex[0...10]
+  FUNCTION_SELECTOR = Eth::Util.keccak256('setL1BlockValuesEcotone()').first(4)
   
   def build(
     timestamp:,
     number:,
     base_fee:,
     blob_base_fee: 1,
-    hash:,
-    batcher_hash: "0x" + "0" * 40
+    hash:
   )
     base_fee_scalar = 0
     blob_base_fee_scalar = 1
     sequence_number = 0
+    batcher_hash = "\x00" * 32
     
-    # Pack the first 3 parameters into a single uint256
-    packed_scalars_and_sequence = (
-      (sequence_number << 64) |
-      (blob_base_fee_scalar << 32) |
-      base_fee_scalar
-    )
-  
-    # Pack number and timestamp into a single uint256
-    packed_number_and_timestamp = (number << 64) | timestamp
-  
-    # Encode the parameters using Eth::Abi.encode
-    encoded_params = Eth::Abi.encode(
-      ['uint256', 'uint256', 'uint256', 'uint256', 'bytes32', 'bytes32'],
-      [
-        packed_scalars_and_sequence,
-        packed_number_and_timestamp,
-        base_fee,
-        blob_base_fee,
-        Eth::Util.hex_to_bin(hash),
-        Eth::Util.hex_to_bin(batcher_hash)
-      ]
-    )
-  
-    # Combine function selector and encoded parameters
-    FUNCTION_SELECTOR + encoded_params.bytes_to_unprefixed_hex
+    hash = hash.hex_to_bin
+    
+    unless hash.length == 32
+      raise "Invalid hash length"
+    end
+    
+    packed_data = [
+      FUNCTION_SELECTOR,
+      base_fee_scalar.zpad(4),
+      blob_base_fee_scalar.zpad(4),
+      sequence_number.zpad(8),
+      timestamp.zpad(8),
+      number.zpad(8),
+      base_fee.zpad(32),
+      blob_base_fee.zpad(32),
+      hash,
+      batcher_hash
+    ].join
+    
+    packed_data.bytes_to_hex
   end
   
   def decode(calldata)
+    data = calldata.hex_to_bytes
+  
     # Remove the function selector
-    encoded_params = calldata[FUNCTION_SELECTOR.length..-1]
+    data = data[4..-1]
     
-    # Decode the parameters using Eth::Abi.decode
-    decoded_params = Eth::Abi.decode(
-      ['uint256', 'uint256', 'uint256', 'uint256', 'bytes32', 'bytes32'],
-      Eth::Util.hex_to_bin(encoded_params)
-    )
-    
-    packed_scalars_and_sequence, packed_number_and_timestamp, base_fee, blob_base_fee, hash, batcher_hash = decoded_params
-    
-    # Unpack the first 3 parameters from the first uint256
-    sequence_number = (packed_scalars_and_sequence >> 64) & 0xFFFFFFFFFFFFFFFF
-    blob_base_fee_scalar = (packed_scalars_and_sequence >> 32) & 0xFFFFFFFF
-    base_fee_scalar = packed_scalars_and_sequence & 0xFFFFFFFF
-    
-    # Unpack number and timestamp from the second uint256
-    number = (packed_number_and_timestamp >> 64) & 0xFFFFFFFFFFFFFFFF
-    timestamp = packed_number_and_timestamp & 0xFFFFFFFFFFFFFFFF
+    # Unpack the data
+    base_fee_scalar = data[0...4].unpack1('N')
+    blob_base_fee_scalar = data[4...8].unpack1('N')
+    sequence_number = data[8...16].unpack1('Q>')
+    timestamp = data[16...24].unpack1('Q>')
+    number = data[24...32].unpack1('Q>')
+    base_fee = data[32...64].unpack1('H*').to_i(16)
+    blob_base_fee = data[64...96].unpack1('H*').to_i(16)
+    hash = data[96...128].unpack1('H*')
+    batcher_hash = data[128...160].unpack1('H*')
     
     {
       timestamp: timestamp,
       number: number,
       base_fee: base_fee,
       blob_base_fee: blob_base_fee,
-      hash: Eth::Util.bin_to_hex(hash),
-      batcher_hash: Eth::Util.bin_to_hex(batcher_hash),
+      hash: "0x#{hash}",
+      batcher_hash: "0x#{batcher_hash}",
       sequence_number: sequence_number,
       blob_base_fee_scalar: blob_base_fee_scalar,
       base_fee_scalar: base_fee_scalar

@@ -32,3 +32,9 @@ class String
     hex_to_bytes
   end
 end
+
+class Integer
+  def zpad(bytes)
+    Eth::Util.zpad_int(self, bytes)
+  end
+end
