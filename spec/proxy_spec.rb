@@ -21,8 +21,8 @@ RSpec.describe "Uniswap" do
   }
   
   before(:all) do
-    GethDriver.teardown_rspec_geth
     GethDriver.setup_rspec_geth
+    Singleton.__init__(EthBlockImporter)
   end
   
   it 'imports old tx #1' do

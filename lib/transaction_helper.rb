@@ -85,7 +85,14 @@ module TransactionHelper
     function_obj = contract_object.parent.function_hash[function]
     data = function_obj.get_call_data(*args) rescue binding.irb
     
-    result = client.call("eth_call", [{
+    # GethDriver.non_auth_client.call("debug_traceCall", [{
+    #   to: address,
+    #   data: data
+    # }, "latest", {
+    #   tracer: "callTracer"
+    # }])
+    
+    result = GethDriver.non_auth_client.call("eth_call", [{
       to: address,
       data: data
     }, "latest"])
@@ -212,146 +219,206 @@ module TransactionHelper
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
     chain_id: FacetTransaction.current_chain_id,
-    expect_failure: false
+    expect_failure: false,
+    expect_blank: false
   )
-    ActiveRecord::Base.transaction do
-      EthBlockImporter.ensure_genesis_blocks
-      last_block = EthBlock.order(number: :desc).first
-      
-      if block_timestamp && block_timestamp.is_a?(Time)
-        block_timestamp = block_timestamp.to_i
-      end
-      
-      eth_data = FacetTransaction.new(
-        chain_id: chain_id,
-        to_address: to_address,
-        from_address: from_address,
-        value: value,
-        max_fee_per_gas: max_fee_per_gas,
-        gas_limit: gas_limit.to_i,
-        input: facet_data
-      ).to_eth_payload
-    
-      eth_transaction = {
-        'hash' => "0x" + SecureRandom.hex(32),
-        'from' => from_address,
-        'to' => "0x1111000000000000000000000000000000002222",
-        'gas' => '0xf4240', # Gas limit in hex (1,000,000 in decimal)
-        'gasPrice' => '0x3b9aca00', # Gas price in hex
-        'input' => eth_data,
-        'nonce' => '0x0',
-        'value' => '0x0',
-        'maxFeePerGas' => "0x123456",
-        'maxPriorityFeePerGas' => '0x3b9aca00',
-        'transactionIndex' => '0x0',
-        'type' => '0x2',
-        'chainId' => '0x1',
-        'v' => '0x1b',
-        'r' => '0x' + SecureRandom.hex(32),
-        's' => '0x' + SecureRandom.hex(32),
-        'yParity' => '0x0',
-        'accessList' => []
-      }
-    
-      block_by_number_response = {
-        'result' => {
-          'number' => (last_block.number + 1).to_s(16),
-          'hash' => "0x" + SecureRandom.hex(32),
-          'parentHash' => last_block.block_hash,
-          'transactions' => [eth_transaction],
-          'baseFeePerGas' => '0x' + eth_base_fee.to_s(16),
-          'gasUsed' => '0xf4240',
-          'timestamp' => (block_timestamp || last_block.timestamp + 12).to_s(16),
-          'excessBlobGas' => "0x0",
-          'blobGasUsed' => "0x0",
-          'difficulty' => "0x0",
-          'gasLimit' => "0x0",
-          'parentBeaconBlockRoot' => "0x" + SecureRandom.hex(32),
-          'size' => "0x0",
-          'logsBloom' => "0x0",
-          'receiptsRoot' => "0x" + SecureRandom.hex(32),
-          'stateRoot' => "0x" + SecureRandom.hex(32),
-          'extraData' => "0x" + SecureRandom.hex(32),
-          'transactionsRoot' => "0x" + SecureRandom.hex(32),
-          'mixHash' => "0x" + SecureRandom.hex(32),
-          'withdrawalsRoot' => "0x" + SecureRandom.hex(32),
-          'miner' => "0x" + SecureRandom.hex(20),
-          'nonce' => "0x0",
-          'totalDifficulty' => "0x0",
-        }
-      }
-    
-      trace_result = {
-        'result' => [
-          {
-            'txHash' => eth_transaction['hash'],
-            'result' => {
-              'from' => eth_transaction['from'],
-              'to' => FacetTransaction::FACET_INBOX_ADDRESS,
-              'gasUsed' => "0x" + eth_gas_used.to_s(16),
-              'gas' => eth_transaction['gas'],
-              'output' => '0x',
-              'input' => eth_transaction['input']
-            }
-          }
-        ]
-      }
-      
-      current_max_facet_block_number = FacetBlock.maximum(:number).to_i
-      facet_block_number = current_max_facet_block_number + 1
-      
-      # Get the earliest block
-      earliest = FacetBlock.order(number: :asc).first
-      in_memory_blocks = FacetBlock.where(number: (current_max_facet_block_number - 64 - 1)..current_max_facet_block_number).index_by(&:number)
-      head_block = in_memory_blocks[facet_block_number - 1] || earliest
-      safe_block = in_memory_blocks[facet_block_number - 32] || earliest
-      finalized_block = in_memory_blocks[facet_block_number - 64] || earliest
-      
-      eth_block = EthBlock.from_rpc_result(block_by_number_response)
-      new_eth_transactions = EthTransaction.from_rpc_result(block_by_number_response['result'])
-      # binding.irb
-      new_eth_calls = EthCall.from_trace_result(trace_result['result'], eth_block)
-      
-      facet_block, facet_txs = EthBlockImporter.propose_facet_block(
-        eth_block,
-        eth_calls: new_eth_calls,
-        eth_transactions: new_eth_transactions,
-        facet_block_number: facet_block_number,
-        earliest: earliest,
-        head_block: head_block,
-        safe_block: safe_block,
-        finalized_block: finalized_block
-      )
-      
-      if facet_txs.blank?
-        raise NoValidFacetTransactions
-      end
-      
-      facet_block, facet_txs, facet_receipts = EthBlockImporter.fill_in_block_data(facet_block, facet_txs)
-
-      res = OpenStruct.new
-      res.receipts_imported = facet_receipts
-      res.transactions_imported = facet_txs
-      
-      if facet_receipts.map(&:status) != [1] && facet_receipts.present?
-        ap facet_txs.first
-        ap facet_receipts.first
-        ap facet_receipts.first.trace
-      end
-      
-      expected = expect_failure ? [0] : [1]
-      
-      eth_block.save!
-      facet_block.save!
-      FacetTransaction.import!(facet_txs)
-      FacetTransactionReceipt.import!(facet_receipts)
-      
-      expect(facet_receipts.map(&:status).uniq).to eq(expected)
-      res
+    last_block = EthBlockImporter.instance.current_max_eth_block
+        
+    if block_timestamp && block_timestamp.is_a?(Time)
+      block_timestamp = block_timestamp.to_i
     end
+    
+    eth_data = FacetTransaction.new(
+      chain_id: chain_id,
+      to_address: to_address,
+      from_address: from_address,
+      value: value,
+      max_fee_per_gas: max_fee_per_gas,
+      gas_limit: gas_limit.to_i,
+      input: facet_data
+    ).to_eth_payload
+
+    eth_transaction = {
+      'hash' => (last_block.number + 3999).zpad(32).bytes_to_hex,
+      'from' => from_address,
+      'to' => "0x1111000000000000000000000000000000002222",
+      'gas' => '0xf4240', # Gas limit in hex (1,000,000 in decimal)
+      'gasPrice' => '0x3b9aca00', # Gas price in hex
+      'input' => eth_data,
+      'nonce' => '0x0',
+      'value' => '0x0',
+      'maxFeePerGas' => "0x123456",
+      'maxPriorityFeePerGas' => '0x3b9aca00',
+      'transactionIndex' => '0x0',
+      'type' => '0x2',
+      'chainId' => '0x1',
+      'v' => '0x1b',
+      'r' => '0x' + SecureRandom.hex(32),
+      's' => '0x' + SecureRandom.hex(32),
+      'yParity' => '0x0',
+      'accessList' => []
+    }
+
+    block_by_number_response = {
+      'result' => {
+        'number' => (last_block.number + 1).to_s(16),
+        'hash' => (last_block.number + 9999).zpad(32).bytes_to_hex,
+        'parentHash' => last_block.block_hash,
+        'transactions' => [eth_transaction],
+        'baseFeePerGas' => '0x' + eth_base_fee.to_s(16),
+        'gasUsed' => '0xf4240',
+        'timestamp' => (block_timestamp || last_block.timestamp + 12).to_s(16),
+        'excessBlobGas' => "0x0",
+        'blobGasUsed' => "0x0",
+        'difficulty' => "0x0",
+        'gasLimit' => "0x0",
+        'parentBeaconBlockRoot' => "0x" + SecureRandom.hex(32),
+        'size' => "0x0",
+        'logsBloom' => "0x0",
+        'receiptsRoot' => "0x" + SecureRandom.hex(32),
+        'stateRoot' => "0x" + SecureRandom.hex(32),
+        'extraData' => "0x" + SecureRandom.hex(32),
+        'transactionsRoot' => "0x" + SecureRandom.hex(32),
+        'mixHash' => "0x" + SecureRandom.hex(32),
+        'withdrawalsRoot' => "0x" + SecureRandom.hex(32),
+        'miner' => "0x" + SecureRandom.hex(20),
+        'nonce' => "0x0",
+        'totalDifficulty' => "0x0",
+      }
+    }
+
+    trace_result = {
+      'result' => [
+        {
+          'txHash' => eth_transaction['hash'],
+          'result' => {
+            'from' => eth_transaction['from'],
+            'to' => FacetTransaction::FACET_INBOX_ADDRESS,
+            'gasUsed' => "0x" + eth_gas_used.to_s(16),
+            'gas' => eth_transaction['gas'],
+            'output' => '0x',
+            'input' => eth_transaction['input']
+          }
+        }
+      ]
+    }
+    
+    receipts_result = {
+      'result' => [
+        {
+          'transactionHash' => eth_transaction['hash'],
+          'status' => 1
+        }
+      ]
+    }
+    
+    dummy_client = Object.new
+    
+    dummy_client.define_singleton_method(:get_block) do |block_number, get_txs = false|
+      block_by_number_response
+    end
+
+    dummy_client.define_singleton_method(:debug_trace_block_by_number) do |block_number|
+      trace_result
+    end
+
+    dummy_client.define_singleton_method(:get_transaction_receipts) do |block_number, blocks_behind: 1000|
+      nil
+    end
+
+    dummy_client.define_singleton_method(:get_block_number) do
+      last_block.number + 3999
+    end
+    
+    EthBlockImporter.instance.define_singleton_method(:blocks_behind) do
+      1
+    end
+    
+    old_client = EthBlockImporter.instance.ethereum_client
+    EthBlockImporter.instance.ethereum_client = dummy_client
+    
+    facet_blocks, eth_blocks = EthBlockImporter.instance.import_next_block
+    facet_block, eth_block = facet_blocks.first, eth_blocks.first
+    
+    facet_block, facet_txs, facet_receipts = fill_in_block_data(facet_block)
+    facet_txs = facet_txs.reject{|tx| tx.from_address == "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001" }
+    facet_receipts = facet_receipts.reject{|tx| tx.from_address == "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001" }
+    
+    res = OpenStruct.new
+    res.receipts_imported = facet_receipts
+    res.transactions_imported = facet_txs
+    
+    if facet_receipts.map(&:status) != [1] && facet_receipts.present?
+      ap facet_txs.first
+      ap facet_receipts.first
+      ap facet_receipts.first.trace
+    end
+    
+    expected = expect_failure ? [0] : [1]
+    expected = expect_blank ? [] : expected
+    
+    expect(facet_receipts.map(&:status).uniq).to eq(expected)
+    res
+  ensure
+    EthBlockImporter.instance.ethereum_client = old_client
   end
   
-  def trigger_contract_interaction(from:, payload:, expect_failure: false, block_timestamp: nil)
+  def fill_in_block_data(facet_block)
+    geth_block = GethDriver.client.call("eth_getBlockByNumber", ["0x" + facet_block.number.to_s(16), true])
+    receipts_data = GethDriver.client.call("eth_getBlockReceipts", ["0x" + facet_block.number.to_s(16)])
+    
+    facet_block.from_rpc_response(geth_block)
+
+    receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
+
+    receipts = []
+    facet_txs = []
+
+    geth_block['transactions'].each.with_index do |tx, index|
+      receipt_details = receipts_data_by_hash[tx['hash']]
+
+      facet_tx = FacetTransaction.new(source_hash: tx['sourceHash'])
+
+      facet_tx.assign_attributes(
+        tx_hash: tx['hash'],
+        transaction_index: receipt_details['transactionIndex'].to_i(16),
+        deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
+        gas: tx['gas'].to_i(16),
+        tx_type: tx['type'],
+        from_address: tx['from'],
+        to_address: tx['to'],
+        value: tx['value'].to_i(16),
+        input: tx['input'],
+        mint: tx['mint'].to_i(16)
+      )
+
+      facet_receipt = FacetTransactionReceipt.new(
+        transaction_hash: tx['hash'],
+        block_hash: facet_block.block_hash,
+        block_number: facet_block.number,
+        contract_address: receipt_details['contractAddress'],
+        cumulative_gas_used: receipt_details['cumulativeGasUsed'].to_i(16),
+        deposit_nonce: tx['nonce'].to_i(16),
+        deposit_receipt_version: tx['type'].to_i(16),
+        effective_gas_price: receipt_details['effectiveGasPrice'].to_i(16),
+        from_address: tx['from'],
+        gas_used: receipt_details['gasUsed'].to_i(16),
+        logs: receipt_details['logs'],
+        logs_bloom: receipt_details['logsBloom'],
+        status: receipt_details['status'].to_i(16),
+        to_address: tx['to'],
+        transaction_index: receipt_details['transactionIndex'].to_i(16),
+        tx_type: tx['type']
+      )
+      
+      facet_txs << facet_tx
+      receipts << facet_receipt
+    end
+
+    [facet_block, facet_txs, receipts]
+  end
+  
+  def trigger_contract_interaction(from:, payload:, expect_failure: false, expect_blank: false, block_timestamp: nil)
     contract = TransactionHelper.contract_addresses.fetch(payload[:to]) rescue binding.irb
 
     contract = get_contract(contract, payload[:to])
@@ -384,7 +451,7 @@ module TransactionHelper
       res = deploy_contract_with_proxy(
         from: from,
         implementation: payload[:data][:type],
-        args: payload[:data][:args].values,
+        args: (payload[:data][:args].is_a?(Hash) ? payload[:data][:args].values : payload[:data][:args]),
         value: payload[:data][:value] || 0,
         gas_limit: payload[:data][:gas_limit] || 10_000_000,
         max_fee_per_gas: payload[:data][:max_fee_per_gas] || 10.gwei,

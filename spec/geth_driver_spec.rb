@@ -1,8 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GethDriver do
-  let(:node_url) { 'http://localhost:8551' }
-  let(:client) { GethClient.new(node_url) }
+  let(:client) { GethDriver.non_auth_client }
   
   describe 'block and deposit transaction' do
     it 'deploys a contract with a deposit tx' do
@@ -23,11 +22,10 @@ RSpec.describe GethDriver do
       expect(res.receipts_imported.map(&:status)).to eq([1])
       
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
-      
       expect(latest_block).not_to be_nil
-      expect(latest_block['transactions'].size).to eq(1)
+      expect(latest_block['transactions'].size).to eq(2)
 
-      deposit_tx_response = latest_block['transactions'].first
+      deposit_tx_response = latest_block['transactions'].second
       expect(deposit_tx_response['input']).to eq("0x" + facet_data)
       
       deposit_tx_receipt = client.call("eth_getTransactionReceipt", [deposit_tx_response['hash']])
@@ -38,7 +36,6 @@ RSpec.describe GethDriver do
       
       sender_balance_before = client.call("eth_getBalance", [from_address, start_block['number']])
       sender_balance_after = client.call("eth_getBalance", [from_address, "latest"])
-
       # Retrieve gas used and gas price
       gas_used = deposit_tx_receipt['gasUsed'].to_i(16)
       gas_price = deposit_tx_receipt['effectiveGasPrice'].to_i(16)
@@ -92,16 +89,19 @@ RSpec.describe GethDriver do
       # Verify the new block and the increment transaction
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
       expect(latest_block).not_to be_nil
-      expect(latest_block['transactions'].size).to eq(1)
+      expect(latest_block['transactions'].size).to eq(2)
 
-      increment_tx_response = latest_block['transactions'].first
-      expect(increment_tx_response['input']).to eq(res.transactions_imported.first.input)
+      increment_tx_response = latest_block['transactions'].second
+      
+      tx_of_interest = res.transactions_imported.first
+      
+      expect(increment_tx_response['input']).to eq(tx_of_interest.input)
 
       increment_tx_receipt = client.call("eth_getTransactionReceipt", [increment_tx_response['hash']])
       expect(increment_tx_receipt).not_to be_nil
-      expect(increment_tx_receipt['from']).to eq(res.transactions_imported.first.from_address)
+      expect(increment_tx_receipt['from']).to eq(tx_of_interest.from_address)
       
-      expect(increment_tx_receipt['to']).to eq(res.transactions_imported.first.to_address)
+      expect(increment_tx_receipt['to']).to eq(tx_of_interest.to_address)
 
       function = contract.parent.function_hash['getCount']
       
@@ -130,10 +130,10 @@ RSpec.describe GethDriver do
       # Step 4: Verify the block was created with the correct properties
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
       expect(latest_block).not_to be_nil
-      expect(latest_block['transactions'].size).to eq(1)
+      expect(latest_block['transactions'].size).to eq(2)
 
       # Step 5: Verify the deposit transaction
-      deposit_tx_response = latest_block['transactions'].first
+      deposit_tx_response = latest_block['transactions'].second
       
       expect(deposit_tx_response['input']).to eq(res.transactions_imported.first.input)
       

@@ -11,14 +11,79 @@ module GethDriver
     EthBlock.all.each(&:destroy)
     FacetBlock.all.each(&:destroy)
     
-    Ethscription.write_alloc_to_genesis
+    # Ethscription.write_alloc_to_genesis
+    SolidityCompiler.compile_all_legacy_files
     
-    system("cd #{geth_dir} && make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json")
+    teardown_rspec_geth
     
-    pid = Process.spawn(%{cd #{geth_dir} && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug' --http.vhosts="*" --authrpc.jwtsecret /tmp/jwtsecret -http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --maxpeers 0 > g.log 2>&1})
+    @temp_datadir = Dir.mktmpdir('geth_datadir_', '/tmp')
+    log_file_location = "#{@temp_datadir}/geth.log"
+    
+    system("cd #{geth_dir} && make geth && ./build/bin/geth init --datadir #{@temp_datadir} facet-chain/genesis3.json")
+    
+    geth_command = [
+      "#{geth_dir}/build/bin/geth",
+      "--datadir", @temp_datadir,
+      "--http",
+      "--http.api", "eth,net,web3,debug",
+      "--http.vhosts", "*",
+      "--authrpc.jwtsecret", "/tmp/jwtsecret",
+      "--http.port", http_port,
+      "--authrpc.port", authrpc_port,
+      "--discovery.port", discovery_port,
+      "--port", discovery_port,
+      "--authrpc.addr", "localhost",
+      "--authrpc.vhosts", "*",
+      "--nodiscover",
+      "--maxpeers", "0",
+      "--log.file", log_file_location,
+      "--syncmode", "full",
+      "--gcmode", "archive",
+      "--history.state", "0",
+      "--history.transactions", "0",
+      "--nocompaction",
+      "--rollup.disabletxpoolgossip=true",
+      "--cache", "12000",
+      "--cache.preimages=true",
+    ]
+    
+    FileUtils.rm(log_file_location) if File.exist?(log_file_location)
+    
+    pid = Process.spawn(*geth_command)
     Process.detach(pid)
     
-    sleep 1
+    File.write('tmp/geth_pid', pid)
+    
+    begin
+      Timeout.timeout(30) do
+        loop do
+          break if File.exist?(log_file_location) && File.read(log_file_location).include?("NAT mapped port")
+          sleep 0.5
+        end
+      end
+    rescue Timeout::Error
+      raise "Geth setup did not complete within the expected time"
+    end
+  end
+  
+  def self.teardown_rspec_geth
+    if File.exist?('tmp/geth_pid')
+      pid = File.read('tmp/geth_pid').to_i
+      begin
+        # Kill the specific geth process
+        Process.kill('TERM', pid)
+        Process.wait(pid)
+      rescue Errno::ESRCH, Errno::ECHILD => e
+        puts e.message
+      ensure
+        File.delete('tmp/geth_pid')
+      end
+    end
+    
+    # Clean up the temporary data directory
+    Dir.glob('/tmp/geth_datadir_*').each do |dir|
+      FileUtils.rm_rf(dir)
+    end
   end
   
   def init_command
@@ -29,10 +94,6 @@ module GethDriver
     puts %{
       make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug' --http.vhosts="*" --authrpc.jwtsecret /tmp/jwtsecret --http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --cache 64000 --cache.preimages=true --maxpeers 0 --verbosity 2 --syncmode full --gcmode archive --history.state 0 --history.transactions 0 --nocompaction --rollup.disabletxpoolgossip=true console
     }.strip
-  end
-  
-  def self.teardown_rspec_geth
-    system("pkill -f geth")
   end
   
   def client

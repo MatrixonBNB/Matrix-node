@@ -32,7 +32,9 @@ RSpec.describe "Reverts" do
     receipt = res.receipts_imported.first
     effective_gas_price = receipt.effective_gas_price
     
-    block = FacetBlock.find_by!(number: receipt.block_number)
+    block = GethDriver.non_auth_client.call('eth_getBlockByNumber', ["0x" + receipt.block_number.to_s(16), true])
+    
+    block = FacetBlock.from_rpc_result(block)
     base_fee_per_gas = block.calculated_base_fee_per_gas
     
     expect(effective_gas_price).to eq(base_fee_per_gas)

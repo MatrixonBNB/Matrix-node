@@ -109,14 +109,12 @@ RSpec.describe "Reverts" do
   end
   
   it 'sets an invalid to' do
-    expect {
-      create_and_import_block(
-        facet_data: "0x",
-        to_address: "0x1234",
-        from_address: from_address,
-        expect_failure: true
-      )
-    }.to raise_error(TransactionHelper::NoValidFacetTransactions)
+    create_and_import_block(
+      facet_data: "0x",
+      to_address: "0x1234",
+      from_address: from_address,
+      expect_blank: true
+    )
   end
   
   it 'is underpriced' do

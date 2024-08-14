@@ -1,13 +1,21 @@
 class EthBlockImporter
+  include Singleton
+  include Memery
+  
   class BlockNotReadyToImportError < StandardError; end
   class TraceTimeoutError < StandardError; end
   
-  attr_accessor :imported_eth_blocks, :imported_facet_blocks, :l1_start_block, :l1_rpc_results, :l2_start_block, :facet_block_cache
+  attr_accessor :imported_eth_blocks, :imported_facet_blocks, :l1_start_block,
+    :l1_rpc_results, :l2_start_block, :facet_block_cache, :ethereum_client
   
   def initialize
     @imported_eth_blocks = {}
     @imported_facet_blocks = {}
     @l1_rpc_results = {}
+    @ethereum_client = AlchemyClient.new(
+      api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
+      base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
+    )
     
     set_eth_block_starting_points
     populate_facet_block_cache
@@ -19,6 +27,14 @@ class EthBlockImporter
   
   def current_max_eth_block_number
     imported_eth_blocks.keys.max || l1_start_block
+  end
+  
+  def current_max_eth_block
+    if imported_eth_blocks.keys.max
+      imported_eth_blocks[current_max_eth_block_number]
+    else
+      EthBlock.from_rpc_result(ethereum_client.get_block(l1_start_block)['result'])
+    end
   end
   
   def populate_facet_block_cache
@@ -34,17 +50,6 @@ class EthBlockImporter
   
   def logger
     Rails.logger
-  end
-  
-  def ethereum_client
-    @_ethereum_client ||= begin
-      client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
-      
-      client_class.new(
-        api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
-        base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
-      )
-    end
   end
   
   def genesis_block
@@ -64,18 +69,13 @@ class EthBlockImporter
   end
   
   def blocks_behind
-    (cached_global_block_number - next_block_to_import) + 1
+    (current_block_number - next_block_to_import) + 1
   end
   
-  def cached_global_block_number
-    Rails.cache.read('global_block_number') || uncached_global_block_number
+  def current_block_number
+    ethereum_client.get_block_number
   end
-  
-  def uncached_global_block_number
-    ethereum_client.get_block_number.tap do |block_number|
-      Rails.cache.write('global_block_number', block_number, expires_in: 12.seconds)
-    end
-  end
+  memoize :current_block_number, ttl: 12.seconds
   
   def import_batch_size
     [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
@@ -135,26 +135,31 @@ class EthBlockImporter
           raise BlockNotReadyToImportError.new("Block not ready")
         end
         
-        next_start_block = block_numbers.last + 1
-        next_block_numbers = (next_start_block...(next_start_block + import_batch_size)).to_a
+        populate_l1_rpc_results(block_numbers)
         
-        blocks_to_import = block_numbers + next_block_numbers * 2
-        
-        blocks_to_import -= l1_rpc_results.keys
-        
-        l1_rpc_results.reverse_merge!(get_blocks_promises(blocks_to_import))
-        
-        BlockImportBatchContext.set(
-          imported_facet_transactions: [],
-          imported_facet_transaction_receipts: []
-        ) do
-          import_blocks(block_numbers, l1_rpc_results)
-        end
+        import_blocks(block_numbers)
       rescue BlockNotReadyToImportError => e
         puts "#{e.message}. Stopping import."
         break
       end
     end
+  end
+  
+  def populate_l1_rpc_results(block_numbers)
+    next_start_block = block_numbers.last + 1
+    next_block_numbers = (next_start_block...(next_start_block + import_batch_size * 2)).to_a
+    
+    blocks_to_import = block_numbers
+    
+    if blocks_behind > 1
+      blocks_to_import += next_block_numbers.select do |num|
+        num <= current_block_number
+      end
+    end
+    
+    blocks_to_import -= l1_rpc_results.keys
+    
+    l1_rpc_results.reverse_merge!(get_blocks_promises(blocks_to_import))
   end
   
   def get_blocks_promises(block_numbers)
@@ -188,11 +193,11 @@ class EthBlockImporter
     end.to_h
   end
   
-  def fetch_block_from_cache(cache, block_number)
-    cache[block_number] || cache.min_by { |k, _| k }&.last
+  def fetch_block_from_cache(block_number)
+    facet_block_cache[block_number] || facet_block_cache.min_by { |k, _| k }&.last
   end
   
-  def import_blocks(block_numbers, l1_rpc_results)
+  def import_blocks(block_numbers)
     puts "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
 
@@ -230,10 +235,10 @@ class EthBlockImporter
       facet_block_number = current_max_facet_block_number + 1
       
       # Determine the head, safe, and finalized blocks
-      earliest = fetch_block_from_cache(facet_block_cache, 0)
-      head_block = fetch_block_from_cache(facet_block_cache, facet_block_number - 1)
-      safe_block = fetch_block_from_cache(facet_block_cache, facet_block_number - 32)
-      finalized_block = fetch_block_from_cache(facet_block_cache, facet_block_number - 64)
+      earliest = fetch_block_from_cache(0)
+      head_block = fetch_block_from_cache(facet_block_number - 1)
+      safe_block = fetch_block_from_cache(facet_block_number - 32)
+      finalized_block = fetch_block_from_cache(facet_block_number - 64)
 
       eth_block = EthBlock.from_rpc_result(block_result)
 
@@ -260,6 +265,9 @@ class EthBlockImporter
       imported_eth_blocks[eth_block.number] = eth_block
       imported_facet_blocks[facet_block_number] = facet_block  
       
+      facet_blocks << facet_block
+      eth_blocks << eth_block
+      
       res << OpenStruct.new(
         facet_block: facet_block,
         transactions_imported: facet_block.in_memory_txs.length
@@ -283,7 +291,7 @@ class EthBlockImporter
     puts "Total gas used: #{total_gas_millions} million (avg: #{average_gas_per_block_millions} million / block)"
     puts "Gas per second: #{gas_per_second_millions} million / s"
   
-    block_numbers
+    [facet_blocks, eth_blocks]
   end
   
   def validate_ready_to_import!(block_by_number_response, trace_response)
@@ -304,6 +312,8 @@ class EthBlockImporter
   
   def import_next_block
     block_number = next_block_to_import
+    
+    populate_l1_rpc_results([block_number])
     
     import_blocks([block_number])
   end
