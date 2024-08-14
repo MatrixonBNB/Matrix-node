@@ -1,21 +1,25 @@
 default: &default
   adapter: postgresql
   encoding: unicode
-  pool: 50
+  pool: 30
   username:
   password:
 
 development:
   <<: *default
-  database: evm_facet_development
+  database: evm_facet_development_dup1000
+  
+other_development:
+  <<: *default
+  database: <%= ENV['OTHER_DEVELOPMENT_DB_URL'] %>
 
 test:
   <<: *default
-  database: evm_facet_test
+  database: evm_facet_test_dup1000
 
 production:
   <<: *default
-  database: evm_facet_production
+  database: evm_facet_production_dup1000
   pool: 100
 
 secondary:
