@@ -7,6 +7,13 @@ class AlchemyClient
   end
 
   def get_block(block_number, include_txs = false)
+    if block_number.is_a?(String)
+      return query_api(
+        method: 'eth_getBlockByNumber',
+        params: [block_number, include_txs]
+      )
+    end
+    
     query_api(
       method: 'eth_getBlockByNumber',
       params: ['0x' + block_number.to_s(16), include_txs]

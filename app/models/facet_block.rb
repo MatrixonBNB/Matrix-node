@@ -54,43 +54,70 @@ class FacetBlock < ApplicationRecord
   end
   memoize :calculated_base_fee_per_gas
   
-  def self.check_hashes(batch_size: 1000)
-    offset = 0
-
-    loop do
-      # Fetch block hashes from the other database in batches
-      other_db_hashes = OtherFacetBlock.order(:number).limit(batch_size).offset(offset).pluck(:block_hash)
-      break if other_db_hashes.empty?
-
-      # Fetch block hashes from the current database in the same batch
-      current_db_hashes = FacetBlock.order(:number).limit(batch_size).offset(offset).pluck(:block_hash)
-      break if current_db_hashes.empty?
-
-      # Compare the hashes
-      return unless compare_hashes(current_db_hashes, other_db_hashes, offset)
-
-      offset += batch_size
+  def self.check_hashes
+    # Fetch the latest block number from the Geth instance
+    latest_geth_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])
+    latest_geth_block_number = latest_geth_block['number'].to_i(16)
+  
+    # Fetch the latest block number from the other database
+    latest_other_block = OtherFacetBlock.order(:number).last
+    latest_other_block_number = latest_other_block&.number || 0
+  
+    # Determine the smaller of the two block numbers
+    max_block_number = [latest_geth_block_number, latest_other_block_number].min
+  
+    # Check if the latest common block hash matches
+    geth_block = GethDriver.client.call("eth_getBlockByNumber", ["0x" + max_block_number.to_s(16), false])
+    geth_hash = geth_block['hash']
+    other_hash = OtherFacetBlock.find_by(number: max_block_number)&.block_hash
+  
+    if geth_hash == other_hash
+      puts "Latest common block (#{max_block_number}) hashes match. No discrepancies found."
+      return true
+    else
+      puts "Mismatch found at the latest common block (#{max_block_number}): #{other_hash} != #{geth_hash}"
+      puts "Searching for the point of divergence..."
     end
+  
+    find_divergence_point(0, max_block_number)
   end
-
-  def self.compare_hashes(current_db_hashes, other_db_hashes, offset)
-    current_db_hashes.each_with_index do |hash, index|
-      if hash != other_db_hashes[index]
-        puts "Mismatch found at index #{index + offset}: #{hash} != #{other_db_hashes[index]}"
-        compare_transactions(hash, other_db_hashes[index])
-        return false
+  
+  def self.find_divergence_point(start_block, end_block)
+    while start_block < end_block
+      mid_block = (start_block + end_block) / 2
+  
+      geth_block = GethDriver.client.call("eth_getBlockByNumber", ["0x" + mid_block.to_s(16), false])
+      geth_hash = geth_block['hash']
+      other_block = OtherFacetBlock.find_by!(number: mid_block)
+      other_hash = other_block.block_hash
+  
+      if geth_hash == other_hash
+        # Hashes match, divergence point is after this block
+        start_block = mid_block + 1
+      else
+        # Hashes don't match, divergence point is this block or before
+        end_block = mid_block
       end
     end
-    true
+  
+    # At this point, start_block is the first block where hashes differ
+    puts "Divergence found at block #{start_block}"
+    compare_transactions(start_block, other_hash, geth_hash)
+    return start_block
   end
 
-  def self.compare_transactions(current_block_hash, other_block_hash)
-    current_txs = FacetTransaction.where(block_hash: current_block_hash).order(:transaction_index).pluck(:tx_hash)
+  def self.compare_transactions(block_number, other_block_hash, geth_block_hash)
+    # Fetch transactions from the other database
     other_txs = OtherFacetTransaction.where(block_hash: other_block_hash).order(:transaction_index).pluck(:tx_hash)
 
-    current_txs.each_with_index do |tx_hash, index|
-      if tx_hash != other_txs[index]
-        puts "Transaction mismatch found at index #{index}: #{tx_hash} != #{other_txs[index]}"
+    # Fetch transactions from the Geth instance
+    geth_block = GethDriver.client.call("eth_getBlockByNumber", ["0x" + block_number.to_s(16), true])
+    geth_txs = geth_block['transactions'].map { |tx| tx['hash'] }
+
+    other_txs.each_with_index do |tx_hash, index|
+      if tx_hash != geth_txs[index]
+        puts "Transaction mismatch found at index #{index} in block number #{block_number}: #{tx_hash} != #{geth_txs[index]}"
+        ap GethDriver.client.call("eth_getTransactionByHash", [geth_txs[index]])
       end
     end
   end
