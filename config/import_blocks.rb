@@ -22,6 +22,9 @@ module Clockwork
   end
 
   every(6.seconds, 'import_blocks_until_done') do
-    EthBlockImporter.instance.import_blocks_until_done
+    loop do
+      EthBlockImporter.instance.import_blocks_until_done
+      sleep 6
+    end
   end
 end
