@@ -28,7 +28,7 @@ class GethClient
         "Authorization" => "Bearer #{jwt}"
       }
     }
-    response = HTTParty.post(@node_url, options)
+    response = Benchmark.msr("Calling: #{payload[:method]}") { HTTParty.post(@node_url, options) }
     
     unless response.code == 200
       raise ClientError, response
