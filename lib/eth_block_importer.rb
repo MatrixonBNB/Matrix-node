@@ -107,8 +107,9 @@ class EthBlockImporter
       l2_attributes_tx = l2_block['transactions'].first
       l2_attributes = L1AttributesTxCalldata.decode(l2_attributes_tx['input'])
       our_hash = l2_attributes[:hash]
-      
-      if l1_hash == our_hash
+      our_number = l2_attributes[:number]
+
+      if l1_hash == our_hash && our_number == start_number_candidate
         @l1_start_block = start_number_candidate
         @l2_start_block = l2_block['number'].to_i(16)
         return
