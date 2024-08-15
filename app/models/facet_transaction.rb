@@ -19,6 +19,12 @@ class FacetTransaction < ApplicationRecord
   SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
   L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
   
+  PER_TX_GAS_LIMIT = 30_000_000
+  
+  def within_gas_limit?
+    gas_limit <= PER_TX_GAS_LIMIT
+  end
+  
   def self.current_chain_id
     if ENV['CUSTOM_CHAIN_ID']
       return ENV['CUSTOM_CHAIN_ID'].to_i
@@ -92,6 +98,13 @@ class FacetTransaction < ApplicationRecord
       facet_tx
     end.flatten.compact
     
+    facet_txs = facet_txs.sort_by(&:eth_call_index).each_with_object([[], 0]) do |tx, (selected, total_gas)|
+      if total_gas + tx.gas_limit <= FacetBlock::GAS_LIMIT
+        selected << tx
+        total_gas += tx.gas_limit
+      end
+    end.first
+    
     facet_txs.group_by(&:eth_transaction).each do |eth_tx, grouped_facet_txs|
       in_tx_count = grouped_facet_txs.count
       
@@ -152,6 +165,8 @@ class FacetTransaction < ApplicationRecord
     tx.gas_limit = gas_limit.to_i
     tx.input = data
     
+    return unless tx.within_gas_limit?
+    
     tx.eth_transaction = eth_tx
     tx.eth_transaction_hash = eth_call.transaction_hash
     tx.eth_call_index = eth_call.call_index
@@ -209,6 +224,7 @@ class FacetTransaction < ApplicationRecord
   end
   
   def to_facet_payload
+    # TODO: If greater than base fee set to base fee. (not if 0)
     calculated_max_fee_per_gas = max_fee_per_gas > 0 ? max_fee_per_gas : facet_block.calculated_base_fee_per_gas
     
     tx_data = []

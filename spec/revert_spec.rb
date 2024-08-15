@@ -117,6 +117,21 @@ RSpec.describe "Reverts" do
     )
   end
   
+  it 'hits the block gas limit' do
+    limit = FacetBlock::GAS_LIMIT
+    over_limit = limit + 1
+    
+    call_contract_function(
+      contract: 'contracts/Counter',
+      address: counter_address,
+      from: from_address,
+      function: 'runOutOfGas',
+      args: [],
+      expect_blank: true,
+      gas_limit: over_limit
+    )
+  end
+  
   it 'is underpriced' do
     call_contract_function(
       contract: 'contracts/Counter',

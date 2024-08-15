@@ -123,7 +123,8 @@ module TransactionHelper
     value: 0,
     gas_limit: 10_000_000,
     max_fee_per_gas: 10.gwei,
-    expect_failure: false
+    expect_failure: false,
+    expect_blank: false
   )
     data = TransactionHelper.get_function_calldata(contract: contract, function: function, args: args)
     
@@ -134,7 +135,8 @@ module TransactionHelper
       value: value,
       gas_limit: gas_limit,
       max_fee_per_gas: max_fee_per_gas,
-      expect_failure: expect_failure
+      expect_failure: expect_failure,
+      expect_blank: expect_blank
     )
   end
   

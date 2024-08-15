@@ -130,7 +130,7 @@ module GethDriver
     }])
   end
   
-  def propose_block(transactions, new_facet_block, earliest, head_block, safe_block, finalized_block, reorg: false)
+  def propose_block(transactions, new_facet_block, head_block, safe_block, finalized_block, reorg: false)
     head_block_hash = head_block.block_hash
     safe_block_hash = safe_block.block_hash
     finalized_block_hash = finalized_block.block_hash
@@ -205,7 +205,7 @@ module GethDriver
       finalizedBlockHash: new_finalized_block.block_hash
     }
     
-    fork_choice_response = client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, nil])
+    fork_choice_response = client.call("engine_forkchoiceUpdatedV#{version}", [fork_choice_state, nil])
 
     status = fork_choice_response['payloadStatus']['status']
     unless status == 'VALID'

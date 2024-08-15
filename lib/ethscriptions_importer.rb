@@ -191,7 +191,6 @@ module EthscriptionsImporter
           block_ethscriptions,
           block_legacy_tx_receipts,
           block_number: block_number,
-          earliest: earliest,
           head_block: head_block,
           safe_block: safe_block,
           finalized_block: finalized_block
@@ -486,7 +485,7 @@ module EthscriptionsImporter
     results.sort_by { |idx, _| idx }.map { |_, facet_tx| facet_tx }
   end
   
-  def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, earliest:, head_block:, safe_block:, finalized_block:)
+  def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, head_block:, safe_block:, finalized_block:)
     facet_block = FacetBlock.from_eth_block(eth_block, block_number)
     
     facet_txs = facet_txs_from_ethscriptions_in_block(
@@ -504,7 +503,6 @@ module EthscriptionsImporter
     response = geth_driver.propose_block(
       payload,
       facet_block,
-      earliest,
       head_block,
       safe_block,
       finalized_block

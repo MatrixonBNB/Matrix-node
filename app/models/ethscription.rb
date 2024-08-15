@@ -400,7 +400,7 @@ class Ethscription < ApplicationRecord
         
         return new_value if new_value
         
-        raise "Withdrawal ID not found: #{legacy_to}"
+        raise "Legacy to address not found: #{legacy_to}"
       end
       
       BlockImportBatchContext.imported_facet_transaction_receipts&.each do |receipt|
@@ -635,10 +635,6 @@ class Ethscription < ApplicationRecord
   delegate :normalize_arg_value, to: :class
   delegate :real_withdrawal_id, to: :class
   
-  def self.t
-    no_ar_logging; EthBlock.delete_all; reload!; 50.times{EthBlockImporter.import_next_block;}
-  end
-  
   class << self
     def predeploy_to_local_map
       legacy_dir = Rails.root.join("lib/solidity/legacy")
@@ -659,6 +655,8 @@ class Ethscription < ApplicationRecord
     
           # Compile the contract and add to the map using init_code_hash
           contract = EVMHelpers.compile_contract("legacy/#{filename}")
+          
+          # TODO: Restrict to those being upgraded to
           map["0x" + contract.parent.init_code_hash.last(40)] = filename
         end
       end 

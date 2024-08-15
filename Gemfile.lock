@@ -1,5 +1,5 @@
 GIT
-  remote: https://github.com/RogerPodacter/eth.rb.git
+  remote: https://github.com/0xFacet/eth.rb.git
   revision: 941608ad644a7dbdaba7279821725246ea16a17e
   specs:
     eth (0.5.13)
@@ -407,7 +407,6 @@ DEPENDENCIES
   jbuilder
   jwt (~> 2.8)
   memery (~> 1.5)
-  net-http-persistent (~> 4.0)
   net-pop!
   order_query (~> 0.5.3)
   parallel (~> 1.25)
