@@ -158,7 +158,7 @@ module GethDriver
       version = 2
     end
     
-    fork_choice_response = client.call("engine_forkchoiceUpdatedV#{version}", [fork_choice_state, payload_attributes])
+    fork_choice_response = Benchmark.msr("engine_forkchoiceUpdatedV#{version}") { client.call("engine_forkchoiceUpdatedV#{version}", [fork_choice_state, payload_attributes]) }
     raise "Fork choice update failed: #{fork_choice_response['error']}" if fork_choice_response['error']
     
     payload_id = fork_choice_response['payloadId']
@@ -167,7 +167,7 @@ module GethDriver
       raise "Fork choice update did not return a payload ID"
     end
 
-    get_payload_response = client.call("engine_getPayloadV#{version}", [payload_id])
+    get_payload_response = Benchmark.msr("engine_getPayloadV#{version}") { client.call("engine_getPayloadV#{version}", [payload_id]) }
     raise "Get payload failed: #{get_payload_response['error']}" if get_payload_response['error']
 
     payload = get_payload_response['executionPayload']
@@ -185,7 +185,7 @@ module GethDriver
       new_payload_request << new_facet_block.parent_beacon_block_root
     end
     
-    new_payload_response = client.call("engine_newPayloadV#{version}", new_payload_request)
+    new_payload_response = Benchmark.msr("engine_newPayloadV#{version}") { client.call("engine_newPayloadV#{version}", new_payload_request) }
     
     status = new_payload_response['status']
     unless status == 'VALID'
@@ -205,7 +205,7 @@ module GethDriver
       finalizedBlockHash: new_finalized_block.block_hash
     }
     
-    fork_choice_response = client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, nil])
+    fork_choice_response = Benchmark.msr("engine_forkchoiceUpdatedV3") { client.call("engine_forkchoiceUpdatedV3", [fork_choice_state, nil]) }
 
     status = fork_choice_response['payloadStatus']['status']
     unless status == 'VALID'
