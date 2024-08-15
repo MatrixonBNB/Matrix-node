@@ -107,3 +107,5 @@ gem "rack-cors", "~> 2.0"
 gem "diffy", "~> 3.4"
 
 gem "parallel", "~> 1.25"
+
+gem "net-http-persistent", "~> 4.0"

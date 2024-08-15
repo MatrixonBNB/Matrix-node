@@ -193,6 +193,8 @@ GEM
     multi_xml (0.7.1)
       bigdecimal (~> 3.1)
     mutex_m (0.2.0)
+    net-http-persistent (4.0.2)
+      connection_pool (~> 2.2)
     net-imap (0.4.14)
       date
       net-protocol
@@ -405,6 +407,7 @@ DEPENDENCIES
   jbuilder
   jwt (~> 2.8)
   memery (~> 1.5)
+  net-http-persistent (~> 4.0)
   net-pop!
   order_query (~> 0.5.3)
   parallel (~> 1.25)
