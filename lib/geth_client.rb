@@ -28,7 +28,7 @@ class GethClient
     request['Authorization'] = "Bearer #{jwt}"
     request.body = payload.to_json
 
-    response = Benchmark.msr("Calling: #{payload[:method]}") { @http.request(uri, request) }
+    response = @http.request(uri, request)
 
     unless response.code.to_i == 200
       raise ClientError, response
