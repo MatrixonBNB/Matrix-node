@@ -11,8 +11,8 @@ module GethDriver
     EthBlock.all.each(&:destroy)
     FacetBlock.all.each(&:destroy)
     
-    # Ethscription.write_alloc_to_genesis
-    SolidityCompiler.compile_all_legacy_files
+    Ethscription.write_genesis_json
+    # SolidityCompiler.compile_all_legacy_files
     
     teardown_rspec_geth
     

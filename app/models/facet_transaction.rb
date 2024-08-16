@@ -25,12 +25,10 @@ class FacetTransaction < ApplicationRecord
     gas_limit <= PER_TX_GAS_LIMIT
   end
   
-  def self.current_chain_id
+  def self.current_chain_id(network = ENV.fetch('ETHEREUM_NETWORK'))
     if ENV['CUSTOM_CHAIN_ID']
       return ENV['CUSTOM_CHAIN_ID'].to_i
     end
-    
-    network = ENV.fetch('ETHEREUM_NETWORK')
     
     return 0xface7 if network == "eth-mainnet"
     return 0xface7a if network == "eth-sepolia"

@@ -261,6 +261,10 @@ module TransactionHelper
       'accessList' => []
     }
 
+    cancun_time = Ethscription.cancun_timestamp
+    timestamp = block_timestamp || (last_block.timestamp + 12)
+    in_cancun = timestamp >= cancun_time
+    
     block_by_number_response = {
       'result' => {
         'number' => (last_block.number + 1).to_s(16),
@@ -269,12 +273,12 @@ module TransactionHelper
         'transactions' => [eth_transaction],
         'baseFeePerGas' => '0x' + eth_base_fee.to_s(16),
         'gasUsed' => '0xf4240',
-        'timestamp' => (block_timestamp || last_block.timestamp + 12).to_s(16),
+        'timestamp' => timestamp.to_s(16),
         'excessBlobGas' => "0x0",
         'blobGasUsed' => "0x0",
         'difficulty' => "0x0",
         'gasLimit' => "0x0",
-        'parentBeaconBlockRoot' => "0x" + SecureRandom.hex(32),
+        'parentBeaconBlockRoot' => in_cancun ? "0x" + SecureRandom.hex(32) : nil,
         'size' => "0x0",
         'logsBloom' => "0x0",
         'receiptsRoot' => "0x" + SecureRandom.hex(32),

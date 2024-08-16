@@ -652,12 +652,14 @@ class Ethscription < ApplicationRecord
           end
           
           map[address] = filename
-    
-          # Compile the contract and add to the map using init_code_hash
-          contract = EVMHelpers.compile_contract("legacy/#{filename}")
           
-          # TODO: Restrict to those being upgraded to
-          map["0x" + contract.parent.init_code_hash.last(40)] = filename
+          deployed_by_contract_prefixes = %w(ERC20Bridge FacetBuddy FacetSwapPair)
+          
+          if deployed_by_contract_prefixes.any? { |prefix| filename.match(/^#{prefix}V[a-f0-9]{3}$/i) }
+            contract = EVMHelpers.compile_contract("legacy/#{filename}")
+          
+            map["0x" + contract.parent.init_code_hash.last(40)] = filename
+          end
         end
       end 
       
@@ -702,7 +704,62 @@ class Ethscription < ApplicationRecord
     end.to_h
   end
   
-  def self.write_alloc_to_genesis
+  def self.generate_full_genesis_json(network = ENV.fetch('ETHEREUM_NETWORK'))
+    unless ["eth-mainnet", "eth-sepolia"].include?(network)
+      raise "Invalid network: #{network}"
+    end
+    
+    config = {
+      chainId: FacetTransaction.current_chain_id(network),
+      homesteadBlock: 0,
+      eip150Block: 0,
+      eip155Block: 0,
+      eip158Block: 0,
+      byzantiumBlock: 0,
+      constantinopleBlock: 0,
+      petersburgBlock: 0,
+      istanbulBlock: 0,
+      muirGlacierBlock: 0,
+      berlinBlock: 0,
+      londonBlock: 0,
+      mergeForkBlock: 0,
+      mergeNetsplitBlock: 0,
+      shanghaiTime: 0,
+      cancunTime: cancun_timestamp(network),
+      terminalTotalDifficulty: 0,
+      terminalTotalDifficultyPassed: true,
+      bedrockBlock: 0,
+      regolithTime: 0,
+      canyonTime: 0,
+      ecotoneTime: 0,
+      optimism: {
+        eip1559Elasticity: 2,
+        eip1559Denominator: 8,
+        eip1559DenominatorCanyon: 8
+      }
+    }
+    
+    timestamp = network == "eth-mainnet" ? 1633267481 : 1706742588
+    mix_hash = network == "eth-mainnet" ?
+      "0xf9202de594a3697695c54a4ee8a392f686ca1fc26337eb821e4ca6deb71b2dd7" :
+      "0xc4b4bbd867f5566c344e8ba74372ca493c91c00bb3e10f85a45bd9e89344a977"
+    
+    {
+      config: config,
+      timestamp: "0x#{timestamp.to_s(16)}",
+      extraData: "Think outside the block".ljust(32).bytes_to_hex,
+      gasLimit: "0x#{300e6.to_i.to_s(16)}",
+      difficulty: "0x0",
+      mixHash: mix_hash,
+      alloc: generate_alloc_for_genesis
+    }
+  end
+  
+  def self.cancun_timestamp(network = ENV.fetch('ETHEREUM_NETWORK'))
+    network == "eth-mainnet" ? 1710338135 : 1706655072
+  end
+  
+  def self.write_genesis_json
     Rails.cache.clear
     MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
@@ -712,12 +769,22 @@ class Ethscription < ApplicationRecord
     genesis_path = File.join(geth_dir, 'facet-chain', 'genesis3.json')
 
     # Read the existing genesis.json file
-    genesis_data = JSON.parse(File.read(genesis_path))
-
-    # Overwrite the "alloc" key with the new allocation
-    genesis_data['alloc'] = generate_alloc_for_genesis
+    genesis_data = generate_full_genesis_json
 
     # Write the updated data back to the genesis.json file
     File.write(genesis_path, JSON.pretty_generate(genesis_data))
+    
+    ["eth-mainnet", "eth-sepolia"].each do |network|
+      filename = network == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+      genesis_path = File.join(geth_dir, 'facet-chain', filename)
+
+      # Generate the genesis data for the specific network
+      genesis_data = generate_full_genesis_json(network)
+
+      # Write the data to the appropriate file
+      File.write(genesis_path, JSON.pretty_generate(genesis_data))
+      
+      puts "Generated #{filename}"
+    end
   end
 end
