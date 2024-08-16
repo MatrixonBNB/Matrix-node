@@ -5,7 +5,6 @@ import "solady/src/utils/SafeTransferLib.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/Base64.sol";
 import "solady/src/utils/LibString.sol";
-import "solady/src/utils/EIP712.sol";
 import "solady/src/utils/ECDSA.sol";
 import "./Upgradeable.sol";
 import "./Pausable.sol";
@@ -13,8 +12,9 @@ import "./FacetERC20.sol";
 import "./FacetERC721.sol";
 import "./FacetOwnable.sol";
 import "../contracts/Console.sol";
+import "./FacetEIP712.sol";
 
-contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnable, Pausable, EIP712 {
+contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnable, Pausable, FacetEIP712 {
     using LibString for *;
     using SafeTransferLib for address;
     using ECDSA for bytes32;
@@ -427,7 +427,7 @@ contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnab
         emit StickerCreated(currentId, name, description, imageURI, stickerExpiry, grantingAddress);
     }
     
-    function claimSticker(uint256 stickerId, uint256 deadline, uint256 tokenId, uint256[2] memory position, bytes calldata signature) public whenNotPaused {
+    function claimSticker(uint256 stickerId, uint256 deadline, uint256 tokenId, uint256[2] memory position, bytes memory signature) public whenNotPaused {
         User storage user = s().users[msg.sender];
         require(!user.stickerIdsAwardedMap[stickerId], "Sticker already awarded");
         require(user.stickerAry.length < s().maxStickersPerUser, "Too many stickers");
@@ -437,19 +437,15 @@ contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnab
             "Sticker expired"
         );
 
-        bytes32 hashedMessage = _hashTypedData(keccak256(abi.encode(
+        bytes memory message = abi.encode(
             keccak256("StickerClaim(uint256 stickerId,address claimer,uint256 deadline)"),
             stickerId,
             msg.sender,
             deadline
-        )));
-        
-        address signer = hashedMessage.recoverCalldata(signature);
-        require(
-            signer == s().stickers[stickerId].signer,
-            "Invalid signature"
         );
-
+        
+        verifySignatureAgainstNewAndOldChainId(message, signature, s().stickers[stickerId].signer);
+        
         user.stickerIdsAwardedMap[stickerId] = true;
         user.stickerAry.push(stickerId);
 
@@ -525,10 +521,6 @@ contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnab
     {
         name = _FacetERC721Storage().name;
         version = "1";
-    }
-    
-    function _domainNameAndVersionMayChange() internal pure override returns (bool result) {
-        return true;
     }
     
     function preregistrationComplete() external view returns (bool) {

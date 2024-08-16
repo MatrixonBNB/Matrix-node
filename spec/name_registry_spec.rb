@@ -422,7 +422,7 @@ RSpec.describe "Name Registry" do
     
     deadline = Time.current.to_i + 1000
     
-    chainid = 1# FacetTransaction.current_chain_id
+    chainid = 1
     
     data = {
       types: types,
@@ -443,7 +443,7 @@ RSpec.describe "Name Registry" do
     hashed_data = Eth::Eip712.hash(data)
 
     signature = key.sign(hashed_data)
-    next    
+    
     trigger_contract_interaction_and_expect_success(
       from: user_address,
       payload: {

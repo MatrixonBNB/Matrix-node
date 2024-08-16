@@ -16,7 +16,7 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       t.integer :size#, null: false
       t.string :state_root, null: false
       t.bigint :timestamp, null: false
-      t.string :transactions_root, null: false
+      t.string :transactions_root#, null: false
       t.string :prev_randao, null: false
       
       t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"

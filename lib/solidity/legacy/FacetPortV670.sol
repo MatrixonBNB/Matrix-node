@@ -7,12 +7,12 @@ import "./Pausable.sol";
 import "./FacetERC721.sol";
 import "./FacetERC20.sol";
 import "./FacetERC2981.sol";
+import "./FacetEIP712.sol";
 import "solady/src/utils/Initializable.sol";
-import "solady/src/utils/EIP712.sol";
 import "solady/src/utils/ECDSA.sol";
 import "solady/src/utils/SafeTransferLib.sol";
 
-contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, EIP712 {
+contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, FacetEIP712 {
     using SafeTransferLib for address;
     using ECDSA for bytes32;
     
@@ -127,7 +127,7 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, EI
         uint256 endTime,
         bytes memory signature
     ) internal whenNotPaused returns (bool) {
-        bytes32 hashedMessage = keccak256(abi.encode(
+        bytes memory message = abi.encode(
             keccak256("Offer(string offerType,bytes16 offerId,address offerer,address assetContract,uint256 assetId,string assetType,uint256 assetAmount,address considerationToken,uint256 considerationAmount,uint256 startTime,uint256 endTime)"),
             keccak256(bytes(offerType)),
             offerId,
@@ -140,11 +140,10 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, EI
             considerationAmount,
             startTime,
             endTime
-        ));
+        );
 
-        bytes32 typedDataHash = _hashTypedData(hashedMessage);
-        address signer = typedDataHash.recover(signature);
-        require(signer == offerer, "Invalid signature");
+        verifySignatureAgainstNewAndOldChainId(message, signature, offerer);
+        
         require(!s().userOfferCancellations[offerer][offerId], "Offer cancelled");
         require(keccak256(bytes(offerType)) == keccak256(bytes("Listing")) || keccak256(bytes(offerType)) == keccak256(bytes("Bid")), "Invalid offer type");
         require(keccak256(bytes(assetType)) == keccak256(bytes("ERC721")) && assetAmount == 1, "Only ERC721 assets are supported");
@@ -263,9 +262,5 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, EI
     {
         name = "FacetPort";
         version = "1";
-    }
-    
-    function _domainNameAndVersionMayChange() internal pure override returns (bool result) {
-        return true;
     }
 }
