@@ -376,6 +376,11 @@ class Ethscription < ApplicationRecord
     end
     
     shim_val
+  rescue => e
+    binding.irb
+    puts JSON.pretty_generate(self.as_json)
+    puts JSON.pretty_generate(parsed_content.as_json)
+    raise
   end
   
   class << self
