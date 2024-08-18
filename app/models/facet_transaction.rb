@@ -222,8 +222,9 @@ class FacetTransaction < ApplicationRecord
   end
   
   def to_facet_payload
-    # TODO: If greater than base fee set to base fee. (not if 0)
-    calculated_max_fee_per_gas = max_fee_per_gas > 0 ? max_fee_per_gas : facet_block.calculated_base_fee_per_gas
+    if max_fee_per_gas == 0 || max_fee_per_gas > facet_block.calculated_base_fee_per_gas
+      max_fee_per_gas = facet_block.calculated_base_fee_per_gas
+    end
     
     tx_data = []
     tx_data.push Eth::Util.hex_to_bin source_hash
