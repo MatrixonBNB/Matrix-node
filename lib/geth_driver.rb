@@ -19,7 +19,7 @@ module GethDriver
     @temp_datadir = Dir.mktmpdir('geth_datadir_', '/tmp')
     log_file_location = "#{@temp_datadir}/geth.log"
     
-    system("cd #{geth_dir} && make geth && ./build/bin/geth init --datadir #{@temp_datadir} facet-chain/genesis3.json")
+    system("cd #{geth_dir} && make geth && ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir #{@temp_datadir} facet-chain/genesis3.json")
     
     geth_command = [
       "#{geth_dir}/build/bin/geth",
@@ -42,9 +42,9 @@ module GethDriver
       "--history.state", "0",
       "--history.transactions", "0",
       "--nocompaction",
-      "--rollup.disabletxpoolgossip=true",
+      "--rollup.disabletxpoolgossip",
       "--cache", "12000",
-      "--cache.preimages=true",
+      "--cache.preimages",
     ]
     
     FileUtils.rm(log_file_location) if File.exist?(log_file_location)
@@ -92,7 +92,32 @@ module GethDriver
     discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
     
     puts %{
-      make geth && \\rm -rf ./datadir && ./build/bin/geth init --datadir ./datadir facet-chain/genesis3.json && ./build/bin/geth --datadir ./datadir --http --http.api 'eth,net,web3,debug' --http.vhosts="*" --authrpc.jwtsecret /tmp/jwtsecret --http.port #{http_port} --authrpc.port #{authrpc_port} --discovery.port #{discovery_port} --port #{discovery_port} --authrpc.addr localhost --authrpc.vhosts="*" --nodiscover --cache 64000 --cache.preimages=true --maxpeers 0 --verbosity 2 --syncmode full --gcmode archive --history.state 0 --history.transactions 0 --nocompaction --rollup.disabletxpoolgossip=true console
+      make geth && \\
+      rm -rf ./datadir && \\
+      ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/genesis3.json && \\
+      ./build/bin/geth --datadir ./datadir \\
+      --http \\
+      --http.api 'eth,net,web3,debug' \\
+      --http.vhosts="*" \\
+      --authrpc.jwtsecret /tmp/jwtsecret \\
+      --http.port #{http_port} \\
+      --authrpc.port #{authrpc_port} \\
+      --discovery.port #{discovery_port} \\
+      --port #{discovery_port} \\
+      --authrpc.addr localhost \\
+      --authrpc.vhosts="*" \\
+      --nodiscover \\
+      --cache 64000 \\
+      --cache.preimages \\
+      --maxpeers 0 \\
+      --verbosity 2 \\
+      --syncmode full \\
+      --gcmode archive \\
+      --history.state 0 \\
+      --history.transactions 0 \\
+      --nocompaction \\
+      --rollup.disabletxpoolgossip \\
+      console
     }.strip
   end
   

@@ -698,12 +698,23 @@ class Ethscription < ApplicationRecord
   end
   
   def self.generate_alloc_for_genesis
+    initializable_slot = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132"
+    
+    max_uint64 = 2 ** 64 - 1
+
+    result = max_uint64 << 1
+
+    hex_result = result.zpad(32).bytes_to_hex
+    
     predeploy_to_local_map.map do |address, alloc|
       [
         address,
         {
           "code" => "0x" + get_code(address),
-          "balance" => 0
+          "balance" => 0,
+          "storage" => {
+            initializable_slot => hex_result
+          }
         }
       ]
     end.to_h

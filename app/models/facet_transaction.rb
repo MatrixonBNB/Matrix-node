@@ -232,7 +232,7 @@ class FacetTransaction < ApplicationRecord
     tx_data.push Eth::Util.hex_to_bin to_address.to_s
     tx_data.push Eth::Util.serialize_int_to_big_endian mint
     tx_data.push Eth::Util.serialize_int_to_big_endian value
-    tx_data.push Eth::Util.serialize_int_to_big_endian(calculated_max_fee_per_gas)
+    tx_data.push Eth::Util.serialize_int_to_big_endian max_fee_per_gas
     tx_data.push Eth::Util.serialize_int_to_big_endian gas_limit
     tx_data.push ''
     tx_data.push Eth::Util.hex_to_bin input
