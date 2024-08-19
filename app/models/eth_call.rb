@@ -27,7 +27,7 @@ class EthCall < ApplicationRecord
 
     traces = []
     # Check if the current call is relevant
-    if result['to'] == FacetTransaction::FACET_INBOX_ADDRESS && result['error'].nil?
+    if (result['to'] == FacetTransaction::FACET_INBOX_ADDRESS && result['error'].nil?) || parent_traced_call.nil?
       traced_call = EthCall.new(
         block_hash: eth_block.block_hash,
         block_number: eth_block.number,
