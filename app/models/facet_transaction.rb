@@ -57,9 +57,14 @@ class FacetTransaction < ApplicationRecord
       call_index: idx
     )
     
+    payload = [
+      ethscription.block_hash.hex_to_bytes,
+      ethscription.transaction_hash.hex_to_bytes,
+      0.zpad(32)
+    ].join
+    
     tx.source_hash = FacetTransaction.compute_source_hash(
-      ethscription.block_hash,
-      tx.eth_call.call_index,
+      payload,
       USER_DEPOSIT_SOURCE_DOMAIN
     )
     
@@ -106,9 +111,10 @@ class FacetTransaction < ApplicationRecord
     facet_txs.group_by(&:eth_transaction).each do |eth_tx, grouped_facet_txs|
       in_tx_count = grouped_facet_txs.count
       
-      outer_call = eth_calls.select do |c|
-        c.transaction_hash == eth_tx.tx_hash
-      end.sort_by(&:call_index).first
+      outer_call = eth_calls.detect do |c|
+        c.transaction_hash == eth_tx.tx_hash &&
+        c.order_in_tx == 0
+      end
       
       gas_used = outer_call.gas_used
       base_fee = eth_block.base_fee_per_gas
@@ -171,10 +177,15 @@ class FacetTransaction < ApplicationRecord
     tx.from_address = eth_call.from_address
     tx.eth_call = eth_call
     
+    payload = [
+      eth_tx.block_hash.hex_to_bytes,
+      eth_call.transaction_hash.hex_to_bytes,
+      eth_call.order_in_tx.zpad(32)
+    ].join
+    
     tx.source_hash = FacetTransaction.compute_source_hash(
-      eth_tx.block_hash,
-      eth_call.call_index,
-      USER_DEPOSIT_SOURCE_DOMAIN
+      payload,
+      USER_DEPOSIT_SOURCE_DOMAIN,
     )
     
     tx
@@ -202,22 +213,23 @@ class FacetTransaction < ApplicationRecord
     
     tx.facet_block = facet_block
     
+    payload = [
+      eth_block.block_hash.hex_to_bytes,
+      0.zpad(32)
+    ].join
+    
     tx.source_hash = FacetTransaction.compute_source_hash(
-      eth_block.block_hash,
-      0,
+      payload,
       L1_INFO_DEPOSIT_SOURCE_DOMAIN
     )
     
     tx
   end
   
-  def self.compute_source_hash(block_hash, index, source_domain)
+  def self.compute_source_hash(payload, source_domain)
     Eth::Util.keccak256(
       Eth::Util.zpad_int(source_domain, 32) +
-      Eth::Util.keccak256(
-        block_hash.hex_to_bytes +
-        Eth::Util.zpad_int(index, 32)
-      )
+      Eth::Util.keccak256(payload)
     ).bytes_to_hex
   end
   

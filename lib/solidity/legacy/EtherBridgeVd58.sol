@@ -102,4 +102,28 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
     function generateWithdrawalId() internal returns (bytes32) {
         return keccak256(abi.encode(address(this), msg.sender, s().withdrawalIdNonce++));
     }
+    
+    function getTrustedSmartContract() public view returns (address) {
+        return s().trustedSmartContract;
+    }
+
+    function getWithdrawalIdAmount(bytes32 withdrawalId) public view returns (uint256) {
+        return s().withdrawalIdAmount[withdrawalId];
+    }
+
+    function getUserWithdrawalId(address user) public view returns (bytes32) {
+        return s().userWithdrawalId[user];
+    }
+
+    function getWithdrawalIdNonce() public view returns (uint256) {
+        return s().withdrawalIdNonce;
+    }
+
+    function getBridgeAndCallHelper() public view returns (address) {
+        return s()._bridgeAndCallHelper;
+    }
+
+    function getFacetBuddyFactory() public view returns (address) {
+        return s().facetBuddyFactory;
+    }
 }

@@ -826,6 +826,22 @@ CREATE TRIGGER trigger_check_facet_block_order BEFORE INSERT ON public.facet_blo
 
 
 --
+-- Name: ethscriptions fk_rails_104cee2b3d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ethscriptions
+    ADD CONSTRAINT fk_rails_104cee2b3d FOREIGN KEY (block_number) REFERENCES public.eth_blocks(number) ON DELETE CASCADE;
+
+
+--
+-- Name: ethscriptions fk_rails_2accd8a448; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ethscriptions
+    ADD CONSTRAINT fk_rails_2accd8a448 FOREIGN KEY (transaction_hash) REFERENCES public.eth_transactions(tx_hash) ON DELETE CASCADE;
+
+
+--
 -- Name: eth_calls fk_rails_2bd24c7340; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
