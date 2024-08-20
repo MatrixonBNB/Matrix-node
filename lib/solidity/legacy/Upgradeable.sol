@@ -2,13 +2,8 @@
 pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
-import "solady/src/utils/LibString.sol";
-import "../contracts/Console.sol";
 
 abstract contract Upgradeable {
-    using LibString for *;
-    
-    uint256 public immutable __myAddress = uint256(uint160(address(this)));
     
     struct UpgradeStorage {
         address upgradeAdmin;
@@ -39,13 +34,26 @@ abstract contract Upgradeable {
     function _authorizeUpgrade(address) internal view {
         require(msg.sender == _upgradeStorage().upgradeAdmin, "NOT_AUTHORIZED TO UPGRADE");
     }
+    
+    function upgradeToAndCall(address newImplementation, bytes calldata migrationCalldata) external {
+        _authorizeUpgrade(newImplementation);
+        ERC1967Utils.upgradeToAndCall(newImplementation, migrationCalldata);
+        emit ContractUpgraded(newImplementation);
+    }
+    
+    function upgradeTo(address newImplementation) external {
+        _authorizeUpgrade(newImplementation);
+        ERC1967Utils.upgradeToAndCall(newImplementation, bytes(''));
+        emit ContractUpgraded(newImplementation);
+    }
+    
+    function getImplementation() external view returns (address) {
+        return ERC1967Utils.getImplementation();
+    }
 
     function upgradeAndCall(bytes32 newHash, string calldata newSource, bytes calldata migrationCalldata) external {
         address newImplementation = address(uint160(uint256(newHash)));
         _authorizeUpgrade(newImplementation);
-        
-        console.log("__myAddress: ".concat(__myAddress.toHexString()));
-        console.log("address(this): ".concat(address(this).toHexString()));
         
         ERC1967Utils.upgradeToAndCall(newImplementation, migrationCalldata);
         emit ContractUpgraded(newImplementation);

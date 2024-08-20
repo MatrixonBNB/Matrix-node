@@ -386,9 +386,9 @@ class Ethscription < ApplicationRecord
   class << self
     def get_implementation(to_address)
       TransactionHelper.static_call(
-        contract: 'legacy/ERC1967Proxy',
+        contract: 'legacy/Upgradeable',
         address: to_address,
-        function: '__getImplementation',
+        function: 'getImplementation',
         args: []
       ).freeze
     end
