@@ -145,9 +145,10 @@ class FacetTransaction < ApplicationRecord
     bin = Eth::Util.hex_to_bin hex[2..]
     tx = Eth::Rlp.decode bin
 
-    unless tx.size == 6
-      raise Eth::Tx::ParameterError, "Transaction missing fields!"
-    end
+    # So people can add "extra data" to burn more gas
+    # unless tx.size == 6
+    #   raise Eth::Tx::ParameterError, "Transaction missing fields!"
+    # end
 
     chain_id = Eth::Util.deserialize_big_endian_to_int tx[0]
     
