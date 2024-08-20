@@ -4,12 +4,9 @@ pragma solidity 0.8.24;
 import "./FacetERC20.sol";
 import "./Upgradeable.sol";
 import "./FacetSwapFactoryVac5.sol";
+import "./IFacetSwapV1Callee.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
-
-interface FacetSwapV1Callee {
-    function facetSwapV1Call(address sender, uint256 amount0Out, uint256 amount1Out, bytes calldata data) external;
-}
 
 contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
     using LibString for *;
