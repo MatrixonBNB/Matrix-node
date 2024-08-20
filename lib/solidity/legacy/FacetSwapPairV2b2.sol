@@ -6,7 +6,6 @@ import "./Upgradeable.sol";
 import "./FacetSwapFactoryVe7f.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
-import "../contracts/Console.sol";
 
 interface FacetSwapV1Callee {
     function facetSwapV1Call(address sender, uint256 amount0Out, uint256 amount1Out, bytes calldata data) external;

@@ -11,7 +11,6 @@ import "./Pausable.sol";
 import "./FacetERC20.sol";
 import "./FacetERC721.sol";
 import "./FacetOwnable.sol";
-import "../contracts/Console.sol";
 import "./FacetEIP712.sol";
 
 contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnable, Pausable, FacetEIP712 {

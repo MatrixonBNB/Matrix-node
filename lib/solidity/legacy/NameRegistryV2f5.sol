@@ -11,7 +11,6 @@ import "./Pausable.sol";
 import "./FacetERC20.sol";
 import "./FacetERC721.sol";
 import "./FacetOwnable.sol";
-import "../contracts/Console.sol";
 import "./FacetERC2981.sol";
 import "./FacetEIP712.sol";
 
