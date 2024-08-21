@@ -250,9 +250,8 @@ module EthscriptionsImporter
     if e.message.include?("New block number must be equal to max block number + 1")
       logger.error "Error importing blocks: #{e.message}"
       incorrect_block_number = e.message.match(/new number = (\d+)/)[1].to_i
-      parent_block_number = incorrect_block_number - import_batch_size - 1
       
-      EthBlock.where("number >= ?", parent_block_number).destroy_all
+      EthBlock.where("number >= ?", incorrect_block_number).destroy_all
     else
       raise
     end
