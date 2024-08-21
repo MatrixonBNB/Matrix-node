@@ -2,10 +2,11 @@
 pragma solidity 0.8.24;
 
 import "./FacetERC20.sol";
+import "./PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
 import "solady/src/utils/Initializable.sol";
 
-contract ERC20BatchTransferV4c9 is Initializable {
+contract ERC20BatchTransferV4c9 is Initializable, PublicImplementationAddress {
     using LibString for uint256;
 
     event BatchTransfer(address indexed tokenAddress, address[] recipients, uint256[] amounts);

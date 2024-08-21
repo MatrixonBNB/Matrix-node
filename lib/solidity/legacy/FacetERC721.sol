@@ -3,8 +3,9 @@ pragma solidity 0.8.24;
 
 import "solady/src/tokens/ERC721.sol";
 import "./FacetBuddyLib.sol";
+import "./PublicImplementationAddress.sol";
 
-abstract contract FacetERC721 is ERC721 {
+abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
     using FacetBuddyLib for address;
     struct FacetERC721Storage {
         string name;

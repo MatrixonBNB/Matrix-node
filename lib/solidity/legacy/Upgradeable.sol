@@ -2,9 +2,9 @@
 pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import "./PublicImplementationAddress.sol";
 
-abstract contract Upgradeable {
-    
+abstract contract Upgradeable is PublicImplementationAddress {
     struct UpgradeStorage {
         address upgradeAdmin;
     }
@@ -45,10 +45,6 @@ abstract contract Upgradeable {
         _authorizeUpgrade(newImplementation);
         ERC1967Utils.upgradeToAndCall(newImplementation, bytes(''));
         emit ContractUpgraded(newImplementation);
-    }
-    
-    function getImplementation() external view returns (address) {
-        return ERC1967Utils.getImplementation();
     }
 
     function upgradeAndCall(bytes32 newHash, string calldata newSource, bytes calldata migrationCalldata) external {
