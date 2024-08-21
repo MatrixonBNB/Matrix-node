@@ -9,14 +9,13 @@ class FacetTransactionReceipt < ApplicationRecord
   def set_legacy_contract_address_map
     unless legacy_receipt
       self.legacy_contract_address_map[calculate_legacy_contract_address] = contract_address
-      self.legacy_contract_address_map.compact!
+      self.legacy_contract_address_map.reject! { |k, v| k.nil? || v.nil? }
       
       self.legacy_contract_address_map.each do |legacy_address, new_address|
         LegacyValueMapping.find_or_create_by!(
           mapping_type: 'address',
           legacy_value: legacy_address,
-          new_value: new_address,
-          # created_by_eth_transaction_hash: self.transaction_hash
+          new_value: new_address
         )
       end
       
@@ -29,17 +28,16 @@ class FacetTransactionReceipt < ApplicationRecord
     update_legacy_contract_address_map('BridgeCreated', 'newBridge')
     update_legacy_contract_address_map('BuddyCreated', 'buddy')
   
-    self.legacy_contract_address_map.compact!
+    self.legacy_contract_address_map.reject! { |k, v| k.nil? || v.nil? }
     
-    puts JSON.pretty_generate(self.as_json)
-    puts JSON.pretty_generate(legacy_receipt.as_json)
+    # puts JSON.pretty_generate(self.as_json)
+    # puts JSON.pretty_generate(legacy_receipt.as_json)
     
     self.legacy_contract_address_map.each do |legacy_address, new_address|
       LegacyValueMapping.find_or_create_by!(
         mapping_type: 'address',
         legacy_value: legacy_address,
-        new_value: new_address,
-        # created_by_eth_transaction_hash: self.transaction_hash
+        new_value: new_address
       )
     end
   end
