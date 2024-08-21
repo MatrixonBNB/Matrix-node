@@ -755,7 +755,7 @@ class Ethscription < ApplicationRecord
       }
     }
     
-    timestamp = network == "eth-mainnet" ? 1633267481 : 1706742588
+    timestamp = network == "eth-mainnet" ? 1701353099 : 1706742588
     mix_hash = network == "eth-mainnet" ?
       "0xf9202de594a3697695c54a4ee8a392f686ca1fc26337eb821e4ca6deb71b2dd7" :
       "0xc4b4bbd867f5566c344e8ba74372ca493c91c00bb3e10f85a45bd9e89344a977"
