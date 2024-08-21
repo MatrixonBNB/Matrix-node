@@ -47,7 +47,7 @@ class EthCall < ApplicationRecord
       gas_used: result['gasUsed'].to_i(16),
       input: result['input'],
       output: result['output'],
-      value: result['value'],
+      value: result['value']&.to_i(16),
       call_type: result['type'],
       error: result['error'],
       revert_reason: result['revertReason'],
