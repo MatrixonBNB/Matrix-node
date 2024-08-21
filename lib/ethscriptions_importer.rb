@@ -246,6 +246,16 @@ module EthscriptionsImporter
     puts "Gas per second: #{gas_per_second_millions} million / s"
     
     block_numbers
+  rescue ActiveRecord::StatementInvalid => e
+    if e.message.include?("New block number must be equal to max block number + 1")
+      logger.error "Error importing blocks: #{e.message}"
+      incorrect_block_number = e.message.match(/new number = (\d+)/)[1].to_i
+      parent_block_number = incorrect_block_number - 1
+      
+      EthBlock.where("number >= ?", parent_block_number).destroy_all
+    else
+      raise
+    end
   rescue => e
     binding.irb
     raise
