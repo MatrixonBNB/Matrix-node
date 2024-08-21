@@ -31,6 +31,9 @@ class FacetTransactionReceipt < ApplicationRecord
   
     self.legacy_contract_address_map.compact!
     
+    puts JSON.pretty_generate(self.as_json)
+    puts JSON.pretty_generate(legacy_receipt.as_json)
+    
     self.legacy_contract_address_map.each do |legacy_address, new_address|
       LegacyValueMapping.find_or_create_by!(
         mapping_type: 'address',

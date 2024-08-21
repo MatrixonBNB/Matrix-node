@@ -17,10 +17,18 @@ class GethClient
       id: 1
     }
     
-    send_request(payload)
+    # Benchmark.msr("Call: #{command}") do
+      send_request(payload)
+    # end
   end
   alias :send_command :call
 
+  def get_l1_attributes(l2_block_number)
+    l2_block = call("eth_getBlockByNumber", ["0x#{l2_block_number.to_s(16)}", true])
+    l2_attributes_tx = l2_block['transactions'].first
+    L1AttributesTxCalldata.decode(l2_attributes_tx['input'])
+  end
+  
   def send_request(payload)
     uri = URI(@node_url)
     request = Net::HTTP::Post.new(uri)
