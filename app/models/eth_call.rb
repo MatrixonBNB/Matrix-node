@@ -37,7 +37,7 @@ class EthCall < ApplicationRecord
   
     traces = []
     
-    traced_call = EthCall.new(
+    traced_call = EthCallStruct.new(
       block_hash: eth_block.block_hash,
       block_number: eth_block.number,
       transaction_hash: trace['txHash'],
