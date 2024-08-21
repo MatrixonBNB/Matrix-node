@@ -87,6 +87,19 @@ class FacetTransaction < ApplicationRecord
     tx
   end
   
+  def self.calculate_calldata_cost(hex_string)
+    bytes = hex_string.hex_to_bytes
+    zero_count = bytes.count("\x00")
+    non_zero_count = bytes.size - zero_count
+    
+    zero_count * 4 + non_zero_count * 16
+  end
+  
+  def self.calculate_mint_amount(input_data, base_fee)
+    calldata_cost = calculate_calldata_cost(input_data)
+    calldata_cost * base_fee * 1024
+  end
+  
   def self.from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls, facet_block)
     facet_txs = eth_calls.map do |call|
       next unless call.to_address == FACET_INBOX_ADDRESS
@@ -95,6 +108,8 @@ class FacetTransaction < ApplicationRecord
       eth_tx = eth_transactions.detect { |tx| tx.tx_hash == call.transaction_hash }
       
       facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
+      
+      facet_tx&.mint = calculate_mint_amount(call.input, eth_block.base_fee_per_gas)
       
       facet_tx&.facet_block = facet_block
       
@@ -107,24 +122,6 @@ class FacetTransaction < ApplicationRecord
         total_gas += tx.gas_limit
       end
     end.first
-    
-    facet_txs.group_by(&:eth_transaction).each do |eth_tx, grouped_facet_txs|
-      in_tx_count = grouped_facet_txs.count
-      
-      outer_call = eth_calls.detect do |c|
-        c.transaction_hash == eth_tx.tx_hash &&
-        c.order_in_tx == 0
-      end
-      
-      gas_used = outer_call.gas_used
-      base_fee = eth_block.base_fee_per_gas
-      total_mint_amount = gas_used * base_fee
-      mint_amount_per_tx = total_mint_amount / in_tx_count
-      
-      grouped_facet_txs.each do |facet_tx|
-        facet_tx.mint = mint_amount_per_tx
-      end
-    end
     
     facet_txs
   end

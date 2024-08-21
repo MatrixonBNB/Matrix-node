@@ -159,7 +159,7 @@ RSpec.describe "Reverts" do
       facet_data: "0x",
       to_address: counter_address,
       from_address: from_address,
-      value: from_address_balance + 1,
+      value: from_address_balance + 1000.ether,
       eth_gas_used: 0,
       expect_failure: true
     )

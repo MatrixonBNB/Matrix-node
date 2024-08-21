@@ -12,7 +12,7 @@ class EthTransaction < ApplicationRecord
     block_number = block_result['number'].to_i(16)
     
     if receipt_result.present?
-      indexed_receipts = receipt_result['receipts'].index_by{|el| el['transactionHash']}
+      indexed_receipts = receipt_result.index_by{|el| el['transactionHash']}
     end
     
     block_result['transactions'].map do |tx|

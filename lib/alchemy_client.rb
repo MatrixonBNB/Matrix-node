@@ -27,6 +27,20 @@ class AlchemyClient
     )
   end
 
+  def debug_trace_transaction(transaction_hash)
+    query_api(
+      method: 'debug_traceTransaction',
+      params: [transaction_hash, { tracer: "callTracer" }]
+    )
+  end
+
+  def get_transaction(transaction_hash)
+    query_api(
+      method: 'eth_getTransactionByHash',
+      params: [transaction_hash]
+    )
+  end
+  
   def get_transaction_receipts(block_number, blocks_behind: nil)
     use_individual = ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia" &&
       blocks_behind.present? &&
@@ -41,7 +55,7 @@ class AlchemyClient
   
   def get_transaction_receipts_batch(block_number)
     query_api(
-      method: 'alchemy_getTransactionReceipts',
+      method: 'eth_getBlockReceipts',
       params: [{ blockNumber: "0x" + block_number.to_s(16) }]
     )
   end

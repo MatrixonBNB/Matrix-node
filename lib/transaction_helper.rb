@@ -303,7 +303,8 @@ module TransactionHelper
             'gasUsed' => "0x" + eth_gas_used.to_s(16),
             'gas' => eth_transaction['gas'],
             'output' => '0x',
-            'input' => eth_transaction['input']
+            'input' => eth_transaction['input'],
+            'type' => 'CALL'
           }
         }
       ]
@@ -367,6 +368,20 @@ module TransactionHelper
     res
   ensure
     EthBlockImporter.instance.ethereum_client = old_client
+  end
+  
+  def create_and_import_block2(
+    block_number:
+  )
+    EthBlockImporter.instance.define_singleton_method(:next_block_to_import) do
+      block_number
+    end
+    
+    EthBlockImporter.instance.define_singleton_method(:in_v2?) do |block_number|
+      true
+    end
+    
+    EthBlockImporter.instance.import_next_block
   end
   
   def fill_in_block_data(facet_block)
