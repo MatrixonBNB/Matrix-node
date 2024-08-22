@@ -24,11 +24,13 @@ module HttpPartyWithRetry
       response = HTTParty.send(method, url, options)
       
       if response.code != 200
-        raise "HTTP error: #{response.code} #{response.message}"
+        raise "HTTP error: #{response.code} #{response.message}. Full URL: #{response.request.last_uri}"
       end
 
       response
     rescue StandardError => e
+      full_url = e.respond_to?(:response) ? e.response&.request&.last_uri : url
+      
       puts "Retrying #{retries} more times (last error: #{e.message.inspect})"
       
       retries -= 1
@@ -36,7 +38,7 @@ module HttpPartyWithRetry
         sleep 1
         retry
       else
-        raise "Failed after #{retries} retries: #{e.message.inspect}"
+        raise "Failed after #{retries} retries: #{e.message.inspect}. Full URL: #{full_url}"
       end
     end
   end
