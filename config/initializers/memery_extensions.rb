@@ -27,8 +27,18 @@ module MemeryExtensions
   end
 end
 
+module MemeryClassMethodsExtensions
+  def class_memoize(*method_names)
+    singleton_class.class_eval do
+      include Memery unless singleton_class.included_modules.include?(Memery)
+      memoize(*method_names)
+    end
+  end
+end
+
 # Prepend MemeryExtensions to Memery::ModuleMethods
 Memery::ModuleMethods.prepend(MemeryExtensions)
+Memery::ClassMethods.prepend(MemeryClassMethodsExtensions)
 
 # Register a reloader hook to reset the checksum and clear caches
 ActiveSupport::Reloader.to_prepare do

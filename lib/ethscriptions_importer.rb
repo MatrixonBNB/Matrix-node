@@ -152,7 +152,7 @@ class EthscriptionsImporter
     
     legacy_blocks_future, ethscriptions_future, legacy_tx_receipts_future = [
       LegacyEthBlock.where(block_number: block_numbers).load_async,
-      Ethscription.where(block_number: block_numbers).load_async,
+      LegacyEthscription.where(block_number: block_numbers).load_async,
       LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
     ]
     
@@ -165,7 +165,11 @@ class EthscriptionsImporter
     alchemy_responses.reject! { |block_number, promise| block_by_number_responses.key?(block_number) }
     
     legacy_blocks = legacy_blocks_future.to_a
-    ethscriptions = ethscriptions_future.to_a.select(&:contract_transaction?)
+    
+    ethscriptions = ethscriptions_future.to_a.map do |e|
+      Ethscription.from_legacy_ethscription(e)
+    end.select(&:valid?)
+    
     legacy_tx_receipts = legacy_tx_receipts_future.to_a
     
     ethscriptions_by_block = ethscriptions.group_by(&:block_number)

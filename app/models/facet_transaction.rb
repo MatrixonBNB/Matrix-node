@@ -4,7 +4,6 @@ class FacetTransaction < ApplicationRecord
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
-  belongs_to :ethscription, primary_key: :transaction_hash, foreign_key: :eth_transaction_hash, optional: true
   
   attr_accessor :chain_id, :eth_call
   

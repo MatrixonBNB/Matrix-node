@@ -154,7 +154,7 @@ class FacetTransactionReceipt < ApplicationRecord
   def decoded_legacy_logs
     logs.map do |log|
       implementation_address = Ethscription.get_implementation(log['address'])
-      implementation_name = Ethscription.local_from_predeploy(implementation_address)
+      implementation_name = PredeployManager.local_from_predeploy(implementation_address)
       impl = EVMHelpers.compile_contract(implementation_name)
   
       begin
@@ -229,7 +229,7 @@ class FacetTransactionReceipt < ApplicationRecord
       calls.each do |call|
         if call["type"] == "DELEGATECALL"
           to_address = call["to"]
-          contract_name = Ethscription.local_from_predeploy(to_address)
+          contract_name = PredeployManager.local_from_predeploy(to_address)
           abi = get_abi(contract_name)
           function_name, decoded_inputs, decoded_outputs = decode_function_input(call, abi)
           call["function_name"] = function_name

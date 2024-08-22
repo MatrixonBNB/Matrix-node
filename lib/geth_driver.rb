@@ -11,7 +11,7 @@ module GethDriver
     EthBlock.all.each(&:destroy)
     FacetBlock.all.each(&:destroy)
     
-    Ethscription.write_genesis_json
+    PredeployManager.write_genesis_json
     # SolidityCompiler.compile_all_legacy_files
     
     teardown_rspec_geth
@@ -93,10 +93,12 @@ module GethDriver
     authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
     discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
     
+    genesis_filename = ENV.fetch("ETHEREUM_NETWORK") == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+    
     puts %{
       make geth && \\
       rm -rf ./datadir && \\
-      ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/genesis3.json && \\
+      ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} && \\
       ./build/bin/geth --datadir ./datadir \\
       --http \\
       --http.api 'eth,net,web3,debug' \\

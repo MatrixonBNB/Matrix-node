@@ -174,7 +174,7 @@ module TransactionHelper
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
-    pre_deploy = Ethscription.predeploy_to_local_map.invert[implementation.split("/").last]
+    pre_deploy = PredeployManager.predeploy_to_local_map.invert[implementation.split("/").last]
     
     implementation_address = if pre_deploy
       pre_deploy
@@ -261,7 +261,7 @@ module TransactionHelper
       'accessList' => []
     }
 
-    cancun_time = Ethscription.cancun_timestamp
+    cancun_time = PredeployManager.cancun_timestamp
     timestamp = block_timestamp || (last_block.timestamp + 12)
     in_cancun = timestamp >= cancun_time
     

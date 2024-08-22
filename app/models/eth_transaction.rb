@@ -1,7 +1,6 @@
 class EthTransaction < ApplicationRecord
   belongs_to :eth_block, primary_key: :block_hash, foreign_key: :block_hash
   has_many :eth_calls, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
-  has_one :ethscription, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   has_many :facet_transactions, -> { order(eth_call_index: :asc) },
     primary_key: :tx_hash, foreign_key: :eth_transaction_hash, dependent: :destroy
     
@@ -60,9 +59,7 @@ class EthTransaction < ApplicationRecord
       from_address: ethscription.creator,
       to_address: ethscription.initial_owner,
       input: ethscription.content_uri,
-      gas_price: ethscription.gas_price,
       gas: ethscription.gas_used,
-      value: ethscription.transaction_fee,
     )
   end
   
@@ -90,17 +87,17 @@ class EthTransaction < ApplicationRecord
   CreateEthscriptionEventSig = event_signature("ethscriptions_protocol_CreateEthscription(address,string)")
   
   def init_ethscription_from_input
-    unless to_address == Ethscription.required_initial_owner
+    unless to_address == Ethscription::REQUIRED_INITIAL_OWNER
       return
     end
     
-    potentially_valid = Ethscription.new(
-      {
-        creator: from_address,
-        initial_owner: to_address,
-        content_uri: utf8_input,
-      }.merge(ethscription_attrs)
-    )
+    attrs = ethscription_attrs({
+      creator: from_address,
+      initial_owner: to_address,
+      content_uri: utf8_input,
+    })
+    
+    potentially_valid = Ethscription.new(**attrs.symbolize_keys)
     
     init_if_valid_and_no_ethscription_initialized(potentially_valid)
   end
@@ -117,14 +114,14 @@ class EthTransaction < ApplicationRecord
       rescue Eth::Abi::DecodingError
         next
       end
-          
-      potentially_valid = Ethscription.new(
-        {
-          creator: creation_event['address'],
-          initial_owner: initial_owner,
-          content_uri: content_uri
-        }.merge(ethscription_attrs)
-      )
+         
+      attrs = ethscription_attrs({
+        creator: creation_event['address'],
+        initial_owner: initial_owner,
+        content_uri: content_uri
+      })
+      
+      potentially_valid = Ethscription.new(**attrs.symbolize_keys)
       
       init_if_valid_and_no_ethscription_initialized(potentially_valid)
     end
@@ -140,20 +137,20 @@ class EthTransaction < ApplicationRecord
   
   def init_if_valid_and_no_ethscription_initialized(potentially_valid)
     return if initialized_ethscription.present?
-    return unless potentially_valid.valid_ethscription?
+    return unless potentially_valid.valid?
     
     self.initialized_ethscription = potentially_valid
     initialized_ethscription
   end
   
-  def ethscription_attrs
+  def ethscription_attrs(to_merge = {})
     {
       transaction_hash: tx_hash,
       block_number: block_number,
       block_blockhash: block_hash,
       transaction_index: transaction_index,
       gas_used: gas_used
-    }
+    }.merge(to_merge)
   end
   
   def self.on_testnet?

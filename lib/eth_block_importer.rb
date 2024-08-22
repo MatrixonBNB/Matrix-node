@@ -339,8 +339,8 @@ class EthBlockImporter
   end
   
   def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, facet_block)
-    results = Parallel.map_with_index(ethscriptions.sort_by(&:transaction_index), in_threads: 10) do |ethscription, idx|
-    # results = ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
+    # results = Parallel.map_with_index(ethscriptions.sort_by(&:transaction_index), in_threads: 10) do |ethscription, idx|
+    results = ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
       ethscription.clear_caches_if_upgrade!
       
       facet_tx = FacetTransaction.from_eth_tx_and_ethscription(
