@@ -369,12 +369,10 @@ class Ethscription < ApplicationRecord
   rescue ContractMissing => e
     shim_val = "0x00000000000000000000000000000000000000c5"
     
-    unless ENV['LEGACY_VALUE_ORACLE_URL']
-      LegacyValueMapping.find_or_create_by!(
-        legacy_value: parsed_content['data']['to'].downcase,
-        new_value: shim_val
-      )
-    end
+    EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+      legacy_value: parsed_content['data']['to'],
+      new_value: shim_val
+    )
     
     shim_val
   rescue => e
@@ -424,9 +422,9 @@ class Ethscription < ApplicationRecord
       
       new_to = deploy_receipt.legacy_contract_address_map[legacy_to]
       
-      LegacyValueMapping.find_or_create_by!(
+      EthscriptionsImporter.instance.add_legacy_value_mapping_item(
         legacy_value: legacy_to,
-        new_value: new_to,
+        new_value: new_to
       )
       
       new_to
@@ -580,7 +578,7 @@ class Ethscription < ApplicationRecord
         if transaction
           receipt = transaction.facet_transaction_receipt
         else
-          LegacyValueMapping.find_or_create_by!(
+          EthscriptionsImporter.instance.add_legacy_value_mapping_item(
             legacy_value: user_withdrawal_id,
             new_value: "0x" + "0" * 62 + "c5",
           )
@@ -590,8 +588,7 @@ class Ethscription < ApplicationRecord
       end
       
       unless receipt
-        # binding.irb
-        LegacyValueMapping.find_or_create_by!(
+        EthscriptionsImporter.instance.add_legacy_value_mapping_item(
           legacy_value: user_withdrawal_id,
           new_value: "0x" + "0" * 62 + "c5",
         )
@@ -600,7 +597,7 @@ class Ethscription < ApplicationRecord
       end
       
       if receipt.status == 0
-        LegacyValueMapping.find_or_create_by!(
+        EthscriptionsImporter.instance.add_legacy_value_mapping_item(
           legacy_value: user_withdrawal_id,
           new_value: user_withdrawal_id,
         )
@@ -611,14 +608,14 @@ class Ethscription < ApplicationRecord
       new_withdrawal_id = receipt.decoded_legacy_logs.
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
       
-      LegacyValueMapping.find_or_create_by!(
+      EthscriptionsImporter.instance.add_legacy_value_mapping_item(
         legacy_value: user_withdrawal_id,
         new_value: new_withdrawal_id,
       )
       
       new_withdrawal_id
     rescue ActiveRecord::RecordNotFound => e
-      LegacyValueMapping.find_or_create_by!(
+      EthscriptionsImporter.instance.add_legacy_value_mapping_item(
         legacy_value: user_withdrawal_id,
         new_value: "0x" + "0" * 62 + "c5",
       )

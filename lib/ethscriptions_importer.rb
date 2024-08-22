@@ -8,9 +8,7 @@ class EthscriptionsImporter
     :ethereum_client, :legacy_value_mapping
   
   def initialize
-    @imported_facet_transaction_receipts = []
-    @imported_facet_transactions = []
-    @legacy_value_mapping = {}
+    reset_state
     
     client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
       
@@ -18,6 +16,12 @@ class EthscriptionsImporter
       api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
       base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
     )
+  end
+  
+  def reset_state
+    @imported_facet_transaction_receipts = []
+    @imported_facet_transactions = []
+    @legacy_value_mapping = {}
   end
   
   def logger
@@ -51,6 +55,23 @@ class EthscriptionsImporter
   
   def import_batch_size
     [blocks_behind, 100].min
+  end
+  
+  def add_legacy_value_mapping_item(legacy_value:, new_value:)
+    if legacy_value.blank? || new_value.blank?
+      raise "Legacy value or new value is blank: #{legacy_value} -> #{new_value}"
+    end
+    
+    legacy_value = legacy_value.downcase
+    new_value = new_value.downcase
+    
+    current_value = legacy_value_mapping[legacy_value]
+    
+    if current_value.present? && current_value != new_value
+      raise "Mismatch: #{legacy_value} -> #{current_value} != #{new_value}"
+    end
+    
+    legacy_value_mapping[legacy_value] = new_value
   end
   
   def import_blocks_until_done
@@ -158,6 +179,8 @@ class EthscriptionsImporter
     all_receipts = []
     res = []
     
+    reset_state
+    
     # Get the current maximum block number from the database
     current_max_block_number = FacetBlock.maximum(:number).to_i
     
@@ -225,6 +248,12 @@ class EthscriptionsImporter
       FacetBlock.import!(facet_blocks)
       FacetTransaction.import!(all_facet_txs)
       FacetTransactionReceipt.import!(all_receipts)
+      
+      legacy_value_objects = legacy_value_mapping.map do |legacy_value, new_value|
+        LegacyValueMapping.new(legacy_value: legacy_value, new_value: new_value)
+      end
+      
+      LegacyValueMapping.import!(legacy_value_objects, on_duplicate_key_update: { conflict_target: [:legacy_value], columns: [:new_value] })
     end
     
     elapsed_time = Time.current - start

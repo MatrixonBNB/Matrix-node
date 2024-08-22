@@ -43,6 +43,27 @@ CREATE FUNCTION public.check_facet_block_order() RETURNS trigger
         $$;
 
 
+--
+-- Name: check_legacy_value_conflict(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_legacy_value_conflict() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM legacy_value_mappings
+          WHERE legacy_value = NEW.legacy_value
+            AND new_value <> NEW.new_value
+        ) THEN
+          RAISE EXCEPTION 'Conflict: legacy_value % is already mapped to a different new_value', NEW.legacy_value;
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -822,6 +843,13 @@ CREATE TRIGGER trigger_check_eth_block_order BEFORE INSERT ON public.eth_blocks 
 --
 
 CREATE TRIGGER trigger_check_facet_block_order BEFORE INSERT ON public.facet_blocks FOR EACH ROW EXECUTE FUNCTION public.check_facet_block_order();
+
+
+--
+-- Name: legacy_value_mappings trigger_check_legacy_value_conflict; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_check_legacy_value_conflict BEFORE INSERT OR UPDATE ON public.legacy_value_mappings FOR EACH ROW EXECUTE FUNCTION public.check_legacy_value_conflict();
 
 
 --

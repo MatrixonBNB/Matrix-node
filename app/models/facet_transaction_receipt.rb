@@ -12,7 +12,7 @@ class FacetTransactionReceipt < ApplicationRecord
       self.legacy_contract_address_map.reject! { |k, v| k.nil? || v.nil? }
       
       self.legacy_contract_address_map.each do |legacy_address, new_address|
-        LegacyValueMapping.find_or_create_by!(
+        EthscriptionsImporter.instance.add_legacy_value_mapping_item(
           legacy_value: legacy_address,
           new_value: new_address
         )
@@ -33,7 +33,7 @@ class FacetTransactionReceipt < ApplicationRecord
     # puts JSON.pretty_generate(legacy_receipt.as_json)
     
     self.legacy_contract_address_map.each do |legacy_address, new_address|
-      LegacyValueMapping.find_or_create_by!(
+      EthscriptionsImporter.instance.add_legacy_value_mapping_item(
         legacy_value: legacy_address,
         new_value: new_address
       )
@@ -47,9 +47,9 @@ class FacetTransactionReceipt < ApplicationRecord
     
     withdrawal_id = initiate_event['data']['withdrawalId']
     
-    LegacyValueMapping.find_or_create_by!(
+    EthscriptionsImporter.instance.add_legacy_value_mapping_item(
       legacy_value: legacy_receipt.transaction_hash,
-      new_value: withdrawal_id,
+      new_value: withdrawal_id
     )
   rescue => e
     binding.irb
