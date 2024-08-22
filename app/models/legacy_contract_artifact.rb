@@ -1,5 +1,21 @@
 class LegacyContractArtifact < ApplicationRecord
-  include LegacyModel  
+  include LegacyModel
+  
+  class LegacyContractArtifactStruct < T::Struct
+    const :id, Integer
+    const :transaction_hash, String
+    const :internal_transaction_index, Integer
+    const :block_number, Integer
+    const :transaction_index, Integer
+    const :name, String
+    const :source_code, String
+    const :init_code_hash, String
+    const :references, T::Array[T::Hash[String, T.nilable(String)]]
+    const :pragma_language, String
+    const :pragma_version, String
+    const :created_at, String
+    const :updated_at, String
+  end
   
   class AmbiguousSuffixError < StandardError; end
   include Memery
@@ -20,8 +36,18 @@ class LegacyContractArtifact < ApplicationRecord
   end
   
   def self.cached_all
-    parsed = JSON.parse(all_json)
-    @_cached_all ||= parsed.map { |artifact| LegacyContractArtifact.new(artifact) }
+    @_cached_all ||= begin
+      parsed = JSON.parse(all_json)
+      
+      parsed.map do |artifact|
+        begin
+          LegacyContractArtifactStruct.new(**artifact.symbolize_keys)
+        rescue => e
+          binding.irb
+          raise
+        end
+      end
+    end
   end
   
   def self.find_by_name(name)

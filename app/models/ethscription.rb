@@ -1,4 +1,6 @@
 class Ethscription < ApplicationRecord
+  self.table_name = "ethscriptions"
+  
   include LegacyModel
   
   include Memery

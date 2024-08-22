@@ -4,6 +4,8 @@ module LegacyModel
   included do
     if ENV['FACET_V1_VM_DATABASE_URL']
       establish_connection :secondary
+    else
+      self.abstract_class = true
     end
     
     before_save :raise_readonly_error
