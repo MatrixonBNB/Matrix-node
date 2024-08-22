@@ -8,8 +8,20 @@ class LegacyContractArtifact < ApplicationRecord
   scope :oldest_first, -> { order(:block_number, :transaction_index, :internal_transaction_index) }
   scope :newest_first, -> { order(block_number: :desc, transaction_index: :desc, internal_transaction_index: :desc) }
   
+  def self.all_json
+    if base_url = ENV['LEGACY_VALUE_ORACLE_URL']
+      endpoint = '/legacy_value_mappings/contract_artifacts'
+      
+      response = HttpPartyWithRetry.get_with_retry("#{base_url}#{endpoint}")
+      response.body
+    else
+      LegacyContractArtifact.all.oldest_first.to_json
+    end
+  end
+  
   def self.cached_all
-    @_cached_all ||= all.oldest_first
+    parsed = JSON.parse(all_json)
+    @_cached_all ||= parsed.map { |artifact| LegacyContractArtifact.new(artifact) }
   end
   
   def self.find_by_name(name)

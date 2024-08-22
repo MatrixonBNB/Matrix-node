@@ -12,4 +12,8 @@ class LegacyValueMappingsController < ApplicationController
       render json: { error: 'Mapping not found' }, status: :not_found
     end
   end
+  
+  def contract_artifacts
+    render json: LegacyContractArtifact.all.oldest_first.to_json
+  end
 end
