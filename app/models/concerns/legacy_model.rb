@@ -2,7 +2,9 @@ module LegacyModel
   extend ActiveSupport::Concern
 
   included do
-    establish_connection :secondary
+    if ENV['FACET_V1_VM_DATABASE_URL']
+      establish_connection :secondary
+    end
     
     before_save :raise_readonly_error
     before_destroy :raise_readonly_error
