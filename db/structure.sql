@@ -460,7 +460,7 @@ CREATE TABLE public.legacy_value_mappings (
     new_value character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT legacy_and_new_value_pattern_check CHECK (((((legacy_value)::text ~ '^0x[a-f0-9]{64}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{64}$'::text)) OR (((legacy_value)::text ~ '^0x[a-f0-9]{40}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{40}$'::text))))
+    CONSTRAINT new_value_pattern_check CHECK ((((new_value)::text ~ '^0x[a-f0-9]{64}$'::text) OR ((new_value)::text ~ '^0x[a-f0-9]{40}$'::text)))
 );
 
 
@@ -931,6 +931,7 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20240822162819'),
 ('20240813181411'),
 ('20240813150529'),
 ('20240813133726'),
