@@ -111,9 +111,10 @@ class FacetBlock < ApplicationRecord
   end
 
   def self.compare_transactions(geth_client, other_client, block_number, other_block_hash, geth_block_hash)
-    # Fetch transactions from the other database
-    other_txs = OtherFacetTransaction.where(block_hash: other_block_hash).order(:transaction_index).pluck(:tx_hash)
-
+    # Fetch transactions from the other client
+    other_block = other_client.call("eth_getBlockByNumber", ["0x" + block_number.to_s(16), true])
+    other_txs = other_block['transactions'].map { |tx| tx['hash'] }
+  
     # Fetch transactions from the Geth instance
     geth_block = geth_client.call("eth_getBlockByNumber", ["0x" + block_number.to_s(16), true])
     geth_txs = geth_block['transactions'].map { |tx| tx['hash'] }

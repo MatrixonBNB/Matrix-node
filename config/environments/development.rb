@@ -27,7 +27,8 @@ Rails.application.configure do
         socket_timeout: 1.5,
         socket_failure_delay: 0.2,
         down_retry_delay: 60,
-        compress: true
+        compress: true,
+        namespace: "facet_node_development_#{Rails.root}"
       }
     config.public_file_server.headers = {
       "Cache-Control" => "public, max-age=#{2.days.to_i}"

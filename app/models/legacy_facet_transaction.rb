@@ -1,4 +1,6 @@
 class LegacyFacetTransaction < ApplicationRecord
+  include LegacyModel
+  
   self.table_name = "contract_transactions"
   
   belongs_to :ethscription, primary_key: :transaction_hash, foreign_key: :transaction_hash, optional: true

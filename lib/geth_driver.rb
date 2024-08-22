@@ -19,7 +19,9 @@ module GethDriver
     @temp_datadir = Dir.mktmpdir('geth_datadir_', '/tmp')
     log_file_location = "#{@temp_datadir}/geth.log"
     
-    system("cd #{geth_dir} && make geth && ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir #{@temp_datadir} facet-chain/genesis3.json")
+    genesis_filename = ENV.fetch("ETHEREUM_NETWORK") == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+    
+    system("cd #{geth_dir} && make geth && ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir #{@temp_datadir} facet-chain/#{genesis_filename}")
     
     geth_command = [
       "#{geth_dir}/build/bin/geth",

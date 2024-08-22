@@ -22,6 +22,6 @@ module Clockwork
   end
 
   every(6.seconds, 'import_blocks_until_done') do
-    EthscriptionsImporter.import_blocks_until_done
+    EthscriptionsImporter.instance.import_blocks_until_done
   end
 end

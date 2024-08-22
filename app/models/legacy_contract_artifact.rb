@@ -1,4 +1,6 @@
 class LegacyContractArtifact < ApplicationRecord
+  include LegacyModel  
+  
   class AmbiguousSuffixError < StandardError; end
   include Memery
   self.table_name = "contract_artifacts"
@@ -7,7 +9,7 @@ class LegacyContractArtifact < ApplicationRecord
   scope :newest_first, -> { order(block_number: :desc, transaction_index: :desc, internal_transaction_index: :desc) }
   
   def self.cached_all
-    @_cached_all ||= reading { all.oldest_first }
+    @_cached_all ||= all.oldest_first
   end
   
   def self.find_by_name(name)

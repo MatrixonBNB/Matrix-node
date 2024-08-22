@@ -1,4 +1,6 @@
 class Ethscription < ApplicationRecord
+  include LegacyModel
+  
   include Memery
   class << self
     include Memery
@@ -369,7 +371,6 @@ class Ethscription < ApplicationRecord
     
     unless ENV['LEGACY_VALUE_ORACLE_URL']
       LegacyValueMapping.find_or_create_by!(
-        mapping_type: :address,
         legacy_value: parsed_content['data']['to'].downcase,
         new_value: shim_val
       )
@@ -386,7 +387,7 @@ class Ethscription < ApplicationRecord
   class << self
     def get_implementation(to_address)
       TransactionHelper.static_call(
-        contract: 'legacy/Upgradeable',
+        contract: 'legacy/PublicImplementationAddress',
         address: to_address,
         function: 'getImplementation',
         args: []
@@ -408,7 +409,7 @@ class Ethscription < ApplicationRecord
         raise "Legacy to address not found: #{legacy_to}"
       end
       
-      BlockImportBatchContext.imported_facet_transaction_receipts&.each do |receipt|
+      EthscriptionsImporter.instance.imported_facet_transaction_receipts.each do |receipt|
         if receipt.legacy_contract_address_map.key?(legacy_to)
           return receipt.legacy_contract_address_map[legacy_to]
         end
@@ -424,10 +425,8 @@ class Ethscription < ApplicationRecord
       new_to = deploy_receipt.legacy_contract_address_map[legacy_to]
       
       LegacyValueMapping.find_or_create_by!(
-        mapping_type: 'address',
         legacy_value: legacy_to,
         new_value: new_to,
-        # created_by_eth_transaction_hash: self.transaction_hash
       )
       
       new_to
@@ -538,7 +537,6 @@ class Ethscription < ApplicationRecord
       base_url = ENV.fetch('LEGACY_VALUE_ORACLE_URL')
       endpoint = '/legacy_value_mappings/lookup'
       query_params = {
-        mapping_type: type,
         legacy_value: legacy_value
       }
   
@@ -572,10 +570,10 @@ class Ethscription < ApplicationRecord
       end
       
       # Check in-memory cache first
-      transaction = BlockImportBatchContext.imported_facet_transactions&.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
+      transaction = EthscriptionsImporter.instance.imported_facet_transactions.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
       
       if transaction
-        receipt = BlockImportBatchContext.imported_facet_transaction_receipts.find { |r| r.transaction_hash == transaction.tx_hash }
+        receipt = EthscriptionsImporter.instance.imported_facet_transaction_receipts.find { |r| r.transaction_hash == transaction.tx_hash }
       else
         # Fallback to database query
         transaction = FacetTransaction.find_by(eth_transaction_hash: user_withdrawal_id)
@@ -583,7 +581,6 @@ class Ethscription < ApplicationRecord
           receipt = transaction.facet_transaction_receipt
         else
           LegacyValueMapping.find_or_create_by!(
-            mapping_type: 'withdrawal_id',
             legacy_value: user_withdrawal_id,
             new_value: "0x" + "0" * 62 + "c5",
           )
@@ -595,7 +592,6 @@ class Ethscription < ApplicationRecord
       unless receipt
         # binding.irb
         LegacyValueMapping.find_or_create_by!(
-          mapping_type: 'withdrawal_id',
           legacy_value: user_withdrawal_id,
           new_value: "0x" + "0" * 62 + "c5",
         )
@@ -605,7 +601,6 @@ class Ethscription < ApplicationRecord
       
       if receipt.status == 0
         LegacyValueMapping.find_or_create_by!(
-          mapping_type: 'withdrawal_id',
           legacy_value: user_withdrawal_id,
           new_value: user_withdrawal_id,
         )
@@ -617,7 +612,6 @@ class Ethscription < ApplicationRecord
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
       
       LegacyValueMapping.find_or_create_by!(
-        mapping_type: 'withdrawal_id',
         legacy_value: user_withdrawal_id,
         new_value: new_withdrawal_id,
       )
@@ -625,7 +619,6 @@ class Ethscription < ApplicationRecord
       new_withdrawal_id
     rescue ActiveRecord::RecordNotFound => e
       LegacyValueMapping.find_or_create_by!(
-        mapping_type: 'withdrawal_id',
         legacy_value: user_withdrawal_id,
         new_value: "0x" + "0" * 62 + "c5",
       )
@@ -782,13 +775,6 @@ class Ethscription < ApplicationRecord
     SolidityCompiler.compile_all_legacy_files
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
-    genesis_path = File.join(geth_dir, 'facet-chain', 'genesis3.json')
-
-    # Read the existing genesis.json file
-    genesis_data = generate_full_genesis_json
-
-    # Write the updated data back to the genesis.json file
-    File.write(genesis_path, JSON.pretty_generate(genesis_data))
     
     ["eth-mainnet", "eth-sepolia"].each do |network|
       filename = network == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"

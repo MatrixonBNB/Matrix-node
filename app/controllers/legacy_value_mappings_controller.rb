@@ -1,10 +1,8 @@
 class LegacyValueMappingsController < ApplicationController
   def lookup
-    mapping_type = params[:mapping_type]
     legacy_value = params[:legacy_value]
 
     legacy_value_mapping = LegacyValueMapping.find_by(
-      mapping_type: mapping_type,
       legacy_value: legacy_value
     )
 

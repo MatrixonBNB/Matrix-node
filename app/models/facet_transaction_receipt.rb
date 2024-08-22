@@ -13,7 +13,6 @@ class FacetTransactionReceipt < ApplicationRecord
       
       self.legacy_contract_address_map.each do |legacy_address, new_address|
         LegacyValueMapping.find_or_create_by!(
-          mapping_type: 'address',
           legacy_value: legacy_address,
           new_value: new_address
         )
@@ -35,7 +34,6 @@ class FacetTransactionReceipt < ApplicationRecord
     
     self.legacy_contract_address_map.each do |legacy_address, new_address|
       LegacyValueMapping.find_or_create_by!(
-        mapping_type: 'address',
         legacy_value: legacy_address,
         new_value: new_address
       )
@@ -50,10 +48,8 @@ class FacetTransactionReceipt < ApplicationRecord
     withdrawal_id = initiate_event['data']['withdrawalId']
     
     LegacyValueMapping.find_or_create_by!(
-      mapping_type: :withdrawal_id,
       legacy_value: legacy_receipt.transaction_hash,
       new_value: withdrawal_id,
-      # created_by_eth_transaction_hash: self.transaction_hash
     )
   rescue => e
     binding.irb

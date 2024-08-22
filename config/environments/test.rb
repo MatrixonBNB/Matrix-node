@@ -35,7 +35,7 @@ Rails.application.configure do
         socket_failure_delay: 0.2,
         down_retry_delay: 60,
         compress: true,
-        namespace: 'test_namespace'
+        namespace: "facet_node_test_#{Rails.root}"
       }
     }
     config.public_file_server.headers = {

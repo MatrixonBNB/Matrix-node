@@ -1,27 +1,24 @@
 default: &default
   adapter: postgresql
   encoding: unicode
-  pool: 30
-  username:
-  password:
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
-development:
+primary: &primary
   <<: *default
-  database: evm_facet_development_dup1000
-  
-other_development:
-  <<: *default
-  database: <%= ENV['OTHER_DEVELOPMENT_DB_URL'] %>
-
-test:
-  <<: *default
-  database: evm_facet_test_dup1000
-
-production:
-  <<: *default
-  database: evm_facet_production_dup1000
-  pool: 100
+  url: <%= ENV.fetch("DATABASE_URL") %>
 
 secondary:
   <<: *default
-  url: <%= ENV['SECONDARY_DB_URL'] %>
+  url: <%= ENV['FACET_V1_VM_DATABASE_URL'] %>
+
+development:
+  primary:
+    <<: *primary
+
+test:
+  primary:
+    <<: *primary
+
+production:
+  primary:
+    <<: *primary

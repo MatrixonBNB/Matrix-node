@@ -1,17 +1,23 @@
-module EthscriptionsImporter
-  extend self
+class EthscriptionsImporter
+  include Singleton
+  include Memery
   
   class BlockNotReadyToImportError < StandardError; end
   
-  def ethereum_client
-    @_ethereum_client ||= begin
-      client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
+  attr_accessor :imported_facet_transaction_receipts, :imported_facet_transactions,
+    :ethereum_client, :legacy_value_mapping
+  
+  def initialize
+    @imported_facet_transaction_receipts = []
+    @imported_facet_transactions = []
+    @legacy_value_mapping = {}
+    
+    client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
       
-      client_class.new(
-        api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
-        base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
-      )
-    end
+    @ethereum_client = client_class.new(
+      api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
+      base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
+    )
   end
   
   def logger
@@ -77,12 +83,7 @@ module EthscriptionsImporter
         
         alchemy_responses.reverse_merge!(get_blocks_promises(blocks_to_import))
         
-        BlockImportBatchContext.set(
-          imported_facet_transactions: [],
-          imported_facet_transaction_receipts: []
-        ) do
-          import_blocks(block_numbers, alchemy_responses)
-        end
+        import_blocks(block_numbers, alchemy_responses)
       rescue BlockNotReadyToImportError => e
         puts "#{e.message}. Stopping import."
         break
@@ -128,13 +129,11 @@ module EthscriptionsImporter
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
-    legacy_blocks_future, ethscriptions_future, legacy_tx_receipts_future = ApplicationRecord.reading do
-      [
-        LegacyEthBlock.where(block_number: block_numbers).load_async,
-        Ethscription.where(block_number: block_numbers).load_async,
-        LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
-      ]
-    end
+    legacy_blocks_future, ethscriptions_future, legacy_tx_receipts_future = [
+      LegacyEthBlock.where(block_number: block_numbers).load_async,
+      Ethscription.where(block_number: block_numbers).load_async,
+      LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
+    ]
     
     block_by_number_responses = Benchmark.msr("blocks") do
       alchemy_responses.select do |block_number, promise|
@@ -203,8 +202,8 @@ module EthscriptionsImporter
         all_facet_txs.concat(facet_txs)
         all_receipts.concat(receipts)
         
-        BlockImportBatchContext.imported_facet_transaction_receipts.concat(receipts)
-        BlockImportBatchContext.imported_facet_transactions.concat(facet_txs)
+        imported_facet_transaction_receipts.concat(receipts)
+        imported_facet_transactions.concat(facet_txs)
 
         receipts.each(&:set_legacy_contract_address_map)
         receipts.each(&:update_real_withdrawal_id)

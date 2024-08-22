@@ -435,12 +435,11 @@ ALTER SEQUENCE public.facet_transactions_id_seq OWNED BY public.facet_transactio
 
 CREATE TABLE public.legacy_value_mappings (
     id bigint NOT NULL,
-    mapping_type character varying NOT NULL,
     legacy_value character varying NOT NULL,
     new_value character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT chk_rails_6862305fab CHECK (((mapping_type)::text = ANY ((ARRAY['address'::character varying, 'withdrawal_id'::character varying])::text[])))
+    CONSTRAINT legacy_and_new_value_pattern_check CHECK (((((legacy_value)::text ~ '^0x[a-f0-9]{64}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{64}$'::text)) OR (((legacy_value)::text ~ '^0x[a-f0-9]{40}$'::text) AND ((new_value)::text ~ '^0x[a-f0-9]{40}$'::text))))
 );
 
 
@@ -805,10 +804,10 @@ CREATE UNIQUE INDEX index_facet_transactions_on_tx_hash ON public.facet_transact
 
 
 --
--- Name: index_legacy_value_mappings_on_mapping_type_and_legacy_value; Type: INDEX; Schema: public; Owner: -
+-- Name: index_legacy_value_mappings_on_legacy_value; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX index_legacy_value_mappings_on_mapping_type_and_legacy_value ON public.legacy_value_mappings USING btree (mapping_type, legacy_value);
+CREATE UNIQUE INDEX index_legacy_value_mappings_on_legacy_value ON public.legacy_value_mappings USING btree (legacy_value);
 
 
 --
