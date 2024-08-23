@@ -93,6 +93,7 @@ class EthTransaction < ApplicationRecord
     
     attrs = ethscription_attrs({
       creator: from_address,
+      l1_tx_origin: from_address,
       initial_owner: to_address,
       content_uri: utf8_input,
     })
@@ -117,6 +118,7 @@ class EthTransaction < ApplicationRecord
          
       attrs = ethscription_attrs({
         creator: creation_event['address'],
+        l1_tx_origin: from_address,
         initial_owner: initial_owner,
         content_uri: content_uri
       })

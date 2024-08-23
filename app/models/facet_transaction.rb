@@ -5,7 +5,7 @@ class FacetTransaction < ApplicationRecord
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
   
-  attr_accessor :chain_id, :eth_call
+  attr_accessor :chain_id, :eth_call, :l1_tx_origin
   
   FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
@@ -56,6 +56,8 @@ class FacetTransaction < ApplicationRecord
       call_index: idx
     )
     
+    tx.l1_tx_origin = ethscription.l1_tx_origin
+    
     payload = [
       ethscription.block_hash.hex_to_bytes,
       ethscription.transaction_hash.hex_to_bytes,
@@ -70,7 +72,7 @@ class FacetTransaction < ApplicationRecord
     user_current_balance = TransactionHelper.balance(tx.from_address)
     next_block_base_fee = facet_block.calculated_base_fee_per_gas
     
-    eth_gas_used = ethscription.gas_used
+    eth_gas_used = ethscription.gas_used # Should be calldata cost
     eth_base_fee = eth_block.base_fee_per_gas
     mint_amount = eth_gas_used * eth_base_fee
     
@@ -239,6 +241,7 @@ class FacetTransaction < ApplicationRecord
     
     tx_data = []
     tx_data.push Eth::Util.hex_to_bin source_hash
+    tx_data.push Eth::Util.hex_to_bin l1_tx_origin.to_s
     tx_data.push Eth::Util.hex_to_bin from_address
     tx_data.push Eth::Util.hex_to_bin to_address.to_s
     tx_data.push Eth::Util.serialize_int_to_big_endian mint

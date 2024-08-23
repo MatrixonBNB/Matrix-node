@@ -10,6 +10,7 @@ class Ethscription < T::Struct
   const :block_blockhash, String
   const :transaction_index, Integer
   const :creator, String
+  const :l1_tx_origin, String
   const :initial_owner, String
   const :content_uri, String
   const :gas_used, Integer
