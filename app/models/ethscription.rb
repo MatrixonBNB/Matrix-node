@@ -15,8 +15,9 @@ class Ethscription < T::Struct
   const :content_uri, String
   const :gas_used, Integer
   
-  def self.from_legacy_ethscription(legacy_ethscription)
+  def self.from_legacy_ethscription(legacy_ethscription, l1_tx_origin)
     relevant_attrs = legacy_ethscription.attributes.symbolize_keys.slice(*props.keys)
+    relevant_attrs[:l1_tx_origin] = l1_tx_origin
     
     new(**relevant_attrs)
   rescue => e

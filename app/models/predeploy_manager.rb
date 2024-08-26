@@ -135,8 +135,8 @@ module PredeployManager
     network == "eth-mainnet" ? 1710338135 : 1706655072
   end
   
-  def write_genesis_json
-    Rails.cache.clear
+  def write_genesis_json(clear_cache: true)
+    Rails.cache.clear if clear_cache
     MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
     SolidityCompiler.compile_all_legacy_files

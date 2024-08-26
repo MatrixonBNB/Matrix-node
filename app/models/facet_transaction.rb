@@ -72,9 +72,9 @@ class FacetTransaction < ApplicationRecord
     user_current_balance = TransactionHelper.balance(tx.from_address)
     next_block_base_fee = facet_block.calculated_base_fee_per_gas
     
-    eth_gas_used = ethscription.gas_used # Should be calldata cost
     eth_base_fee = eth_block.base_fee_per_gas
-    mint_amount = eth_gas_used * eth_base_fee
+    
+    mint_amount = calculate_mint_amount(ethscription.content_uri.bytes_to_hex, eth_base_fee)
     
     user_next_balance = user_current_balance + mint_amount
     
@@ -91,7 +91,7 @@ class FacetTransaction < ApplicationRecord
   def self.calculate_calldata_cost(hex_string)
     bytes = hex_string.hex_to_bytes
     zero_count = bytes.count("\x00")
-    non_zero_count = bytes.size - zero_count
+    non_zero_count = bytes.bytesize - zero_count
     
     zero_count * 4 + non_zero_count * 16
   end
@@ -174,6 +174,7 @@ class FacetTransaction < ApplicationRecord
     tx.eth_transaction_hash = eth_call.transaction_hash
     tx.eth_call_index = eth_call.call_index
     tx.from_address = eth_call.from_address
+    tx.l1_tx_origin = eth_tx.from_address
     tx.eth_call = eth_call
     
     payload = [
@@ -283,6 +284,8 @@ class FacetTransaction < ApplicationRecord
   end
   
   def to_eth_payload
+    raise unless gas_limit > 0
+    
     chain_id_bin = Eth::Util.serialize_int_to_big_endian(chain_id)
     to_bin = Eth::Util.hex_to_bin(to_address.to_s)
     value_bin = Eth::Util.serialize_int_to_big_endian(value)

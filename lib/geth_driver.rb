@@ -11,13 +11,16 @@ module GethDriver
     EthBlock.all.each(&:destroy)
     FacetBlock.all.each(&:destroy)
     
-    PredeployManager.write_genesis_json
+    PredeployManager.write_genesis_json(clear_cache: false)
     # SolidityCompiler.compile_all_legacy_files
     
     teardown_rspec_geth
     
     @temp_datadir = Dir.mktmpdir('geth_datadir_', '/tmp')
-    log_file_location = "#{@temp_datadir}/geth.log"
+    log_file_location = Rails.root.join('tmp', 'geth.log').to_s
+    if File.exist?(log_file_location)
+      File.delete(log_file_location)
+    end
     
     genesis_filename = ENV.fetch("ETHEREUM_NETWORK") == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
     

@@ -7,9 +7,9 @@ class CreateFacetTransactions < ActiveRecord::Migration[7.1]
       t.bigint :block_number, null: false
       t.string :deposit_receipt_version, null: false
       t.string :from_address, null: false
-      t.bigint :gas, null: false
+      # t.bigint :gas, null: false
       t.bigint :gas_limit, null: false
-      t.numeric :gas_price, precision: 78, scale: 0#, null: false
+      # t.numeric :gas_price, precision: 78, scale: 0#, null: false
       t.string :tx_hash, null: false
       t.text :input, null: false
       # t.integer :nonce, null: false

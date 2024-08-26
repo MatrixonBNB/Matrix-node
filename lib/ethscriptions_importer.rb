@@ -54,7 +54,7 @@ class EthscriptionsImporter
   end
   
   def import_batch_size
-    [blocks_behind, 100].min
+    [blocks_behind, 63].min
   end
   
   def add_legacy_value_mapping_item(legacy_value:, new_value:)
@@ -75,6 +75,10 @@ class EthscriptionsImporter
   end
   
   def import_blocks_until_done
+    unless ENV['FACET_V1_VM_DATABASE_URL']
+      raise "FACET_V1_VM_DATABASE_URL is not set"
+    end
+    
     # Rails.cache.clear
     # SolidityCompiler.reset_checksum
     # SolidityCompiler.compile_all_legacy_files
@@ -139,7 +143,7 @@ class EthscriptionsImporter
   def get_blocks_promises(block_numbers)
     block_numbers.map do |block_number|
       promise = Concurrent::Promise.execute do
-         ethereum_client.get_block(block_number)
+         ethereum_client.get_block(block_number, true)
       end
       
       [block_number, promise]
@@ -166,8 +170,16 @@ class EthscriptionsImporter
     
     legacy_blocks = legacy_blocks_future.to_a
     
+    # Create a hash mapping transaction hashes to their "from" addresses
+    tx_hash_to_from = {}
+    block_by_number_responses.each do |_, block_data|
+      block_data['result']['transactions'].each do |tx|
+        tx_hash_to_from[tx['hash']] = tx['from']
+      end
+    end
+    
     ethscriptions = ethscriptions_future.to_a.map do |e|
-      Ethscription.from_legacy_ethscription(e)
+      Ethscription.from_legacy_ethscription(e, tx_hash_to_from[e.transaction_hash])
     end.select(&:valid?)
     
     legacy_tx_receipts = legacy_tx_receipts_future.to_a
@@ -575,7 +587,7 @@ class EthscriptionsImporter
         block_number: response['blockNumber'].to_i(16),
         transaction_index: receipt_details['transactionIndex'].to_i(16),
         deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
-        gas: tx['gas'].to_i(16),
+        gas_limit: tx['gas'].to_i(16),
         tx_type: tx['type']
       )
       

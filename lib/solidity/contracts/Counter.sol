@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import "solady/src/utils/GasBurnerLib.sol";
+
 contract Counter {
     event Deployed(address indexed addr, string greeting);
 
@@ -13,6 +15,10 @@ contract Counter {
 
     function increment() public {
         count += 1;
+    }
+    
+    function consumeGas(uint256 amountToBurn, string memory stringToIncreaseCalldataCost) public {
+        // GasBurnerLib.burn(amountToBurn);
     }
 
     function getCount() public view returns (uint256) {

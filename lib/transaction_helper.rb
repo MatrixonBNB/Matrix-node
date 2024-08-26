@@ -119,12 +119,13 @@ module TransactionHelper
     address:,
     from:,
     function:,
-    args:,
+    args: [],
     value: 0,
     gas_limit: 10_000_000,
-    max_fee_per_gas: 10.gwei,
+    max_fee_per_gas: 1.gwei,
     expect_failure: false,
-    expect_blank: false
+    expect_blank: false,
+    sub_calls: []
   )
     data = TransactionHelper.get_function_calldata(contract: contract, function: function, args: args)
     
@@ -136,7 +137,8 @@ module TransactionHelper
       gas_limit: gas_limit,
       max_fee_per_gas: max_fee_per_gas,
       expect_failure: expect_failure,
-      expect_blank: expect_blank
+      expect_blank: expect_blank,
+      sub_calls: sub_calls
     )
   end
   
@@ -217,12 +219,14 @@ module TransactionHelper
     value: 0,
     block_timestamp: nil,
     max_fee_per_gas: 10.gwei,
+    sub_calls: [],
     gas_limit: 10_000_000,
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
     chain_id: FacetTransaction.current_chain_id,
     expect_failure: false,
-    expect_blank: false
+    expect_blank: false,
+    in_v2: true
   )
     last_block = EthBlockImporter.instance.current_max_eth_block
         
@@ -293,22 +297,47 @@ module TransactionHelper
       }
     }
 
-    trace_result = {
-      'result' => [
-        {
-          'txHash' => eth_transaction['hash'],
-          'result' => {
-            'from' => eth_transaction['from'],
-            'to' => FacetTransaction::FACET_INBOX_ADDRESS,
-            'gasUsed' => "0x" + eth_gas_used.to_s(16),
-            'gas' => eth_transaction['gas'],
-            'output' => '0x',
-            'input' => eth_transaction['input'],
-            'type' => 'CALL'
-          }
+    trace_result = [
+      {
+        'txHash' => eth_transaction['hash'],
+        'result' => {
+          'from' => eth_transaction['from'],
+          'to' => FacetTransaction::FACET_INBOX_ADDRESS,
+          'gasUsed' => "0x" + eth_gas_used.to_s(16),
+          'gas' => eth_transaction['gas'],
+          'output' => '0x',
+          'input' => eth_transaction['input'],
+          'type' => 'CALL',
+          'calls' => []
         }
-      ]
-    }
+      }
+    ]
+    
+    sub_calls.each do |sub_call|
+      sub_call = sub_call.with_indifferent_access
+      
+      sub_call_data = FacetTransaction.new(
+        chain_id: chain_id,
+        to_address: sub_call['to'],
+        from_address: sub_call['from'],
+        value: value,
+        max_fee_per_gas: max_fee_per_gas,
+        gas_limit: sub_call['gas_limit'].to_i,
+        input: sub_call['input']
+      ).to_eth_payload
+      # binding.irb
+      sub_call_result = {
+        'from' => sub_call['from'],
+        'to' => FacetTransaction::FACET_INBOX_ADDRESS,
+        'gasUsed' => "0x0",
+        'gas' => "0x1",
+        'output' => '0x',
+        'input' => sub_call_data,
+        'type' => 'CALL'
+      }
+      
+      trace_result[0]['result']['calls'] << sub_call_result
+    end
     
     receipts_result = {
       'result' => [
@@ -326,7 +355,7 @@ module TransactionHelper
     end
 
     dummy_client.define_singleton_method(:debug_trace_block_by_number) do |block_number|
-      trace_result
+      {'result' => trace_result}
     end
 
     dummy_client.define_singleton_method(:get_transaction_receipts) do |block_number, blocks_behind: 1000|
@@ -335,6 +364,10 @@ module TransactionHelper
 
     dummy_client.define_singleton_method(:get_block_number) do
       last_block.number + 3999
+    end
+    
+    EthBlockImporter.instance.define_singleton_method(:in_v2?) do |block_number|
+      true
     end
     
     EthBlockImporter.instance.define_singleton_method(:blocks_behind) do
@@ -355,10 +388,13 @@ module TransactionHelper
     res.receipts_imported = facet_receipts
     res.transactions_imported = facet_txs
     
-    if facet_receipts.map(&:status) != [1] && facet_receipts.present?
-      ap facet_txs.first
-      ap facet_receipts.first
-      ap facet_receipts.first.trace
+    if facet_receipts.map(&:status).uniq != [1] && facet_receipts.present?
+      failed_receipts = facet_receipts.select{|r| r.status != 1}
+      failed_transactions = facet_txs.select{|tx| failed_receipts.map(&:transaction_hash).include?(tx.tx_hash)}
+      # ap facet_txs.first
+      ap failed_transactions
+      ap failed_receipts
+      ap failed_receipts.map(&:trace)
     end
     
     expected = expect_failure ? [0] : [1]
@@ -404,7 +440,7 @@ module TransactionHelper
         tx_hash: tx['hash'],
         transaction_index: receipt_details['transactionIndex'].to_i(16),
         deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
-        gas: tx['gas'].to_i(16),
+        gas_limit: tx['gas'].to_i(16),
         tx_type: tx['type'],
         from_address: tx['from'],
         to_address: tx['to'],
