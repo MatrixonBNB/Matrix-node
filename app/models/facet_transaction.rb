@@ -117,13 +117,6 @@ class FacetTransaction < ApplicationRecord
       facet_tx
     end.flatten.compact
     
-    facet_txs = facet_txs.sort_by(&:eth_call_index).each_with_object([[], 0]) do |tx, (selected, total_gas)|
-      if total_gas + tx.gas_limit <= FacetBlock::GAS_LIMIT
-        selected << tx
-        total_gas += tx.gas_limit
-      end
-    end.first
-    
     facet_txs
   end
   
