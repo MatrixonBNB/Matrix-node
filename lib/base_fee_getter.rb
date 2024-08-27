@@ -5,13 +5,9 @@ module BaseFeeGetter
   RETRY_DELAY = 2
 
   def ethereum_client
-    @_ethereum_client ||= begin
-      client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
-      client_class.new(
-        api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
-        base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
-      )
-    end
+    @_ethereum_client ||= EthRpcClient.new(
+      base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
+    )
   end
 
   def start_block

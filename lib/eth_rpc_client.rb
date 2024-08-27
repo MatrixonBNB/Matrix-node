@@ -1,9 +1,8 @@
-class AlchemyClient
-  attr_accessor :base_url, :api_key
+class EthRpcClient
+  attr_accessor :base_url
 
-  def initialize(base_url: ENV['ETHEREUM_CLIENT_BASE_URL'], api_key:)
-    self.base_url = base_url.chomp('/')
-    self.api_key = api_key
+  def initialize(base_url: ENV['ETHEREUM_CLIENT_BASE_URL'])
+    self.base_url = base_url
   end
 
   def get_block(block_number, include_txs = false)
@@ -56,7 +55,7 @@ class AlchemyClient
   def get_transaction_receipts_batch(block_number)
     query_api(
       method: 'eth_getBlockReceipts',
-      params: [{ blockNumber: "0x" + block_number.to_s(16) }]
+      params: ["0x" + block_number.to_s(16)]
     )
   end
   
@@ -111,8 +110,8 @@ class AlchemyClient
       params: params
     }
 
-    url = [base_url, api_key].join('/')
-
+    url = base_url
+    
     retries = 5
     begin
       response = HTTParty.post(url, body: data.to_json, headers: headers)

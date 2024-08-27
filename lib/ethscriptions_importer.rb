@@ -10,10 +10,7 @@ class EthscriptionsImporter
   def initialize
     reset_state
     
-    client_class = ENV.fetch('ETHEREUM_CLIENT_CLASS', 'AlchemyClient').constantize
-      
-    @ethereum_client = client_class.new(
-      api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
+    @ethereum_client ||= EthRpcClient.new(
       base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
     )
   end
@@ -87,7 +84,7 @@ class EthscriptionsImporter
     SolidityCompiler.compile_all_legacy_files
     ensure_genesis_blocks
     
-    alchemy_responses = {}
+    l1_rpc_responses = {}
     
     loop do
       begin
@@ -104,11 +101,11 @@ class EthscriptionsImporter
         
         blocks_to_import = block_numbers + next_block_numbers
         
-        blocks_to_import -= alchemy_responses.keys
+        blocks_to_import -= l1_rpc_responses.keys
         
-        alchemy_responses.reverse_merge!(get_blocks_promises(blocks_to_import))
+        l1_rpc_responses.reverse_merge!(get_blocks_promises(blocks_to_import))
         
-        import_blocks(block_numbers, alchemy_responses)
+        import_blocks(block_numbers, l1_rpc_responses)
       rescue BlockNotReadyToImportError => e
         puts "#{e.message}. Stopping import."
         break
@@ -150,7 +147,7 @@ class EthscriptionsImporter
     end.to_h
   end
   
-  def import_blocks(block_numbers, alchemy_responses)
+  def import_blocks(block_numbers, l1_rpc_responses)
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
@@ -161,12 +158,12 @@ class EthscriptionsImporter
     ]
     
     block_by_number_responses = Benchmark.msr("blocks") do
-      alchemy_responses.select do |block_number, promise|
+      l1_rpc_responses.select do |block_number, promise|
         block_numbers.include?(block_number)
       end.to_h.transform_values!(&:value!)
     end
     
-    alchemy_responses.reject! { |block_number, promise| block_by_number_responses.key?(block_number) }
+    l1_rpc_responses.reject! { |block_number, promise| block_by_number_responses.key?(block_number) }
     
     legacy_blocks = legacy_blocks_future.to_a
     

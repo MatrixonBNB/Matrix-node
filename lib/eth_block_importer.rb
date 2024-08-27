@@ -12,8 +12,7 @@ class EthBlockImporter
     @facet_block_cache = {}
     @eth_block_cache = {}
     
-    @ethereum_client = AlchemyClient.new(
-      api_key: ENV['ETHEREUM_CLIENT_API_KEY'],
+    @ethereum_client ||= EthRpcClient.new(
       base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
     )
     
