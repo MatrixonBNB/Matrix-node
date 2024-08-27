@@ -51,7 +51,7 @@ class EthscriptionsImporter
   end
   
   def import_batch_size
-    [blocks_behind, 63].min
+    [blocks_behind, 100].min
   end
   
   def add_legacy_value_mapping_item(legacy_value:, new_value:)
@@ -105,7 +105,12 @@ class EthscriptionsImporter
         
         l1_rpc_responses.reverse_merge!(get_blocks_promises(blocks_to_import))
         
-        import_blocks(block_numbers, l1_rpc_responses)
+        result = import_blocks(block_numbers, l1_rpc_responses)
+        
+        if result.nil?
+          logger.info "Reorg detected. Restarting import process."
+          next
+        end
       rescue BlockNotReadyToImportError => e
         puts "#{e.message}. Stopping import."
         break
@@ -151,11 +156,10 @@ class EthscriptionsImporter
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
-    legacy_blocks_future, ethscriptions_future, legacy_tx_receipts_future = [
-      LegacyEthBlock.where(block_number: block_numbers).load_async,
-      LegacyEthscription.where(block_number: block_numbers).load_async,
-      LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
-    ]
+    block_numbers = block_numbers.sort
+    
+    # Fetch the latest block from the database once
+    latest_db_block = EthBlock.order(number: :desc).first
     
     block_by_number_responses = Benchmark.msr("blocks") do
       l1_rpc_responses.select do |block_number, promise|
@@ -165,7 +169,26 @@ class EthscriptionsImporter
     
     l1_rpc_responses.reject! { |block_number, promise| block_by_number_responses.key?(block_number) }
     
-    legacy_blocks = legacy_blocks_future.to_a
+    # Check for reorg at the start of the batch
+    first_block_number = block_numbers.first
+    first_block_data = block_by_number_responses[first_block_number]['result']
+    
+    if latest_db_block
+      if first_block_number == latest_db_block.number + 1
+        if latest_db_block.block_hash != first_block_data['parentHash']
+          logger.warn "Reorg detected at block #{first_block_number}"
+          EthBlock.where("number >= ?", latest_db_block.number).destroy_all
+          return nil
+        end
+      else
+        raise "Unexpected block number: expected #{latest_db_block.number + 1}, got #{first_block_number}"
+      end
+    end
+    
+    ethscriptions_future, legacy_tx_receipts_future = [
+      LegacyEthscription.where(block_number: block_numbers).load_async,
+      LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
+    ]
     
     # Create a hash mapping transaction hashes to their "from" addresses
     tx_hash_to_from = {}
@@ -204,15 +227,15 @@ class EthscriptionsImporter
     in_memory_blocks = FacetBlock.where(number: (current_max_block_number - 64 - block_numbers.size)..current_max_block_number).index_by(&:number)
     
     ActiveRecord::Base.transaction do
-      legacy_blocks.each_with_index do |block, index|
-        eth_block = EthBlock.from_rpc_result(block_by_number_responses[block.block_number]['result'])
+      block_numbers.each_with_index do |block_number, index|
+        eth_block = EthBlock.from_rpc_result(block_by_number_responses[block_number]['result'])
+
         eth_blocks << eth_block
         
-        block_ethscriptions = Array.wrap(ethscriptions_by_block[block.block_number]).sort_by(&:transaction_index)
-        block_legacy_tx_receipts = Array.wrap(legacy_tx_receipts_by_block[block.block_number]).sort_by(&:transaction_index)
+        block_ethscriptions = Array.wrap(ethscriptions_by_block[block_number]).sort_by(&:transaction_index)
+        block_legacy_tx_receipts = Array.wrap(legacy_tx_receipts_by_block[block_number]).sort_by(&:transaction_index)
         
         eth_transactions.concat(block_ethscriptions.map { |e| EthTransaction.from_ethscription(e) })
-        # all_ethscriptions.concat(block_ethscriptions.map(&:dup))
         
         block_number = current_max_block_number + index + 1
         
@@ -287,16 +310,6 @@ class EthscriptionsImporter
     puts "Gas per second: #{gas_per_second_millions} million / s"
     
     block_numbers
-  rescue ActiveRecord::StatementInvalid => e
-    if e.message.include?("New block number must be equal to max block number + 1")
-      logger.error "Error importing blocks: #{e.message}"
-      incorrect_block_number = e.message.match(/new number = (\d+)/)[1].to_i
-      parent = incorrect_block_number - 1
-      
-      EthBlock.where("number >= ?", parent).destroy_all
-    else
-      raise
-    end
   rescue => e
     binding.irb
     raise
@@ -319,7 +332,6 @@ class EthscriptionsImporter
       "0xdad5e47c73dec1ba0e4b7943e588a3deb290ed3b85b9f40d11a9edd3799135ab",
       "0xb5cf66fbaeb93b876a3cb3c6126b16bb73d8897e407ee0d712e52410f18d3542",
       
-      # Where do these comes from?
       "0x8d3cf03f51c9813dffb2f804e2ec6f8f187b687b0e3374bf44936adc15d938f8",
       "0xabea86865dc24c3719ebe2c0d75ff8b81f4124449a66b2a15dc6dcff75cf44d7",
     ]
