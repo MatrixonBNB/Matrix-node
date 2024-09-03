@@ -41,32 +41,28 @@ module PredeployManager
   def predeploy_info
     parsed = JSON.parse(File.read(PREDEPLOY_INFO_PATH))
     
-    parsed.transform_values do |info|
+    result = {}
+    parsed.each do |contract_name, info|
       contract = Eth::Contract.from_bin(
         name: info.fetch('name'),
         bin: info.fetch('bin'),
         abi: info.fetch('abi'),
       )
       
-      if info['address']
-        contract.address = info['address']
+      addresses = Array.wrap(info['address'])
+      addresses.each do |address|
+        result[address] = contract.dup.tap { |c| c.address = address }.freeze
       end
       
-      contract.freeze
-    end.freeze
+      result[contract_name] = contract.freeze
+    end
+    
+    result.freeze
   end
   memoize :predeploy_info
   
   def get_contract_from_predeploy_info!(address: nil, name: nil)
-    if name
-      predeploy_info.fetch(name)
-    elsif address
-      ret = predeploy_info.values.find { |contract| contract.address&.downcase == address.downcase }
-      raise KeyError, "Contract with address #{address} not found in predeploy info" unless ret
-      ret
-    else
-      raise "Either address or name must be provided"
-    end
+    predeploy_info.fetch(address || name)
   end
   memoize :get_contract_from_predeploy_info!
   
@@ -115,24 +111,25 @@ module PredeployManager
   end
   
   def generate_predeploy_info_json
-    predeploy_info = predeploy_to_local_map.map do |address, contract_name|
+    predeploy_info = {}
+    
+    predeploy_to_local_map.each do |address, contract_name|
       contract = EVMHelpers.compile_contract("legacy/#{contract_name}")
-      payload = {
+      predeploy_info[contract_name] ||= {
         name: contract.name,
-        address: address,
+        address: [],
         abi: contract.abi,
         bin: contract.bin,
       }
-      [contract_name, payload]
-    end.to_h
+      predeploy_info[contract_name][:address] << address
+    end
     
     proxy_contract = EVMHelpers.compile_contract("legacy/ERC1967Proxy")
-    proxy_payload = {
+    predeploy_info['ERC1967Proxy'] = {
       name: proxy_contract.name,
       abi: proxy_contract.abi,
       bin: proxy_contract.bin,
     }
-    predeploy_info['ERC1967Proxy'] = proxy_payload
 
     File.write(PREDEPLOY_INFO_PATH, JSON.pretty_generate(predeploy_info))
     puts "Generated predeploy_info.json"

@@ -229,8 +229,8 @@ class FacetTransactionReceipt < ApplicationRecord
       calls.each do |call|
         if call["type"] == "DELEGATECALL"
           to_address = call["to"]
-          contract_name = PredeployManager.local_from_predeploy(to_address)
-          abi = get_abi(contract_name)
+          contract = PredeployManager.get_contract_from_predeploy_info!(address: to_address)
+          abi = contract.abi
           function_name, decoded_inputs, decoded_outputs = decode_function_input(call, abi)
           call["function_name"] = function_name
           call["inputs"] = decoded_inputs
@@ -262,11 +262,6 @@ class FacetTransactionReceipt < ApplicationRecord
     rescue => e
       binding.irb
       raise
-    end
-  
-    def get_abi(contract_name)
-      impl = PredeployManager.get_contract_from_predeploy_info!(name: contract_name)
-      impl.parent.abi
     end
   
     def decode_function_input(call, abi)

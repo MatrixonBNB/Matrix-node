@@ -574,7 +574,7 @@ module TransactionHelper
 
     contract_object = get_contract(contract, address)
     args = convert_args(contract_object, function_name, function_args)
-    res = static_call(contract: contract, address: address, function: function_name, args: args)
+    res = static_call(contract: contract_object, address: address, function: function_name, args: args)
     
     return unless res
     

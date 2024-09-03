@@ -1,7 +1,9 @@
 {
   "AirdropERC20Vb02": {
     "name": "AirdropERC20Vb02",
-    "address": "0x9dc4e7f596baf4227f919102a7f80523834edb02",
+    "address": [
+      "0x9dc4e7f596baf4227f919102a7f80523834edb02"
+    ],
     "abi": [
       {
         "inputs": [
@@ -673,7 +675,9 @@
   },
   "BridgeAndCallHelperVc14": {
     "name": "BridgeAndCallHelperVc14",
-    "address": "0x1417f900e3095bfc603b84849e36488ae3017c14",
+    "address": [
+      "0x1417f900e3095bfc603b84849e36488ae3017c14"
+    ],
     "abi": [
       {
         "inputs": [
@@ -1238,7 +1242,9 @@
   },
   "ERC20BatchTransferV4c9": {
     "name": "ERC20BatchTransferV4c9",
-    "address": "0x978997b7e5af223021470a1deb14211511dd04c9",
+    "address": [
+      "0x978997b7e5af223021470a1deb14211511dd04c9"
+    ],
     "abi": [
       {
         "inputs": [
@@ -1398,7 +1404,9 @@
   },
   "ERC20BridgeFactoryVce0": {
     "name": "ERC20BridgeFactoryVce0",
-    "address": "0x90767a6e0b80b492642364382e609b6e84d85ce0",
+    "address": [
+      "0x90767a6e0b80b492642364382e609b6e84d85ce0"
+    ],
     "abi": [
       {
         "inputs": [
@@ -2171,7 +2179,10 @@
   },
   "ERC20BridgeV1aa": {
     "name": "ERC20BridgeV1aa",
-    "address": "0x8c9fe34fc771f4ad594fb2b5abf9529d0ce5f3ec",
+    "address": [
+      "0xfc14eb8e62ebd0a5cc26b1a95dfac3d5d834c1aa",
+      "0x8c9fe34fc771f4ad594fb2b5abf9529d0ce5f3ec"
+    ],
     "abi": [
       {
         "inputs": [
@@ -2946,7 +2957,9 @@
   },
   "ERC20LockerV2c7": {
     "name": "ERC20LockerV2c7",
-    "address": "0x568dac12d14dab2d5994ec8037feae7aeeb4e2c7",
+    "address": [
+      "0x568dac12d14dab2d5994ec8037feae7aeeb4e2c7"
+    ],
     "abi": [
       {
         "inputs": [
@@ -3578,7 +3591,9 @@
   },
   "EditionMetadataRendererV3f8": {
     "name": "EditionMetadataRendererV3f8",
-    "address": "0x99632006a0c00e4e002aea6b1e03809442f763f8",
+    "address": [
+      "0x99632006a0c00e4e002aea6b1e03809442f763f8"
+    ],
     "abi": [
       {
         "inputs": [
@@ -4032,7 +4047,9 @@
   },
   "EtherBridgeV064": {
     "name": "EtherBridgeV064",
-    "address": "0x897d289b77c8393783829489b9ab3255c0158064",
+    "address": [
+      "0x897d289b77c8393783829489b9ab3255c0158064"
+    ],
     "abi": [
       {
         "inputs": [
@@ -4780,7 +4797,9 @@
   },
   "EtherBridgeV0ee": {
     "name": "EtherBridgeV0ee",
-    "address": "0x77eccf9c6e226d728e467f5bc8f8898864e290ee",
+    "address": [
+      "0x77eccf9c6e226d728e467f5bc8f8898864e290ee"
+    ],
     "abi": [
       {
         "inputs": [
@@ -5768,7 +5787,9 @@
   },
   "EtherBridgeVd58": {
     "name": "EtherBridgeVd58",
-    "address": "0xbe83630c4d38d8bed6ce7e8f6a1a15466f3e9d58",
+    "address": [
+      "0xbe83630c4d38d8bed6ce7e8f6a1a15466f3e9d58"
+    ],
     "abi": [
       {
         "inputs": [
@@ -6848,7 +6869,9 @@
   },
   "EthscriptionERC20BridgeV6e4": {
     "name": "EthscriptionERC20BridgeV6e4",
-    "address": "0x3da27228c6567cee2e004d4ccbb6a34011ab66e4",
+    "address": [
+      "0x3da27228c6567cee2e004d4ccbb6a34011ab66e4"
+    ],
     "abi": [
       {
         "inputs": [
@@ -7879,7 +7902,9 @@
   },
   "EthscriptionERC20BridgeVd9d": {
     "name": "EthscriptionERC20BridgeVd9d",
-    "address": "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d",
+    "address": [
+      "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d"
+    ],
     "abi": [
       {
         "inputs": [
@@ -8802,7 +8827,9 @@
   },
   "EthscriptionERC20BridgeVf6e": {
     "name": "EthscriptionERC20BridgeVf6e",
-    "address": "0x89cfcf16d1fffb3937b47f1d1a22850c0ad80f6e",
+    "address": [
+      "0x89cfcf16d1fffb3937b47f1d1a22850c0ad80f6e"
+    ],
     "abi": [
       {
         "inputs": [
@@ -9570,7 +9597,9 @@
   },
   "FacetBuddyFactoryVef8": {
     "name": "FacetBuddyFactoryVef8",
-    "address": "0xf755ca9cf7311dd857250a183b74a779e3c96ef8",
+    "address": [
+      "0xf755ca9cf7311dd857250a183b74a779e3c96ef8"
+    ],
     "abi": [
       {
         "inputs": [
@@ -9920,7 +9949,10 @@
   },
   "FacetBuddyVe5c": {
     "name": "FacetBuddyVe5c",
-    "address": "0x17a26121650a35308438b622ed25c5613f995f2e",
+    "address": [
+      "0xe6d43163aaab54cc6e6c54ff5b7c7570a2dabe5c",
+      "0x17a26121650a35308438b622ed25c5613f995f2e"
+    ],
     "abi": [
       {
         "inputs": [
@@ -10083,7 +10115,9 @@
   },
   "FacetPortV27b": {
     "name": "FacetPortV27b",
-    "address": "0xa17f86ce3c867a3d38fa65e46f9eeebe9eec127b",
+    "address": [
+      "0xa17f86ce3c867a3d38fa65e46f9eeebe9eec127b"
+    ],
     "abi": [
       {
         "inputs": [
@@ -10995,7 +11029,9 @@
   },
   "FacetPortV670": {
     "name": "FacetPortV670",
-    "address": "0x6928a6a853a23f15c2393221f6a9db8d81fd5670",
+    "address": [
+      "0x6928a6a853a23f15c2393221f6a9db8d81fd5670"
+    ],
     "abi": [
       {
         "inputs": [
@@ -11923,7 +11959,9 @@
   },
   "FacetPortVee3": {
     "name": "FacetPortVee3",
-    "address": "0xc7b4f3e0c0bf1a2cc4769a3ec54f4948dca13ee3",
+    "address": [
+      "0xc7b4f3e0c0bf1a2cc4769a3ec54f4948dca13ee3"
+    ],
     "abi": [
       {
         "inputs": [
@@ -12835,7 +12873,9 @@
   },
   "FacetSwapFactoryVac5": {
     "name": "FacetSwapFactoryVac5",
-    "address": "0xbb8c78aabb60b5cfb7113224102e1a9a07c77ac5",
+    "address": [
+      "0xbb8c78aabb60b5cfb7113224102e1a9a07c77ac5"
+    ],
     "abi": [
       {
         "inputs": [
@@ -13310,7 +13350,9 @@
   },
   "FacetSwapFactoryVe7f": {
     "name": "FacetSwapFactoryVe7f",
-    "address": "0x0ad9c442bd4eb506447f125b7e71b64e33583e7f",
+    "address": [
+      "0x0ad9c442bd4eb506447f125b7e71b64e33583e7f"
+    ],
     "abi": [
       {
         "inputs": [
@@ -13720,7 +13762,10 @@
   },
   "FacetSwapPairV2b2": {
     "name": "FacetSwapPairV2b2",
-    "address": "0xd1cc0aa91053a26d340e9d710a430b111b2ccda0",
+    "address": [
+      "0x283fc37c0fb170a75b8f22ce65d0f0a4b46022b2",
+      "0xd1cc0aa91053a26d340e9d710a430b111b2ccda0"
+    ],
     "abi": [
       {
         "inputs": [
@@ -14645,7 +14690,10 @@
   },
   "FacetSwapPairVdfd": {
     "name": "FacetSwapPairVdfd",
-    "address": "0xc5e59e350c4fe947a19394710b01aa2235c0bc93",
+    "address": [
+      "0x806a6cc5f16ae52c0f8dae730a886d7212db2dfd",
+      "0xc5e59e350c4fe947a19394710b01aa2235c0bc93"
+    ],
     "abi": [
       {
         "inputs": [
@@ -15570,7 +15618,9 @@
   },
   "FacetSwapRouterV099": {
     "name": "FacetSwapRouterV099",
-    "address": "0x1f157ea244a08dd78c14ba8faa7280559232b099",
+    "address": [
+      "0x1f157ea244a08dd78c14ba8faa7280559232b099"
+    ],
     "abi": [
       {
         "inputs": [
@@ -16270,7 +16320,9 @@
   },
   "FacetSwapRouterV56d": {
     "name": "FacetSwapRouterV56d",
-    "address": "0xaee84241099b58f9cf51f6f4bcaf6bac4c29756d",
+    "address": [
+      "0xaee84241099b58f9cf51f6f4bcaf6bac4c29756d"
+    ],
     "abi": [
       {
         "inputs": [
@@ -17325,7 +17377,9 @@
   },
   "FacetSwapRouterVaf8": {
     "name": "FacetSwapRouterVaf8",
-    "address": "0xac8855e1888892d5b16ee635df1ecd19d13edaf8",
+    "address": [
+      "0xac8855e1888892d5b16ee635df1ecd19d13edaf8"
+    ],
     "abi": [
       {
         "inputs": [
@@ -18365,7 +18419,9 @@
   },
   "NFTCollectionV5f8": {
     "name": "NFTCollectionV5f8",
-    "address": "0x523f902d56b4eb825eda09306925588f6d36c5f8",
+    "address": [
+      "0x523f902d56b4eb825eda09306925588f6d36c5f8"
+    ],
     "abi": [
       {
         "inputs": [
@@ -20049,7 +20105,9 @@
   },
   "NFTCollectionV77f": {
     "name": "NFTCollectionV77f",
-    "address": "0xaf4d97792fce2b2a58ff0ee2274b86eac91e977f",
+    "address": [
+      "0xaf4d97792fce2b2a58ff0ee2274b86eac91e977f"
+    ],
     "abi": [
       {
         "inputs": [
@@ -21763,7 +21821,9 @@
   },
   "NFTCollectionVa11": {
     "name": "NFTCollectionVa11",
-    "address": "0x737d48d005c5842a76e79f545e850e03c502fa11",
+    "address": [
+      "0x737d48d005c5842a76e79f545e850e03c502fa11"
+    ],
     "abi": [
       {
         "inputs": [
@@ -23477,7 +23537,9 @@
   },
   "NameRegistryV139": {
     "name": "NameRegistryV139",
-    "address": "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139",
+    "address": [
+      "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139"
+    ],
     "abi": [
       {
         "inputs": [
@@ -25534,7 +25596,9 @@
   },
   "NameRegistryV2f5": {
     "name": "NameRegistryV2f5",
-    "address": "0x5844bea96e5ac147cd9ddc7daa22a0899659d2f5",
+    "address": [
+      "0x5844bea96e5ac147cd9ddc7daa22a0899659d2f5"
+    ],
     "abi": [
       {
         "inputs": [
@@ -27750,7 +27814,9 @@
   },
   "PresaleERC20V6f0": {
     "name": "PresaleERC20V6f0",
-    "address": "0x1e6a9d641a7658788ac6b35e02bbfae63ccdd6f0",
+    "address": [
+      "0x1e6a9d641a7658788ac6b35e02bbfae63ccdd6f0"
+    ],
     "abi": [
       {
         "inputs": [
@@ -28549,7 +28615,9 @@
   },
   "PublicMintERC20Vc88": {
     "name": "PublicMintERC20Vc88",
-    "address": "0x137e368f782453e41f622fa8cf68296d04c84c88",
+    "address": [
+      "0x137e368f782453e41f622fa8cf68296d04c84c88"
+    ],
     "abi": [
       {
         "inputs": [
@@ -29033,7 +29101,9 @@
   },
   "TokenUpgradeRendererV3d1": {
     "name": "TokenUpgradeRendererV3d1",
-    "address": "0x941182f7c4e753eb2b3c5a40b338d7c44d7b43d1",
+    "address": [
+      "0x941182f7c4e753eb2b3c5a40b338d7c44d7b43d1"
+    ],
     "abi": [
       {
         "inputs": [
@@ -29921,7 +29991,9 @@
   },
   "TokenUpgradeRendererV859": {
     "name": "TokenUpgradeRendererV859",
-    "address": "0x7edfc18d02285a683a9db40bc8b3df0c54975859",
+    "address": [
+      "0x7edfc18d02285a683a9db40bc8b3df0c54975859"
+    ],
     "abi": [
       {
         "inputs": [
@@ -30743,7 +30815,9 @@
   },
   "TokenUpgradeRendererVbf5": {
     "name": "TokenUpgradeRendererVbf5",
-    "address": "0xe0058ca1c48e8f694324a6d95334f539598d9bf5",
+    "address": [
+      "0xe0058ca1c48e8f694324a6d95334f539598d9bf5"
+    ],
     "abi": [
       {
         "inputs": [
@@ -31621,7 +31695,9 @@
   },
   "NonExistentContractShim": {
     "name": "NonExistentContractShim",
-    "address": "0x00000000000000000000000000000000000000c5",
+    "address": [
+      "0x00000000000000000000000000000000000000c5"
+    ],
     "abi": [
       {
         "stateMutability": "nonpayable",
@@ -31632,7 +31708,9 @@
   },
   "L1Block": {
     "name": "L1Block",
-    "address": "0x4200000000000000000000000000000000000015",
+    "address": [
+      "0x4200000000000000000000000000000000000015"
+    ],
     "abi": [
       {
         "inputs": [
