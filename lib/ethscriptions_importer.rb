@@ -76,12 +76,7 @@ class EthscriptionsImporter
       raise "FACET_V1_VM_DATABASE_URL is not set"
     end
     
-    # Rails.cache.clear
-    # SolidityCompiler.reset_checksum
-    # SolidityCompiler.compile_all_legacy_files
     MemeryExtensions.clear_all_caches!
-    SolidityCompiler.reset_checksum
-    SolidityCompiler.compile_all_legacy_files
     ensure_genesis_blocks
     
     l1_rpc_responses = {}
@@ -222,6 +217,7 @@ class EthscriptionsImporter
     earliest = FacetBlock.order(number: :asc).first
     
     # Initialize in-memory representation of blocks
+    # TODO: this grows unbounded, need to trim it to last 64 blocks
     in_memory_blocks = FacetBlock.where(number: (current_max_block_number - 64 - block_numbers.size)..current_max_block_number).index_by(&:number)
     
     ActiveRecord::Base.transaction do

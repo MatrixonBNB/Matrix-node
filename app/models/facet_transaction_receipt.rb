@@ -154,8 +154,8 @@ class FacetTransactionReceipt < ApplicationRecord
   def decoded_legacy_logs
     logs.map do |log|
       implementation_address = Ethscription.get_implementation(log['address'])
-      implementation_name = PredeployManager.local_from_predeploy(implementation_address)
-      impl = EVMHelpers.compile_contract(implementation_name)
+      impl = PredeployManager.get_contract_from_predeploy_info!(address: implementation_address)
+      implementation_name = impl.name
   
       begin
         impl.parent.decode_log(log)
@@ -170,7 +170,7 @@ class FacetTransactionReceipt < ApplicationRecord
         legacy_files.each do |file|
           contract_name = File.basename(file, '.sol')
           begin
-            impl = EVMHelpers.compile_contract("legacy/#{contract_name}")
+            impl = PredeployManager.get_contract_from_predeploy_info!(name: contract_name)
             decoded = impl.parent.decode_log(log)
             break if decoded
           rescue Eth::Contract::UnknownEvent
@@ -265,7 +265,8 @@ class FacetTransactionReceipt < ApplicationRecord
     end
   
     def get_abi(contract_name)
-      EVMHelpers.compile_contract(contract_name).abi
+      impl = PredeployManager.get_contract_from_predeploy_info!(name: contract_name)
+      impl.parent.abi
     end
   
     def decode_function_input(call, abi)

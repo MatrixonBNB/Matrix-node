@@ -80,17 +80,8 @@ module TransactionHelper
   end
   
   def static_call(contract:, address:, function:, args:)
-    contract_object = get_contract(contract, address)
-    
-    function_obj = contract_object.parent.function_hash[function]
-    data = function_obj.get_call_data(*args) rescue binding.irb
-    
-    # GethDriver.non_auth_client.call("debug_traceCall", [{
-    #   to: address,
-    #   data: data
-    # }, "latest", {
-    #   tracer: "callTracer"
-    # }])
+    function_obj = contract.parent.function_hash[function]
+    data = function_obj.get_call_data(*args)
     
     result = GethDriver.non_auth_client.call("eth_call", [{
       to: address,
@@ -106,9 +97,7 @@ module TransactionHelper
       function:,
       args:
     )
-      contract_object = compile_contract(contract)
-      
-      function_obj = contract_object.parent.function_hash[function]
+      function_obj = contract.parent.function_hash[function]
       function_obj.get_call_data(*args).freeze
     end
     memoize :get_function_calldata
@@ -176,32 +165,40 @@ module TransactionHelper
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
-    pre_deploy = PredeployManager.predeploy_to_local_map.invert[implementation.split("/").last]
+    begin
+      pre_deploy = PredeployManager.get_contract_from_predeploy_info!(name: implementation.split("/").last)
+    rescue KeyError
+      pre_deploy = nil
+    end
     
-    implementation_address = if pre_deploy
+    implementation_contract = if pre_deploy
       pre_deploy
     else
-      deploy_contract(
+      address = deploy_contract(
         from: from,
-        contract: implementation,
+        contract: EVMHelpers.compile_contract(implementation),
         args: [],
         value: value,
         gas_limit: gas_limit,
         max_fee_per_gas: max_fee_per_gas,
         expect_failure: expect_failure
-      ).contract_address  
+      ).contract_address
+      
+      c = TransactionHelper.contract_addresses[address]
+      c.address = address
+      c
     end
-  
+    
     initialize_calldata = TransactionHelper.get_function_calldata(
-      contract: implementation,
+      contract: implementation_contract,
       function: 'initialize',
       args: args
     )
     
     res = deploy_contract(
       from: from,
-      contract: 'legacy/ERC1967Proxy',
-      args: [implementation_address, initialize_calldata],
+      contract: PredeployManager.get_contract_from_predeploy_info!(name: "ERC1967Proxy"),
+      args: [implementation_contract.address, initialize_calldata],
       value: value,
       gas_limit: gas_limit,
       max_fee_per_gas: max_fee_per_gas,

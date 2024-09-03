@@ -7,8 +7,10 @@ RSpec.describe "Reverts" do
   
   let(:from_address) { "0x000000000000000000000000000000000000000a" }
   
+  let(:counter_contract) { EVMHelpers.compile_contract('contracts/Counter') }
+  
   let!(:counter_address) {
-    facet_data = EVMHelpers.get_deploy_data('contracts/Counter', [1])
+    facet_data = EVMHelpers.get_deploy_data(counter_contract, [1])
             
     res = create_and_import_block(
       facet_data: facet_data,
@@ -46,7 +48,7 @@ RSpec.describe "Reverts" do
   
   it 'handles reverts' do
     call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'createRevert',
@@ -54,7 +56,7 @@ RSpec.describe "Reverts" do
     )
     
     call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'createRevert',
@@ -83,7 +85,7 @@ RSpec.describe "Reverts" do
   
   it 'calls with wrong args' do
     data = TransactionHelper.get_function_calldata(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       function: 'createRevert',
       args: [false]
     ).dup
@@ -99,7 +101,7 @@ RSpec.describe "Reverts" do
   
   it 'runs out of gas' do
     call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'runOutOfGas',
@@ -122,7 +124,7 @@ RSpec.describe "Reverts" do
     over_limit = limit + 1
     
     call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'runOutOfGas',
@@ -134,7 +136,7 @@ RSpec.describe "Reverts" do
   
   it 'is underpriced' do
     call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'createRevert',
@@ -142,7 +144,7 @@ RSpec.describe "Reverts" do
     )
     
     call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'createRevert',

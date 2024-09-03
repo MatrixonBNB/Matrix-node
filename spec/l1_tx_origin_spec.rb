@@ -6,7 +6,8 @@ RSpec.describe "L1 Tx Origin Gas Delegation" do
   let!(:from_address2) { "0x2222" + SecureRandom.hex(18) }
   
   let!(:counter_address) {
-    facet_data = EVMHelpers.get_deploy_data('contracts/Counter', [1])
+    contract = EVMHelpers.compile_contract('contracts/Counter')
+    facet_data = EVMHelpers.get_deploy_data(contract, [1])
             
     res = create_and_import_block(
       facet_data: facet_data,
@@ -18,12 +19,13 @@ RSpec.describe "L1 Tx Origin Gas Delegation" do
   }
   
   it 'handles refunds correctly for internal calls' do
-    # Setup
+    contract = EVMHelpers.compile_contract('contracts/Counter')
+    
     increment_input = TransactionHelper.get_function_calldata(
-      contract: 'contracts/Counter', function: 'increment', args: []
+      contract: contract, function: 'increment', args: []
     )
     consume_gas_input = TransactionHelper.get_function_calldata(
-      contract: 'contracts/Counter', function: 'consumeGas', args: [5_000, "a" * 1_000]
+      contract: contract, function: 'consumeGas', args: [5_000, "a" * 1_000]
     )
     
     initial_from_address_balance = GethDriver.client.call('eth_getBalance', [from_address, 'latest']).to_i(16)
@@ -34,7 +36,7 @@ RSpec.describe "L1 Tx Origin Gas Delegation" do
     
     # Execute transaction
     res = call_contract_function(
-      contract: 'contracts/Counter',
+      contract: contract,
       address: counter_address,
       from: from_address,
       function: 'increment',

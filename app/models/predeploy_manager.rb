@@ -2,6 +2,8 @@ module PredeployManager
   extend self
   include Memery
   
+  PREDEPLOY_INFO_PATH = Rails.root.join('config', 'predeploy_info.json')
+  
   def predeploy_to_local_map
     legacy_dir = Rails.root.join("lib/solidity/legacy")
     map = {}
@@ -35,6 +37,38 @@ module PredeployManager
     map
   end
   memoize :predeploy_to_local_map
+  
+  def predeploy_info
+    parsed = JSON.parse(File.read(PREDEPLOY_INFO_PATH))
+    
+    parsed.transform_values do |info|
+      contract = Eth::Contract.from_bin(
+        name: info.fetch('name'),
+        bin: info.fetch('bin'),
+        abi: info.fetch('abi'),
+      )
+      
+      if info['address']
+        contract.address = info['address']
+      end
+      
+      contract.freeze
+    end.freeze
+  end
+  memoize :predeploy_info
+  
+  def get_contract_from_predeploy_info!(address: nil, name: nil)
+    if name
+      predeploy_info.fetch(name)
+    elsif address
+      ret = predeploy_info.values.find { |contract| contract.address&.downcase == address.downcase }
+      raise KeyError, "Contract with address #{address} not found in predeploy info" unless ret
+      ret
+    else
+      raise "Either address or name must be provided"
+    end
+  end
+  memoize :get_contract_from_predeploy_info!
   
   def local_from_predeploy(address)
     name = predeploy_to_local_map.fetch(address&.downcase)
@@ -78,6 +112,30 @@ module PredeployManager
         }
       ]
     end.to_h
+  end
+  
+  def generate_predeploy_info_json
+    predeploy_info = predeploy_to_local_map.map do |address, contract_name|
+      contract = EVMHelpers.compile_contract("legacy/#{contract_name}")
+      payload = {
+        name: contract.name,
+        address: address,
+        abi: contract.abi,
+        bin: contract.bin,
+      }
+      [contract_name, payload]
+    end.to_h
+    
+    proxy_contract = EVMHelpers.compile_contract("legacy/ERC1967Proxy")
+    proxy_payload = {
+      name: proxy_contract.name,
+      abi: proxy_contract.abi,
+      bin: proxy_contract.bin,
+    }
+    predeploy_info['ERC1967Proxy'] = proxy_payload
+
+    File.write(PREDEPLOY_INFO_PATH, JSON.pretty_generate(predeploy_info))
+    puts "Generated predeploy_info.json"
   end
   
   def generate_full_genesis_json(network = ENV.fetch('ETHEREUM_NETWORK'))
@@ -155,5 +213,7 @@ module PredeployManager
       
       puts "Generated #{filename}"
     end
+    
+    generate_predeploy_info_json
   end
 end

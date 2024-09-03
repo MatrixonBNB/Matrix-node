@@ -265,7 +265,11 @@ module EthRbExtensions
     def self.decode_function_inputs(contract_address, input_data)
       implementation_address = Ethscription.get_implementation(contract_address)
       implementation_name = Ethscription.local_from_predeploy(implementation_address)
-      contract = EVMHelpers.compile_contract(implementation_name)
+      begin
+        contract = PredeployManager.get_contract_from_predeploy_info!(name: implementation_name)
+      rescue
+        contract = EVMHelpers.compile_contract(implementation_name)
+      end
 
       contract.parent.decode_function_inputs(input_data)
     end

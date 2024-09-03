@@ -7,8 +7,10 @@ RSpec.describe "Reverts" do
   
   let(:from_address) { "0x000000000000000000000000000000000000000a" }
   
+  let(:counter_contract) { EVMHelpers.compile_contract('contracts/Counter') }
+  
   let!(:counter_address) {
-    facet_data = EVMHelpers.get_deploy_data('contracts/Counter', [1])
+    facet_data = EVMHelpers.get_deploy_data(counter_contract, [1])
             
     res = create_and_import_block(
       facet_data: facet_data,
@@ -21,7 +23,7 @@ RSpec.describe "Reverts" do
   
   it "automatically uses the base fee per gas of the block" do
     res = call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'increment',
@@ -42,7 +44,7 @@ RSpec.describe "Reverts" do
   
   it "still fails for underpriced transactions" do
     res = call_contract_function(
-      contract: 'contracts/Counter',
+      contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'increment',

@@ -9,6 +9,7 @@ module EthscriptionEVMConverter
   
   included do
     delegate :local_from_predeploy, to: :PredeployManager
+    delegate :get_contract_from_predeploy_info!, to: :PredeployManager
     delegate :predeploy_to_local_map, to: :PredeployManager
     delegate :convert_args, to: :class
     delegate :normalize_args, to: :class
@@ -45,7 +46,7 @@ module EthscriptionEVMConverter
       predeploy_address = "0x" + data['init_code_hash'].last(40)
       
       begin
-        contract_name = local_from_predeploy(predeploy_address)
+        contract = get_contract_from_predeploy_info!(address: predeploy_address)
       rescue KeyError => e
         if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
           return predeploy_address
@@ -56,16 +57,18 @@ module EthscriptionEVMConverter
         end
       end
       
-      args = convert_args(contract_name, 'initialize', data['args'])
+      args = convert_args(contract, 'initialize', data['args'])
       
       initialize_calldata = TransactionHelper.get_function_calldata(
-        contract: contract_name,
+        contract: contract,
         function: 'initialize',
         args: args
       )
       
+      proxy_contract = get_contract_from_predeploy_info!(name: "ERC1967Proxy")
+      
       EVMHelpers.get_deploy_data(
-        'legacy/ERC1967Proxy', [predeploy_address, initialize_calldata]
+        proxy_contract, [predeploy_address, initialize_calldata]
       )
     elsif content['op'] == 'call'
       clear_caches_if_upgrade!
@@ -79,6 +82,7 @@ module EthscriptionEVMConverter
       end
       
       implementation_address = get_implementation(to_address)
+      contract = get_contract_from_predeploy_info!(address: implementation_address)
       
       unless implementation_address
         if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
@@ -89,21 +93,20 @@ module EthscriptionEVMConverter
         end
       end
       
-      contract_name = local_from_predeploy(implementation_address)
-      args = convert_args(contract_name, data['function'], data['args'])
+      args = convert_args(contract, data['function'], data['args'])
       
       if data['function'] == 'upgradeAndCall'
         new_impl_address = "0x" + args.first.last(40)
-        new_contract_name = local_from_predeploy(new_impl_address)
+        new_contract = get_contract_from_predeploy_info!(address: new_impl_address)
         migrationCalldata = JSON.parse(args.last)
         migration_args = convert_args(
-          new_contract_name,
+          new_contract,
           migrationCalldata['function'],
           migrationCalldata['args']
         )
         
         cooked = TransactionHelper.get_function_calldata(
-          contract: new_contract_name,
+          contract: new_contract,
           function: migrationCalldata['function'],
           args: migration_args
         )
@@ -120,19 +123,21 @@ module EthscriptionEVMConverter
         end
         
         target_contract_name = if metadata_calldata['args'].keys == ['info']
-          "legacy/EditionMetadataRendererV3f8"
+          "EditionMetadataRendererV3f8"
         else
-          "legacy/TokenUpgradeRendererVbf5"
+          "TokenUpgradeRendererVbf5"
         end
         
+        target_contract = get_contract_from_predeploy_info!(name: target_contract_name)
+        
         metadata_args = convert_args(
-          target_contract_name,
+          target_contract,
           metadata_calldata['function'],
           metadata_calldata['args']
         )
         
         cooked_metadata = TransactionHelper.get_function_calldata(
-          contract: target_contract_name,
+          contract: target_contract,
           function: metadata_calldata['function'],
           args: metadata_args.map(&:to_h)
         )
@@ -144,19 +149,19 @@ module EthscriptionEVMConverter
         
         to_address = calculate_to_address(data['args'].is_a?(Hash) ? data['args']['addressToCall'] : data['args'].third)
         implementation_address = get_implementation(to_address)
-        sub_contract_name = local_from_predeploy(implementation_address)
+        sub_contract = get_contract_from_predeploy_info!(address: implementation_address)
         
         bridge_calldata = begin
           json_input = JSON.parse(decoded_input)
           
           bridge_args = convert_args(
-            sub_contract_name,
+            sub_contract,
             json_input['function'],
             json_input['args']
           )
           
           TransactionHelper.get_function_calldata(
-            contract: sub_contract_name,
+            contract: sub_contract,
             function: json_input['function'],
             args: bridge_args
           )
@@ -172,7 +177,7 @@ module EthscriptionEVMConverter
         
         to_address = calculate_to_address(data['args'].is_a?(Hash) ? data['args']['addressToCall'] : data['args'].second)
         implementation_address = get_implementation(to_address)
-        sub_contract_name = local_from_predeploy(implementation_address)
+        sub_contract = get_contract_from_predeploy_info!(address: implementation_address)
         
         factory_calldata = begin
           json_input = JSON.parse(decoded_input)
@@ -181,13 +186,13 @@ module EthscriptionEVMConverter
           function_args = json_input.is_a?(Hash) ? json_input['args'] : json_input[1..-1]
           
           buddy_args = convert_args(
-            sub_contract_name,
+            sub_contract,
             function,
             function_args
           )
           
           TransactionHelper.get_function_calldata(
-            contract: sub_contract_name,
+            contract: sub_contract,
             function: function,
             args: buddy_args
           )
@@ -196,7 +201,7 @@ module EthscriptionEVMConverter
         end
         
         args[2] = factory_calldata.hex_to_bin
-      elsif data['function'] == 'bridgeOut' && contract_name == "legacy/ERC20BridgeFactoryVce0"
+      elsif data['function'] == 'bridgeOut' && contract.name == "ERC20BridgeFactoryVce0"
         if TransactionHelper.code_at_address(args[0]) == "0x"
           args[0] = calculate_to_address(args[0])
         end
@@ -228,7 +233,7 @@ module EthscriptionEVMConverter
       clear_caches_if_upgrade!
 
       TransactionHelper.get_function_calldata(
-        contract: contract_name,
+        contract: contract,
         function: data['function'],
         args: args
       )
@@ -276,7 +281,8 @@ module EthscriptionEVMConverter
     
     def get_implementation(to_address)
       TransactionHelper.static_call(
-        contract: 'legacy/PublicImplementationAddress',
+        # Every contract has this function so the choice of EtherBridgeV064 is arbitrary
+        contract: PredeployManager.get_contract_from_predeploy_info!(name: "EtherBridgeV064"),
         address: to_address,
         function: 'getImplementation',
         args: []
@@ -325,8 +331,8 @@ module EthscriptionEVMConverter
     end
     memoize :calculate_to_address
     
-    def convert_args(contract_name, function_name, args)
-      contract = EVMHelpers.compile_contract(contract_name)
+    def convert_args(contract, function_name, args)
+      contract_name = contract.name
       function = contract.functions.find { |f| f.name == function_name }
       
       unless function
@@ -339,7 +345,7 @@ module EthscriptionEVMConverter
         
           next_artifact_name = contract_name.gsub(current_suffix, next_artifact_suffix)
           
-          contract = EVMHelpers.compile_contract(next_artifact_name)
+          contract = get_contract_from_predeploy_info!(name: next_artifact_name)
           function = contract.functions.find { |f| f.name == function_name }
           
           unless function
