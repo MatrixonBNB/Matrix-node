@@ -212,11 +212,11 @@ class EthBlockImporter
     puts "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
 
-    block_responses = Benchmark.msr("block_responses") { l1_rpc_results.select do |block_number, _|
+    block_responses = l1_rpc_results.select do |block_number, _|
       block_numbers.include?(block_number)
-    end.to_h.transform_values! do |hsh|
-      hsh.transform_values!(&:value!)
-    end }
+    end.to_h.transform_values do |hsh|
+      hsh.transform_values(&:value!)
+    end
   
     l1_rpc_results.reject! { |block_number, _| block_responses.key?(block_number) }
     

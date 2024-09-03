@@ -161,11 +161,9 @@ class EthscriptionsImporter
     # Fetch the latest block from the database once
     latest_db_block = EthBlock.order(number: :desc).first
     
-    block_by_number_responses = Benchmark.msr("blocks") do
-      l1_rpc_responses.select do |block_number, promise|
-        block_numbers.include?(block_number)
-      end.to_h.transform_values!(&:value!)
-    end
+    block_by_number_responses = l1_rpc_responses.select do |block_number, promise|
+      block_numbers.include?(block_number)
+    end.to_h.transform_values(&:value!)
     
     l1_rpc_responses.reject! { |block_number, promise| block_by_number_responses.key?(block_number) }
     

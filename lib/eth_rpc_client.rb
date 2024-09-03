@@ -22,14 +22,14 @@ class EthRpcClient
   def debug_trace_block_by_number(block_number)
     query_api(
       method: 'debug_traceBlockByNumber',
-      params: ['0x' + block_number.to_s(16), { tracer: "callTracer" }]
+      params: ['0x' + block_number.to_s(16), { tracer: "callTracer", timeout: "10s" }]
     )
   end
 
   def debug_trace_transaction(transaction_hash)
     query_api(
       method: 'debug_traceTransaction',
-      params: [transaction_hash, { tracer: "callTracer" }]
+      params: [transaction_hash, { tracer: "callTracer", timeout: "10s" }]
     )
   end
 
