@@ -63,7 +63,7 @@ RSpec.describe GethDriver do
       decoded_data = Eth::Abi.decode(["string"], log_event['data'].hex_to_bytes)
       expect(decoded_data[0]).to eq("Hello, World!")
    
-      contract = get_contract('contracts/Counter', contract_address)
+      contract = EVMHelpers.get_contract('contracts/Counter', contract_address)
       function = contract.parent.function_hash['getCount']
       
       data = function.get_call_data

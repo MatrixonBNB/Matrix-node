@@ -64,7 +64,8 @@ RSpec.describe "FacetSwapRouterV099 contract" do
     )
 # binding.pry
     pair_address = create_pair_receipt.decoded_logs.detect { |i| i['event'] == 'PairCreated' }['data']['pair']
-    TransactionHelper.contract_addresses[pair_address] = "legacy/FacetSwapPairV2b2"
+    
+    EVMTestHelper.contract_addresses[pair_address] = "legacy/FacetSwapPairV2b2"
 
     make_static_call(
       contract: pair_address,

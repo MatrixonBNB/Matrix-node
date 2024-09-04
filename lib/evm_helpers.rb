@@ -33,19 +33,6 @@ module EVMHelpers
   end
   memoize :memoized_compile_contract
 
-  def proxy_and_implementation_deploy_data(
-    proxy_path: 'legacy/EtherBridge',
-    implementation_path: 'legacy/EtherBridgeV064',
-    init_args: ["name", "symbol", "0xC2172a6315c1D7f6855768F843c420EbB36eDa97", "0xC2172a6315c1D7f6855768F843c420EbB36eDa97"]
-  )
-    implementation = compile_contract(implementation_path)
-    implementation_byte_code = get_deploy_data(implementation_path, [])
-    
-    implementation_init = implementation.parent.function_hash['initialize'].get_call_data(*init_args)
-    
-    proxy_deploy_data = get_deploy_data(proxy_path, [implementation_byte_code, implementation_init])
-  end
-
   def get_deploy_data(contract, constructor_args)
     encoded_constructor_params = contract.parent.function_hash['constructor'].get_call_data(*constructor_args)
     deploy_data = contract.bin + encoded_constructor_params

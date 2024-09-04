@@ -41,8 +41,7 @@ RSpec.configure do |config|
   config.use_transactional_fixtures = false
 
   Dir[Rails.root.join('spec', 'support', '**', '*.rb')].each { |f| require f }
-  config.include EVMHelpers
-  config.include TransactionHelper
+  config.include EVMTestHelper
   config.fail_fast = true
   
   config.before(:suite) do
