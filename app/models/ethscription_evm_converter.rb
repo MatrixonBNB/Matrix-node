@@ -293,7 +293,7 @@ module EthscriptionEVMConverter
     def calculate_to_address(legacy_to)
       legacy_to = legacy_to.downcase
       
-      if ENV['LEGACY_VALUE_ORACLE_URL']
+      if LegacyValueMapping.oracle_base_url
         new_value = lookup_new_value(legacy_to)
         
         return new_value if new_value

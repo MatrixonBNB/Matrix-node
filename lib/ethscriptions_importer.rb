@@ -6,7 +6,9 @@ class EthscriptionsImporter
   
   attr_accessor :imported_facet_transaction_receipts, :imported_facet_transactions,
     :ethereum_client, :legacy_value_mapping
-  
+    
+  delegate :genesis_block, :v2_fork_block, to: :FacetBlock
+
   def initialize
     reset_state
     
@@ -32,14 +34,6 @@ class EthscriptionsImporter
     return false if network == "eth-sepolia"
     
     raise "Invalid network: #{network}"
-  end
-  
-  def genesis_block
-    ENV.fetch('START_BLOCK').to_i - 1
-  end
-  
-  def v2_fork_block
-    ENV['V2_FORK_BLOCK'].presence&.to_i
   end
   
   def in_v2?(block_number)

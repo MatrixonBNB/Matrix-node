@@ -25,7 +25,7 @@ class LegacyContractArtifact < ApplicationRecord
   scope :newest_first, -> { order(block_number: :desc, transaction_index: :desc, internal_transaction_index: :desc) }
   
   def self.all_json
-    if base_url = ENV['LEGACY_VALUE_ORACLE_URL']
+    if base_url = LegacyValueMapping.oracle_base_url
       endpoint = '/legacy_value_mappings/contract_artifacts'
       
       response = HttpPartyWithRetry.get_with_retry("#{base_url}#{endpoint}")

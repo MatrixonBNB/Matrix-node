@@ -8,6 +8,14 @@ class FacetBlock < ApplicationRecord
   GAS_LIMIT = 300e6.to_i
   attr_accessor :in_memory_txs
   
+  def self.genesis_block
+    ENV.fetch("START_BLOCK").to_i - 1
+  end
+  
+  def self.v2_fork_block
+    ENV.fetch("V2_FORK_BLOCK").to_i
+  end
+  
   def self.from_eth_block(eth_block, block_number)
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,

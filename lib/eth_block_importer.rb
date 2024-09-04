@@ -6,6 +6,7 @@ class EthBlockImporter
   class TraceTimeoutError < StandardError; end
   
   attr_accessor :l1_rpc_results, :facet_block_cache, :ethereum_client, :eth_block_cache
+  delegate :genesis_block, :v2_fork_block, to: :FacetBlock
   
   def initialize
     @l1_rpc_results = {}
@@ -45,14 +46,6 @@ class EthBlockImporter
   
   def logger
     Rails.logger
-  end
-  
-  def genesis_block
-    ENV.fetch('START_BLOCK').to_i - 1
-  end
-  
-  def v2_fork_block
-    ENV['V2_FORK_BLOCK'].presence&.to_i
   end
   
   def in_v2?(block_number)
