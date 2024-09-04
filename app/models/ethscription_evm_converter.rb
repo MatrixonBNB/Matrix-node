@@ -345,7 +345,7 @@ module EthscriptionEVMConverter
         
           next_artifact_name = contract_name.gsub(current_suffix, next_artifact_suffix)
           
-          contract = get_contract_from_predeploy_info(name: next_artifact_name)
+          contract = PredeployManager.get_contract_from_predeploy_info(name: next_artifact_name)
           function = contract.functions.find { |f| f.name == function_name }
           
           unless function
