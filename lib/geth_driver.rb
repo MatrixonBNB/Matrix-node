@@ -114,7 +114,7 @@ module GethDriver
       --authrpc.addr localhost \\
       --authrpc.vhosts="*" \\
       --nodiscover \\
-      --cache 64000 \\
+      --cache 16000 \\
       --cache.preimages \\
       --maxpeers 0 \\
       --verbosity 2 \\
