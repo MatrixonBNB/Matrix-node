@@ -10,12 +10,6 @@ GIT
       rbsecp256k1 (~> 6.0)
       scrypt (~> 3.0)
 
-GIT
-  remote: https://github.com/ruby/net-pop.git
-  revision: e8d0afe2773b9eb6a23c39e9e437f6fc0fc7c733
-  specs:
-    net-pop (0.1.2)
-
 GEM
   remote: https://rubygems.org/
   specs:
@@ -197,6 +191,8 @@ GEM
       connection_pool (~> 2.2)
     net-imap (0.4.14)
       date
+      net-protocol
+    net-pop (0.1.2)
       net-protocol
     net-protocol (0.2.2)
       timeout
@@ -407,7 +403,7 @@ DEPENDENCIES
   jbuilder
   jwt (~> 2.8)
   memery (~> 1.5)
-  net-pop!
+  net-http-persistent (~> 4.0)
   order_query (~> 0.5.3)
   parallel (~> 1.25)
   pg (~> 1.1)
@@ -429,7 +425,7 @@ DEPENDENCIES
   web-console
 
 RUBY VERSION
-   ruby 3.3.3p89
+   ruby 3.3.4p94
 
 BUNDLED WITH
    2.5.14

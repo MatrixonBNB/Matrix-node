@@ -98,34 +98,36 @@ module GethDriver
     
     genesis_filename = ENV.fetch("ETHEREUM_NETWORK") == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
     
-    puts %{
-      make geth && \\
-      rm -rf ./datadir && \\
-      ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} && \\
-      ./build/bin/geth --datadir ./datadir \\
-      --http \\
-      --http.api 'eth,net,web3,debug' \\
-      --http.vhosts="*" \\
-      --authrpc.jwtsecret /tmp/jwtsecret \\
-      --http.port #{http_port} \\
-      --authrpc.port #{authrpc_port} \\
-      --discovery.port #{discovery_port} \\
-      --port #{discovery_port} \\
-      --authrpc.addr localhost \\
-      --authrpc.vhosts="*" \\
-      --nodiscover \\
-      --cache 16000 \\
-      --cache.preimages \\
-      --maxpeers 0 \\
-      --verbosity 2 \\
-      --syncmode full \\
-      --gcmode archive \\
-      --history.state 0 \\
-      --history.transactions 0 \\
-      --nocompaction \\
-      --rollup.disabletxpoolgossip \\
-      console
-    }.strip
+    command = [
+      "make geth &&",
+      "rm -rf ./datadir &&",
+      "./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} &&",
+      "./build/bin/geth --datadir ./datadir",
+      "--http",
+      "--http.api 'eth,net,web3,debug'",
+      "--http.vhosts=\"*\"",
+      "--authrpc.jwtsecret /tmp/jwtsecret",
+      "--http.port #{http_port}",
+      "--authrpc.port #{authrpc_port}",
+      "--discovery.port #{discovery_port}",
+      "--port #{discovery_port}",
+      "--authrpc.addr localhost",
+      "--authrpc.vhosts=\"*\"",
+      "--nodiscover",
+      "--cache 16000",
+      "--cache.preimages",
+      "--maxpeers 0",
+      "--verbosity 2",
+      "--syncmode full",
+      "--gcmode archive",
+      "--history.state 0",
+      "--history.transactions 0",
+      "--nocompaction",
+      "--rollup.disabletxpoolgossip",
+      "console"
+    ].join(' ')
+
+    puts command
   end
   
   def client
