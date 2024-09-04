@@ -166,7 +166,7 @@ module TransactionHelper
     expect_failure: false
   )
     begin
-      pre_deploy = PredeployManager.get_contract_from_predeploy_info!(name: implementation.split("/").last)
+      pre_deploy = PredeployManager.get_contract_from_predeploy_info(name: implementation.split("/").last)
     rescue KeyError
       pre_deploy = nil
     end
@@ -197,7 +197,7 @@ module TransactionHelper
     
     res = deploy_contract(
       from: from,
-      contract: PredeployManager.get_contract_from_predeploy_info!(name: "ERC1967Proxy"),
+      contract: PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy"),
       args: [implementation_contract.address, initialize_calldata],
       value: value,
       gas_limit: gas_limit,

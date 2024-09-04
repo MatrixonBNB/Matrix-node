@@ -64,6 +64,10 @@ class SolidityCompiler
   end
   
   def self.compile_solidity(file_path)
+    if Rails.env.production?
+      raise "Solidity compilation is disabled in production"
+    end
+    
     pragma_version = nil
     File.foreach(file_path) do |line|
       if line =~ /pragma solidity (.+);/

@@ -41,7 +41,7 @@ class FacetTransactionReceipt < ApplicationRecord
   end
   
   def update_real_withdrawal_id
-    initiate_event = decoded_legacy_logs.detect { |i| i['event'] == 'InitiateWithdrawal' }
+    initiate_event = decoded_logs.detect { |i| i['event'] == 'InitiateWithdrawal' }
     
     return unless initiate_event
     
@@ -57,7 +57,7 @@ class FacetTransactionReceipt < ApplicationRecord
   end
   
   def update_legacy_contract_address_map(event_name, key_name)
-    our_event = decoded_legacy_logs.detect { |log| log['event'] == event_name }
+    our_event = decoded_logs.detect { |log| log['event'] == event_name }
   
     their_event = legacy_receipt.logs.detect { |i| i['event'] == event_name }
     
@@ -100,7 +100,7 @@ class FacetTransactionReceipt < ApplicationRecord
     
   #   self.legacy_contract_address_map[legacy_receipt.created_contract_address] = contract_address
     
-  #   our_pair_created = decoded_legacy_logs.detect do |log|
+  #   our_pair_created = decoded_logs.detect do |log|
   #     log['event'] == 'PairCreated'
   #   end
     
@@ -151,10 +151,10 @@ class FacetTransactionReceipt < ApplicationRecord
     end
   end
   
-  def decoded_legacy_logs
+  def decoded_logs
     logs.map do |log|
       implementation_address = Ethscription.get_implementation(log['address'])
-      impl = PredeployManager.get_contract_from_predeploy_info!(address: implementation_address)
+      impl = PredeployManager.get_contract_from_predeploy_info(address: implementation_address)
       implementation_name = impl.name
   
       begin
@@ -170,7 +170,7 @@ class FacetTransactionReceipt < ApplicationRecord
         legacy_files.each do |file|
           contract_name = File.basename(file, '.sol')
           begin
-            impl = PredeployManager.get_contract_from_predeploy_info!(name: contract_name)
+            impl = PredeployManager.get_contract_from_predeploy_info(name: contract_name)
             decoded = impl.parent.decode_log(log)
             break if decoded
           rescue Eth::Contract::UnknownEvent
@@ -192,7 +192,7 @@ class FacetTransactionReceipt < ApplicationRecord
       end
     end
   end
-  memoize :decoded_legacy_logs
+  memoize :decoded_logs
   
   def calculate_legacy_contract_address
     return unless contract_address
@@ -229,7 +229,7 @@ class FacetTransactionReceipt < ApplicationRecord
       calls.each do |call|
         if call["type"] == "DELEGATECALL"
           to_address = call["to"]
-          contract = PredeployManager.get_contract_from_predeploy_info!(address: to_address)
+          contract = PredeployManager.get_contract_from_predeploy_info(address: to_address)
           abi = contract.abi
           function_name, decoded_inputs, decoded_outputs = decode_function_input(call, abi)
           call["function_name"] = function_name

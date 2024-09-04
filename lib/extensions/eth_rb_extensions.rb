@@ -266,8 +266,8 @@ module EthRbExtensions
       implementation_address = Ethscription.get_implementation(contract_address)
       implementation_name = Ethscription.local_from_predeploy(implementation_address)
       begin
-        contract = PredeployManager.get_contract_from_predeploy_info!(name: implementation_name)
-      rescue
+        contract = PredeployManager.get_contract_from_predeploy_info(name: implementation_name)
+      rescue KeyError
         contract = EVMHelpers.compile_contract(implementation_name)
       end
 

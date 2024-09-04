@@ -41,7 +41,7 @@ RSpec.describe "FacetSwapV1Factory" do
       function_name: "getAllPairs"
     )
 # binding.pry
-#     expect(create_pair_receipt.decoded_legacy_logs).to include(
+#     expect(create_pair_receipt.decoded_logs).to include(
 #       hash_including('event' => 'PairCreated')
 #     )
   end

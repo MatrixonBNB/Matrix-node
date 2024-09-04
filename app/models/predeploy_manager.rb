@@ -61,10 +61,10 @@ module PredeployManager
   end
   memoize :predeploy_info
   
-  def get_contract_from_predeploy_info!(address: nil, name: nil)
+  def get_contract_from_predeploy_info(address: nil, name: nil)
     predeploy_info.fetch(address || name)
   end
-  memoize :get_contract_from_predeploy_info!
+  memoize :get_contract_from_predeploy_info
   
   def local_from_predeploy(address)
     name = predeploy_to_local_map.fetch(address&.downcase)

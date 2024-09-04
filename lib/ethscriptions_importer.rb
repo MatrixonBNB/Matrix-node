@@ -422,7 +422,7 @@ class EthscriptionsImporter
   
   def compare_event_attributes(legacy_receipt, facet_receipt, event_name, attribute_mapping = {}, except = [])
     legacy_event = legacy_receipt.logs.find { |log| log['event'] == event_name }
-    facet_event = facet_receipt.decoded_legacy_logs.find { |log| log['event'] == event_name }
+    facet_event = facet_receipt.decoded_logs.find { |log| log['event'] == event_name }
 
     if legacy_event && facet_event
       if legacy_event['contractType'] == 'EtherBridge03' && event_name == 'BridgedIn'

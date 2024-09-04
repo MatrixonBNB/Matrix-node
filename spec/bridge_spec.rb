@@ -42,7 +42,7 @@ RSpec.describe "Bridge contracts" do
       }
     )
     
-    withdrawalId = bridge_out_receipt.decoded_legacy_logs.
+    withdrawalId = bridge_out_receipt.decoded_logs.
       detect{|i| i['event'] == 'InitiateWithdrawal'}['data']['withdrawalId']
     
     trigger_contract_interaction_and_expect_success(

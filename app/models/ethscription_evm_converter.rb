@@ -9,7 +9,7 @@ module EthscriptionEVMConverter
   
   included do
     delegate :local_from_predeploy, to: :PredeployManager
-    delegate :get_contract_from_predeploy_info!, to: :PredeployManager
+    delegate :get_contract_from_predeploy_info, to: :PredeployManager
     delegate :predeploy_to_local_map, to: :PredeployManager
     delegate :convert_args, to: :class
     delegate :normalize_args, to: :class
@@ -46,7 +46,7 @@ module EthscriptionEVMConverter
       predeploy_address = "0x" + data['init_code_hash'].last(40)
       
       begin
-        contract = get_contract_from_predeploy_info!(address: predeploy_address)
+        contract = get_contract_from_predeploy_info(address: predeploy_address)
       rescue KeyError => e
         if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
           return predeploy_address
@@ -65,7 +65,7 @@ module EthscriptionEVMConverter
         args: args
       )
       
-      proxy_contract = get_contract_from_predeploy_info!(name: "ERC1967Proxy")
+      proxy_contract = get_contract_from_predeploy_info(name: "ERC1967Proxy")
       
       EVMHelpers.get_deploy_data(
         proxy_contract, [predeploy_address, initialize_calldata]
@@ -82,7 +82,7 @@ module EthscriptionEVMConverter
       end
       
       implementation_address = get_implementation(to_address)
-      contract = get_contract_from_predeploy_info!(address: implementation_address)
+      contract = get_contract_from_predeploy_info(address: implementation_address)
       
       unless implementation_address
         if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
@@ -97,7 +97,7 @@ module EthscriptionEVMConverter
       
       if data['function'] == 'upgradeAndCall'
         new_impl_address = "0x" + args.first.last(40)
-        new_contract = get_contract_from_predeploy_info!(address: new_impl_address)
+        new_contract = get_contract_from_predeploy_info(address: new_impl_address)
         migrationCalldata = JSON.parse(args.last)
         migration_args = convert_args(
           new_contract,
@@ -128,7 +128,7 @@ module EthscriptionEVMConverter
           "TokenUpgradeRendererVbf5"
         end
         
-        target_contract = get_contract_from_predeploy_info!(name: target_contract_name)
+        target_contract = get_contract_from_predeploy_info(name: target_contract_name)
         
         metadata_args = convert_args(
           target_contract,
@@ -149,7 +149,7 @@ module EthscriptionEVMConverter
         
         to_address = calculate_to_address(data['args'].is_a?(Hash) ? data['args']['addressToCall'] : data['args'].third)
         implementation_address = get_implementation(to_address)
-        sub_contract = get_contract_from_predeploy_info!(address: implementation_address)
+        sub_contract = get_contract_from_predeploy_info(address: implementation_address)
         
         bridge_calldata = begin
           json_input = JSON.parse(decoded_input)
@@ -177,7 +177,7 @@ module EthscriptionEVMConverter
         
         to_address = calculate_to_address(data['args'].is_a?(Hash) ? data['args']['addressToCall'] : data['args'].second)
         implementation_address = get_implementation(to_address)
-        sub_contract = get_contract_from_predeploy_info!(address: implementation_address)
+        sub_contract = get_contract_from_predeploy_info(address: implementation_address)
         
         factory_calldata = begin
           json_input = JSON.parse(decoded_input)
@@ -282,7 +282,7 @@ module EthscriptionEVMConverter
     def get_implementation(to_address)
       TransactionHelper.static_call(
         # Every contract has this function so the choice of EtherBridgeV064 is arbitrary
-        contract: PredeployManager.get_contract_from_predeploy_info!(name: "EtherBridgeV064"),
+        contract: PredeployManager.get_contract_from_predeploy_info(name: "EtherBridgeV064"),
         address: to_address,
         function: 'getImplementation',
         args: []
@@ -345,7 +345,7 @@ module EthscriptionEVMConverter
         
           next_artifact_name = contract_name.gsub(current_suffix, next_artifact_suffix)
           
-          contract = get_contract_from_predeploy_info!(name: next_artifact_name)
+          contract = get_contract_from_predeploy_info(name: next_artifact_name)
           function = contract.functions.find { |f| f.name == function_name }
           
           unless function
@@ -503,7 +503,7 @@ module EthscriptionEVMConverter
         return user_withdrawal_id
       end
       
-      new_withdrawal_id = receipt.decoded_legacy_logs.
+      new_withdrawal_id = receipt.decoded_logs.
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
       
       EthscriptionsImporter.instance.add_legacy_value_mapping_item(
