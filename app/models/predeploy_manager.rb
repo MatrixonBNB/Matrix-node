@@ -196,7 +196,9 @@ module PredeployManager
     
     ["mainnet", "sepolia"].each do |network|
       filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
-      genesis_path = File.join(geth_dir, 'facet-chain', filename)
+      facet_chain_dir = File.join(geth_dir, 'facet-chain')
+      FileUtils.mkdir_p(facet_chain_dir) unless File.directory?(facet_chain_dir)
+      genesis_path = File.join(facet_chain_dir, filename)
 
       # Generate the genesis data for the specific network
       genesis_data = generate_full_genesis_json(network)

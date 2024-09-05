@@ -117,7 +117,7 @@ module GethDriver
       "--cache 16000",
       "--cache.preimages",
       "--maxpeers 0",
-      "--verbosity 2",
+      # "--verbosity 2",
       "--syncmode full",
       "--gcmode archive",
       "--history.state 0",

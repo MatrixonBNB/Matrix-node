@@ -40,7 +40,9 @@ class SolidityCompiler
 
     def compile_all_legacy_files
       directory = Rails.root.join('lib', 'solidity', 'legacy')
-      files = Dir.glob("#{directory}/**/*.sol").select { |f| File.file?(f) }
+      files = Dir.glob("#{directory}/**/*.sol").select do |f|
+        File.file?(f) && f.split("/").last.match(/V[a-f0-9]{3}\.sol$/i)
+      end
   
       results = Parallel.map(files, in_processes: Parallel.processor_count) do |file|
         checksum = directory_checksum
@@ -107,7 +109,7 @@ class SolidityCompiler
     
     solc_args += [file_path.to_s]
     
-    Rails.logger.info("Running solc with arguments: #{solc_args.join(' ')}")
+    puts "Running solc with arguments: #{solc_args.join(' ')}"
 
     # Compile with optimizer settings
     stdout, stderr, status = Open3.capture3(*solc_args)

@@ -20,17 +20,18 @@ Here's how it works:
 
 ## Installation
 
-1. Clone facet-node:
+1. Clone `facet-node`:
    ```
    git clone https://github.com/0xFacet/facet-node
    ```
    
-   and facet-geth:
+   and `facet-geth`:
    ```
    git clone https://github.com/0xFacet/facet-geth
    ```
-
- 2.  `cd facet-node`
+2. Facet's version of geth in on the `facet` branch, so `cd facet-geth && git checkout facet`.
+ 
+ 2.  Now `cd ../facet-node`
 
 2. Install Ruby Version Manager (RVM) if not already installed:
    ```
@@ -79,7 +80,7 @@ Here's how it works:
     |----------|-------------|
     | `ETHEREUM_CLIENT_BASE_URL` | The URL of your Ethereum RPC server. Facet blocks are derived from data that comes from this RPC endpoint. |
     | `BLOCK_IMPORT_BATCH_SIZE` | Number of blocks to import in each batch. This is how many simultaneous requests are made to the RPC endpoint. |
-    | `ETHEREUM_NETWORK` | The Ethereum network to derive blocks from. `eth-sepolia` or `eth-mainnet` |
+    | `L1_NETWORK` | The Ethereum network to derive blocks from. `sepolia` or `mainnet` |
     | `GETH_RPC_URL` | RPC URL for authenticated facet-geth connections. You can leave this as the default unless you plan to run multiple facet-geth instances simultaneously. |
     | `NON_AUTH_GETH_RPC_URL` | RPC URL for non-authenticated facet-geth connections. You can leave this as the default unless you plan to run multiple facet-geth instances simultaneously. |
     | `GETH_DISCOVERY_PORT` | Port used by facet-geth for peer discovery. You can leave this as the default unless you plan to run multiple facet-geth instances simultaneously. |
@@ -100,38 +101,28 @@ Here's how it works:
 9. Set up the local database:
    ```
    rails db:create db:migrate
+   rails db:create db:migrate RAILS_ENV=test
    ```
    
-10. Run the specs to ensure everything works:
+10. Run the specs to ensure everything works. This might take a while as all the contracts must be compiled:
    ```
    rspec
    ```
 
-## Setting up facet-geth
+## Using `facet-geth`
 
-Facet-node works with facet-geth, so you need to set it up as well.
+To use facet-geth to process blocks instead of just in a test:
 
-1. Clone facet-geth into the directory specified in your facet-node .env file (`LOCAL_GETH_DIR`):
-   ```
-   git clone https://github.com/0xFacet/facet-geth LOCAL_GETH_DIR
-   ```
-
-2. Now cd back into the facet-node directory and run the test suite to ensure everything works:
-   ```
-   rspec
-   ```
-    (Ignore debug information unless you see a test failure)
-
-3. Generate the geth initialization command:
+1. From the `facet-node` directory, generate the geth initialization command:
    ```
    bundle exec rake geth:init_command
    ```
 
-4. Copy the command, cd back into facet-geth, and run it.
+4. Copy the command, cd back into `facet-geth`, and run it.
 
-5. Finally, cd back into facet-node and start deriving Facet blocks from L1 blocks:
+5. Finally, cd back into `facet-node` and start deriving Facet blocks from L1 blocks:
    ```
    bundle exec clockwork config/derive_facet_blocks.rb
    ```
 
-You should now have facet-node and facet-geth set up and running!
+You should now have `facet-node` and `facet-geth` set up and running!

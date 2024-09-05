@@ -694,6 +694,13 @@ CREATE UNIQUE INDEX index_facet_transaction_receipts_on_transaction_hash ON publ
 
 
 --
+-- Name: index_facet_transaction_receipts_on_transaction_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_facet_transaction_receipts_on_transaction_index ON public.facet_transaction_receipts USING btree (transaction_index);
+
+
+--
 -- Name: index_facet_transactions_on_block_hash; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -826,6 +833,7 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20240905151756'),
 ('20240813133726'),
 ('20240628125033'),
 ('20240627143934'),
