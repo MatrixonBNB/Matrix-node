@@ -163,19 +163,32 @@ class EthscriptionsImporter
     if latest_db_block
       if first_block_number == latest_db_block.number + 1
         if latest_db_block.block_hash != first_block_data['parentHash']
-          logger.warn "Reorg detected at block #{first_block_number}"
+          reorg_message = "Reorg detected at block #{first_block_number}"
+          logger.warn(reorg_message)
+          Airbrake.notify(reorg_message)
+          
           EthBlock.where("number >= ?", latest_db_block.number).destroy_all
           return nil
         end
       else
-        raise "Unexpected block number: expected #{latest_db_block.number + 1}, got #{first_block_number}"
+        unexpected_block_message = "Unexpected block number: expected #{latest_db_block.number + 1}, got #{first_block_number}"
+        Airbrake.notify(unexpected_block_message)
+        
+        raise unexpected_block_message
       end
     end
     
-    ethscriptions_future, legacy_tx_receipts_future = [
+    legacy_eth_blocks_future, ethscriptions_future, legacy_tx_receipts_future = [
+      LegacyEthBlock.where(block_number: block_numbers).load_async,
       LegacyEthscription.where(block_number: block_numbers).load_async,
       LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
     ]
+    
+    legacy_eth_blocks = legacy_eth_blocks_future.to_a
+    
+    unless legacy_eth_blocks.all?(&:processed?)
+      raise "Requested blocks have not yet been processed on the V1 VM: #{legacy_eth_blocks.map(&:block_number).join(', ')}"
+    end
     
     # Create a hash mapping transaction hashes to their "from" addresses
     tx_hash_to_from = {}
@@ -278,6 +291,8 @@ class EthscriptionsImporter
       end
       
       LegacyValueMapping.import!(legacy_value_objects, on_duplicate_key_update: { conflict_target: [:legacy_value], columns: [:new_value] })
+      
+      validate_receipt_counts if validate_import?
     end
     
     elapsed_time = Time.current - start
@@ -323,6 +338,19 @@ class EthscriptionsImporter
       "0x8d3cf03f51c9813dffb2f804e2ec6f8f187b687b0e3374bf44936adc15d938f8",
       "0xabea86865dc24c3719ebe2c0d75ff8b81f4124449a66b2a15dc6dcff75cf44d7",
     ]
+  end
+  
+  def validate_receipt_counts
+    # First tx in the block is the attributes tx
+    our_count = FacetTransactionReceipt.where("transaction_index > 0").count
+    
+    max_block_number = FacetBlock.maximum(:eth_block_number)
+    
+    legacy_count = LegacyFacetTransactionReceipt.where("block_number <= ?", max_block_number).count
+    
+    unless our_count == legacy_count
+      raise "Mismatched number of receipts: our count is #{our_count}, legacy count is #{legacy_count}"
+    end
   end
   
   def validate_receipts(legacy_tx_receipts, facet_receipts)
