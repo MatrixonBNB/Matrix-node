@@ -65,12 +65,12 @@ class FacetTransactionReceipt < ApplicationRecord
       return
     end
     
-    if (our_event.nil? && their_event.nil?) || (ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia" && status == 0)
+    if (our_event.nil? && their_event.nil?) || (EthscriptionEVMConverter.skip_import_validation? && status == 0)
       return
     end
     
     unless our_event.present? && their_event.present?
-      return if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+      return if EthscriptionEVMConverter.skip_import_validation?
       binding.irb
       raise "One of the events is missing"
     end
@@ -333,7 +333,7 @@ class FacetTransactionReceipt < ApplicationRecord
   end
   
   def self.address_mapping_file_path
-    prefix = ENV.fetch('ETHEREUM_NETWORK').underscore
+    prefix = ChainIdManager.current_l1_network
     
     Rails.root.join("#{prefix}_legacy_address_mapping.json")
   end

@@ -22,7 +22,7 @@ module GethDriver
       File.delete(log_file_location)
     end
     
-    genesis_filename = ENV.fetch("ETHEREUM_NETWORK") == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+    genesis_filename = ChainIdManager.on_mainnet? ? "facet-mainnet.json" : "facet-sepolia.json"
     
     system("cd #{geth_dir} && make geth && ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir #{@temp_datadir} facet-chain/#{genesis_filename}")
     
@@ -96,7 +96,7 @@ module GethDriver
     authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
     discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
     
-    genesis_filename = ENV.fetch("ETHEREUM_NETWORK") == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+    genesis_filename = ChainIdManager.on_mainnet? ? "facet-mainnet.json" : "facet-sepolia.json"
     
     command = [
       "make geth &&",

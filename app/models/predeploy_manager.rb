@@ -15,7 +15,7 @@ module PredeployManager
         begin
           address = LegacyContractArtifact.address_from_suffix(filename)
         rescue LegacyContractArtifact::AmbiguousSuffixError => e
-          next if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+          next if ChainIdManager.on_testnet?
           raise
         end
         
@@ -135,13 +135,9 @@ module PredeployManager
     puts "Generated predeploy_info.json"
   end
   
-  def generate_full_genesis_json(network = ENV.fetch('ETHEREUM_NETWORK'))
-    unless ["eth-mainnet", "eth-sepolia"].include?(network)
-      raise "Invalid network: #{network}"
-    end
-    
+  def generate_full_genesis_json(l1_network_name)
     config = {
-      chainId: FacetTransaction.current_chain_id(network),
+      chainId: ChainIdManager.l2_chain_id_from_l1_network_name(l1_network_name),
       homesteadBlock: 0,
       eip150Block: 0,
       eip155Block: 0,
@@ -156,7 +152,7 @@ module PredeployManager
       mergeForkBlock: 0,
       mergeNetsplitBlock: 0,
       shanghaiTime: 0,
-      cancunTime: cancun_timestamp(network),
+      cancunTime: cancun_timestamp(l1_network_name),
       terminalTotalDifficulty: 0,
       terminalTotalDifficultyPassed: true,
       bedrockBlock: 0,
@@ -170,8 +166,8 @@ module PredeployManager
       }
     }
     
-    timestamp = network == "eth-mainnet" ? 1701353099 : 1706742588
-    mix_hash = network == "eth-mainnet" ?
+    timestamp = l1_network_name == "mainnet" ? 1701353099 : 1706742588
+    mix_hash = l1_network_name == "mainnet" ?
       "0xf9202de594a3697695c54a4ee8a392f686ca1fc26337eb821e4ca6deb71b2dd7" :
       "0xc4b4bbd867f5566c344e8ba74372ca493c91c00bb3e10f85a45bd9e89344a977"
     
@@ -186,8 +182,8 @@ module PredeployManager
     }
   end
   
-  def cancun_timestamp(network = ENV.fetch('ETHEREUM_NETWORK'))
-    network == "eth-mainnet" ? 1710338135 : 1706655072
+  def cancun_timestamp(l1_network_name)
+    l1_network_name == "mainnet" ? 1710338135 : 1706655072
   end
   
   def write_genesis_json(clear_cache: true)
@@ -198,8 +194,8 @@ module PredeployManager
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
     
-    ["eth-mainnet", "eth-sepolia"].each do |network|
-      filename = network == "eth-mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+    ["mainnet", "sepolia"].each do |network|
+      filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
       genesis_path = File.join(geth_dir, 'facet-chain', filename)
 
       # Generate the genesis data for the specific network

@@ -126,7 +126,7 @@ module EVMTestHelper
     gas_limit: 10_000_000,
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
-    chain_id: FacetTransaction.current_chain_id,
+    chain_id: ChainIdManager.current_l2_chain_id,
     expect_failure: false,
     expect_blank: false,
     in_v2: true
@@ -168,7 +168,7 @@ module EVMTestHelper
       'accessList' => []
     }
 
-    cancun_time = PredeployManager.cancun_timestamp
+    cancun_time = PredeployManager.cancun_timestamp(ChainIdManager.current_l1_network)
     timestamp = block_timestamp || (last_block.timestamp + 12)
     in_cancun = timestamp >= cancun_time
     

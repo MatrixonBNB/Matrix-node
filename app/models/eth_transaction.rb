@@ -156,6 +156,6 @@ class EthTransaction < ApplicationRecord
   end
   
   def self.on_testnet?
-    ENV['ETHEREUM_NETWORK'] != "eth-mainnet"
+    ChainIdManager.on_testnet?
   end
 end

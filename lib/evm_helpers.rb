@@ -28,7 +28,7 @@ module EVMHelpers
     contract.parent.bin_runtime = contract_bin_runtime
     contract.freeze
   rescue => e
-    binding.irb unless ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+    binding.irb unless ChainIdManager.on_sepolia?
     raise
   end
   memoize :memoized_compile_contract

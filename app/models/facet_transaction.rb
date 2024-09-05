@@ -24,17 +24,6 @@ class FacetTransaction < ApplicationRecord
     gas_limit <= PER_TX_GAS_LIMIT
   end
   
-  def self.current_chain_id(network = ENV.fetch('ETHEREUM_NETWORK'))
-    if ENV['CUSTOM_CHAIN_ID']
-      return ENV['CUSTOM_CHAIN_ID'].to_i
-    end
-    
-    return 0xface7 if network == "eth-mainnet"
-    return 0xface7a if network == "eth-sepolia"
-    
-    raise "Invalid network: #{network}"
-  end
-  
   def self.from_eth_tx_and_ethscription(
     ethscription,
     idx,
@@ -44,7 +33,7 @@ class FacetTransaction < ApplicationRecord
   )
     tx = new
     tx.facet_block = facet_block
-    tx.chain_id = current_chain_id
+    tx.chain_id = ChainIdManager.current_l2_chain_id
     tx.to_address = ethscription.facet_tx_to
     tx.value = 0
     tx.input = ethscription.facet_tx_input
@@ -143,7 +132,7 @@ class FacetTransaction < ApplicationRecord
 
     chain_id = Eth::Util.deserialize_big_endian_to_int tx[0]
     
-    unless chain_id == current_chain_id
+    unless chain_id == ChainIdManager.current_l2_chain_id
       raise Eth::Tx::ParameterError, "Invalid chain ID #{chain_id}!"
     end
     
@@ -195,7 +184,7 @@ class FacetTransaction < ApplicationRecord
     )
     
     tx = new
-    tx.chain_id = current_chain_id
+    tx.chain_id = ChainIdManager.current_l2_chain_id
     tx.to_address = L1_INFO_ADDRESS
     tx.value = 0
     tx.mint = 0

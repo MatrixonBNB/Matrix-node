@@ -422,7 +422,7 @@ RSpec.describe "Name Registry" do
     
     deadline = Time.current.to_i + 1000
     
-    chainid = ENV['ETHEREUM_NETWORK'] == 'eth-sepolia' ? 11155111 : 1
+    chainid = ChainIdManager.current_l1_chain_id
     
     data = {
       types: types,

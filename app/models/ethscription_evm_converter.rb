@@ -17,6 +17,16 @@ module EthscriptionEVMConverter
     delegate :real_withdrawal_id, to: :class
     delegate :calculate_to_address, to: :class
     delegate :get_implementation, to: :class
+    delegate :validate_import?, to: :class
+    delegate :skip_import_validation?, to: :class
+  end
+  
+  def self.validate_import?
+    ChainIdManager.on_mainnet?
+  end
+  
+  def self.skip_import_validation?
+    !validate_import?
   end
   
   def facet_tx_to
@@ -48,7 +58,7 @@ module EthscriptionEVMConverter
       begin
         contract = get_contract_from_predeploy_info(address: predeploy_address)
       rescue KeyError => e
-        if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+        if skip_import_validation?
           return predeploy_address
         else
           ap content
@@ -85,7 +95,7 @@ module EthscriptionEVMConverter
       contract = get_contract_from_predeploy_info(address: implementation_address)
       
       unless implementation_address
-        if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+        if skip_import_validation?
           return "0x" + "0" * 100
         else
           binding.irb
@@ -118,7 +128,7 @@ module EthscriptionEVMConverter
         begin
           metadata_calldata = JSON.parse(data['args'].is_a?(Array) ? data['args'].last : data['args']['data'])
         rescue JSON::ParserError => e
-          raise unless ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+          raise unless skip_import_validation?
           metadata_calldata = {"function" => "", "args" => {}}
         end
         
@@ -246,7 +256,7 @@ module EthscriptionEVMConverter
   rescue ContractMissing => e
     data['to']
   rescue KeyError => e
-    if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+    if skip_import_validation?
       return content.to_json.bytes_to_hex
     else
       ap content
@@ -401,7 +411,7 @@ module EthscriptionEVMConverter
         raise
       end
     rescue Errno::ENOENT, LegacyContractArtifact::AmbiguousSuffixError => e
-      if ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia"
+      if skip_import_validation?
         raise FunctionMissing, "Function #{function_name} not found"
       else
         binding.irb

@@ -19,6 +19,10 @@ class EthRpcClient
     )
   end
   
+  def get_chain_id
+    query_api(method: 'eth_chainId')['result'].to_i(16)
+  end
+  
   def debug_trace_block_by_number(block_number)
     query_api(
       method: 'debug_traceBlockByNumber',
@@ -41,7 +45,7 @@ class EthRpcClient
   end
   
   def get_transaction_receipts(block_number, blocks_behind: nil)
-    use_individual = ENV.fetch('ETHEREUM_NETWORK') == "eth-sepolia" &&
+    use_individual = ChainIdManager.on_sepolia? &&
       blocks_behind.present? &&
       blocks_behind < 5
       

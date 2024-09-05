@@ -28,12 +28,7 @@ class EthscriptionsImporter
   end
   
   def validate_import?
-    network = ENV.fetch('ETHEREUM_NETWORK')
-    
-    return true if network == "eth-mainnet"
-    return false if network == "eth-sepolia"
-    
-    raise "Invalid network: #{network}"
+    EthscriptionEVMConverter.validate_import?
   end
   
   def in_v2?(block_number)
@@ -650,9 +645,5 @@ class EthscriptionsImporter
   
   def geth_driver
     @_geth_driver ||= GethDriver
-  end
-  
-  def facet_chain_id
-    FacetTransaction.current_chain_id
   end
 end
