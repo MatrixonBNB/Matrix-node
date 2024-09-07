@@ -86,7 +86,7 @@ Here's how it works:
     
     | Variable | Description |
     |----------|-------------|
-    | `ETHEREUM_CLIENT_BASE_URL` | The URL of your Ethereum RPC server. Facet blocks are derived from data that comes from this RPC endpoint. |
+    | `L1_RPC_URL` | The URL of your Ethereum RPC server. Facet blocks are derived from data that comes from this RPC endpoint. |
     | `BLOCK_IMPORT_BATCH_SIZE` | Number of blocks to import in each batch. This is how many simultaneous requests are made to the RPC endpoint. |
     | `L1_NETWORK` | The Ethereum network to derive blocks from. `sepolia` or `mainnet` |
     | `GETH_RPC_URL` | RPC URL for authenticated facet-geth connections. You can leave this as the default unless you plan to run multiple facet-geth instances simultaneously. |

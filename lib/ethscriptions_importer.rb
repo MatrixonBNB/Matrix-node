@@ -13,7 +13,7 @@ class EthscriptionsImporter
     reset_state
     
     @ethereum_client ||= EthRpcClient.new(
-      base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
+      base_url: ENV.fetch('L1_RPC_URL')
     )
   end
   

@@ -14,7 +14,7 @@ class EthBlockImporter
     @eth_block_cache = {}
     
     @ethereum_client ||= EthRpcClient.new(
-      base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
+      base_url: ENV.fetch('L1_RPC_URL')
     )
     
     set_eth_block_starting_points
