@@ -99,12 +99,20 @@ class FacetTransaction < ApplicationRecord
       
       facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
       
-      facet_tx&.mint = calculate_mint_amount(call.input, eth_block.base_fee_per_gas)
-      
       facet_tx&.facet_block = facet_block
       
       facet_tx
     end.flatten.compact
+    
+    gas_used_per_tx = facet_txs.map do |tx|
+      calculate_calldata_cost(tx.eth_call.input)
+    end
+    
+    mints = FctMintCalculator.calculate_fct_for_transactions(gas_used_per_tx, eth_block.base_fee_per_gas)
+    
+    mints.each.with_index do |mint, i|
+      facet_txs[i].mint = mint
+    end
     
     facet_txs
   end

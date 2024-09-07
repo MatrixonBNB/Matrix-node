@@ -16,6 +16,7 @@ RSpec.describe "FacetSwapRouterV099 contract" do
     tokenA_deploy_receipt = deploy_contract_with_proxy(
       implementation: 'contracts/StubERC20',
       from: user_address,
+      gas_limit: 5_000_000,
       args: ["Token A"]
     )
 # binding.pry
@@ -32,6 +33,7 @@ RSpec.describe "FacetSwapRouterV099 contract" do
     tokenB_deploy_receipt = deploy_contract_with_proxy(
       implementation: 'contracts/StubERC20',
       from: user_address,
+      gas_limit: 5_000_000,
       args: ["Token B"]
     )
     token_b_address = tokenB_deploy_receipt.contract_address
