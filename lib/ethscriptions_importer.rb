@@ -28,7 +28,7 @@ class EthscriptionsImporter
   end
   
   def validate_import?
-    EthscriptionEVMConverter.validate_import?
+    Ethscription.validate_import?
   end
   
   def in_v2?(block_number)

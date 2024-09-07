@@ -21,14 +21,6 @@ module EthscriptionEVMConverter
     delegate :skip_import_validation?, to: :class
   end
   
-  def self.validate_import?
-    ChainIdManager.on_mainnet?
-  end
-  
-  def self.skip_import_validation?
-    !validate_import?
-  end
-  
   def facet_tx_to
     return if parsed_content['op'] == 'create'
     calculate_to_address(parsed_content['data']['to'])
@@ -288,6 +280,14 @@ module EthscriptionEVMConverter
 
   class_methods do
     include Memery
+    
+    def validate_import?
+      ChainIdManager.on_mainnet?
+    end
+    
+    def skip_import_validation?
+      !validate_import?
+    end
     
     def get_implementation(to_address)
       TransactionHelper.static_call(
