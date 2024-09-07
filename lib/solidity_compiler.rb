@@ -22,11 +22,7 @@ class SolidityCompiler
         Rails.root.join('node_modules')
       ]
       
-      if ENV['LISTEN_FOR_SOLIDITY_CHANGES']
-        calculate_checksum(directories)
-      else
-        @checksum ||= calculate_checksum(directories)
-      end
+      @checksum ||= calculate_checksum(directories)
     end
   
     def calculate_checksum(directories)
@@ -44,8 +40,9 @@ class SolidityCompiler
         File.file?(f) && f.split("/").last.match(/V[a-f0-9]{3}\.sol$/i)
       end
   
-      results = Parallel.map(files, in_processes: Parallel.processor_count) do |file|
-        checksum = directory_checksum
+      checksum = directory_checksum
+      
+      results = Parallel.map(files, in_threads: Parallel.processor_count * 2) do |file|
         memoized_compile(file, checksum)
       end
   
@@ -63,6 +60,11 @@ class SolidityCompiler
       end
     end
     memoize :memoized_compile
+  end
+  
+  def self.current_solc_version
+    version_output = `solc --version`
+    version_output[/\d+\.\d+\.\d+/]
   end
   
   def self.compile_solidity(file_path)
@@ -87,7 +89,9 @@ class SolidityCompiler
     version = version_match[1]
 
     # Set the Solidity version using solc-select
-    system("solc-select use #{version} --always-install")
+    unless current_solc_version == version
+      system("solc-select use #{version} --always-install")
+    end
     
     legacy_solidity = version.split('.').last(2).join('.').to_f < 8.17
     
@@ -95,7 +99,7 @@ class SolidityCompiler
       "solc",
       "--combined-json", "abi,bin,bin-runtime",
       "--optimize",
-      "--optimize-runs", "200",
+      "--optimize-runs", "#{2 ** 32 - 1}",
     ]
 
     # Append additional arguments if not legacy
@@ -111,8 +115,13 @@ class SolidityCompiler
     
     puts "Running solc with arguments: #{solc_args.join(' ')}"
 
+    filename = file_path.to_s.split("/").last
+    
     # Compile with optimizer settings
-    stdout, stderr, status = Open3.capture3(*solc_args)
+    stdout, stderr, status = Benchmark.msr("Compiled #{filename}") do
+      Open3.capture3(*solc_args)
+    end
+    
     raise "Error running solc: #{stderr}" unless status.success?
   
     # Parse the JSON output

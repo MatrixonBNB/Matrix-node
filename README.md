@@ -4,6 +4,8 @@
 
 `facet-node` works with `facet-geth` to trustlessly derive Facet state from Ethereum history. The system is heavily inspired by Optimism, with `facet-geth` forked from `op-geth` and `facet-node` modeled after `op-node`.
 
+`facet-node` is pre-release software and isn't yet production ready.
+
 ### The Basic Idea
 
 Here's how it works:
@@ -56,6 +58,12 @@ Here's how it works:
 4. Install required gems and dependencies:
    ```
    bundle install && npm i && pip install -r requirements.txt
+   ```
+   
+4. Enable caching. Solidity compilation is slow and the output is cached in memcache so this will speed things up a lot:
+
+   ```
+   rails dev:cache
    ```
 
 5. Install PostgreSQL (if not already installed):
