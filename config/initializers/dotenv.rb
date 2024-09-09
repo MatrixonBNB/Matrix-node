@@ -1,6 +1,6 @@
-require 'dotenv'
-
 unless Rails.env.production?
+  require 'dotenv'
+  
   Dotenv.load
 
   if ENV['L1_NETWORK'] == 'sepolia'
