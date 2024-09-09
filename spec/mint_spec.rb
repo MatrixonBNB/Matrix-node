@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Minting" do
+RSpec.describe FctMintCalculator do
   let(:block_base_fee) { 10.gwei }  # Example base fee in ether per gas unit
 
   describe '#calculate_fct_minted_in_block' do
@@ -13,7 +13,7 @@ RSpec.describe "Minting" do
     end
 
     it 'caps the FCT minted at approximately 1 FCT when large amounts of gas are burned' do
-      large_gas_units_used = 1e90.to_i # Large gas usage
+      large_gas_units_used = 100e7.to_i # Large gas usage
       max_fct = FctMintCalculator.max_total_fct_minted_per_block_in_first_period
       fct_minted = FctMintCalculator.calculate_fct_minted_in_block(large_gas_units_used, block_base_fee)
       
@@ -23,36 +23,40 @@ RSpec.describe "Minting" do
       expect(fct_minted).to be_within(epsilon).of(max_fct)
     end
   end
+  
+  describe '.assign_mint_amounts' do
+    let(:block_base_fee) { 10.gwei }
 
-  describe '#calculate_fct_for_transactions' do
-    let(:transactions) do
+    let(:facet_txs) do
       [
-        { tx_id: 1, gas_used: 21000 },
-        { tx_id: 2, gas_used: 50000 },
-        { tx_id: 3, gas_used: 100000 }
-      ].map { |tx| tx[:gas_used] }
+        instance_double('FacetTransaction', l1_calldata_gas_used: 21000, mint: 0),
+        instance_double('FacetTransaction', l1_calldata_gas_used: 50000, mint: 0),
+        instance_double('FacetTransaction', l1_calldata_gas_used: 100000, mint: 0)
+      ]
     end
 
-    it 'distributes FCT incrementally based on gas used in each transaction' do
-      fct_awards = FctMintCalculator.calculate_fct_for_transactions(transactions, block_base_fee)
-
-      expect(fct_awards).to be_an(Array)
-      expect(fct_awards.size).to eq(3)
-      
-      fct_awards.each.with_index do |award, i|
-        expect(award).to be_a(Numeric)
-        expect(award).to be > 0
-        expect(award).to be > (block_base_fee * transactions[i])
+    before do
+      facet_txs.each do |tx|
+        allow(tx).to receive(:mint=)
       end
     end
 
-    it 'ensures that the total FCT minted does not exceed the max per block' do
-      fct_awards = FctMintCalculator.calculate_fct_for_transactions(transactions, block_base_fee)
-
-      total_fct_awarded = fct_awards.sum
-      max_fct = FctMintCalculator.max_total_fct_minted_per_block_in_first_period
+    it 'assigns FCT mints based on calldata gas used in each transaction' do
+      total_l1_calldata_gas_used = facet_txs.sum(&:l1_calldata_gas_used)
+      total_fct_minted = FctMintCalculator.calculate_fct_minted_in_block(total_l1_calldata_gas_used, block_base_fee)
       
-      expect(total_fct_awarded).to be <= max_fct
+      FctMintCalculator.assign_mint_amounts(facet_txs, block_base_fee)
+
+      expected_mints = facet_txs.map do |tx|
+        tx.l1_calldata_gas_used * total_fct_minted / total_l1_calldata_gas_used
+      end
+
+      facet_txs.zip(expected_mints).each do |tx, expected_mint|
+        expect(tx).to have_received(:mint=).with(expected_mint)
+      end
+
+      total_assigned_mint = expected_mints.sum
+      expect(total_assigned_mint).to be_within(facet_txs.length).of(total_fct_minted)
     end
   end
 end

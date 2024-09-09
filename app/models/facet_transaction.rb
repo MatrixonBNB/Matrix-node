@@ -5,7 +5,7 @@ class FacetTransaction < ApplicationRecord
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
   
-  attr_accessor :chain_id, :eth_call, :l1_tx_origin
+  attr_accessor :chain_id, :eth_call, :l1_tx_origin, :l1_calldata_gas_used
   
   FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
@@ -99,20 +99,14 @@ class FacetTransaction < ApplicationRecord
       
       facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
       
+      facet_tx&.l1_calldata_gas_used = calculate_calldata_cost(call.input)
+      
       facet_tx&.facet_block = facet_block
       
       facet_tx
     end.flatten.compact
     
-    gas_used_per_tx = facet_txs.map do |tx|
-      calculate_calldata_cost(tx.eth_call.input)
-    end
-    
-    mints = FctMintCalculator.calculate_fct_for_transactions(gas_used_per_tx, eth_block.base_fee_per_gas)
-    
-    mints.each.with_index do |mint, i|
-      facet_txs[i].mint = mint
-    end
+    FctMintCalculator.assign_mint_amounts(facet_txs, eth_block.base_fee_per_gas)
     
     facet_txs
   end
