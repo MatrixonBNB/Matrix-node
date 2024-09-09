@@ -115,6 +115,25 @@ module EVMTestHelper
     res
   end
   
+  def facet_transaction_to_eth_payload(facet_transaction)
+    raise unless facet_transaction.gas_limit > 0
+    
+    chain_id_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.chain_id)
+    to_bin = Eth::Util.hex_to_bin(facet_transaction.to_address.to_s)
+    value_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.value)
+    max_gas_fee_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.max_fee_per_gas)
+    gas_limit_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.gas_limit)
+    data_bin = Eth::Util.hex_to_bin(facet_transaction.input)
+
+    # Encode the fields using RLP
+    rlp_encoded = Eth::Rlp.encode([chain_id_bin, to_bin, value_bin, max_gas_fee_bin, gas_limit_bin, data_bin])
+
+    # Add the transaction type prefix and convert to hex
+    hex_payload = Eth::Util.bin_to_prefixed_hex([FacetTransaction::FACET_TX_TYPE].pack('C') + rlp_encoded)
+
+    hex_payload
+  end
+  
   def create_and_import_block(
     facet_data:,
     from_address:,
@@ -137,7 +156,7 @@ module EVMTestHelper
       block_timestamp = block_timestamp.to_i
     end
     
-    eth_data = FacetTransaction.new(
+    facet_tx = FacetTransaction.new(
       chain_id: chain_id,
       to_address: to_address,
       from_address: from_address,
@@ -145,7 +164,9 @@ module EVMTestHelper
       max_fee_per_gas: max_fee_per_gas,
       gas_limit: gas_limit.to_i,
       input: facet_data
-    ).to_eth_payload
+    )
+
+    eth_data = facet_transaction_to_eth_payload(facet_tx)
 
     eth_transaction = {
       'hash' => (last_block.number + 3999).zpad(32).bytes_to_hex,
@@ -219,7 +240,7 @@ module EVMTestHelper
     sub_calls.each do |sub_call|
       sub_call = sub_call.with_indifferent_access
       
-      sub_call_data = FacetTransaction.new(
+      facet_tx = FacetTransaction.new(
         chain_id: chain_id,
         to_address: sub_call['to'],
         from_address: sub_call['from'],
@@ -227,7 +248,10 @@ module EVMTestHelper
         max_fee_per_gas: max_fee_per_gas,
         gas_limit: sub_call['gas_limit'].to_i,
         input: sub_call['input']
-      ).to_eth_payload
+      )
+      
+      sub_call_data = facet_transaction_to_eth_payload(facet_tx)
+      
       # binding.irb
       sub_call_result = {
         'from' => sub_call['from'],

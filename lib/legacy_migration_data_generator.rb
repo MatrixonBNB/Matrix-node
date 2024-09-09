@@ -5,7 +5,7 @@ class LegacyMigrationDataGenerator
   class BlockNotReadyToImportError < StandardError; end
   
   attr_accessor :imported_facet_transaction_receipts, :imported_facet_transactions,
-    :ethereum_client, :legacy_value_mapping
+    :ethereum_client, :legacy_value_mapping, :current_import_block_number
     
   delegate :genesis_block, :v2_fork_block, to: :FacetBlock
 
@@ -15,6 +15,10 @@ class LegacyMigrationDataGenerator
     @ethereum_client ||= EthRpcClient.new(
       base_url: ENV.fetch('L1_RPC_URL')
     )
+    
+    unless ENV['FACET_V1_VM_DATABASE_URL'].present?
+      raise "FACET_V1_VM_DATABASE_URL is not set"
+    end
   end
   
   def reset_state
@@ -61,10 +65,6 @@ class LegacyMigrationDataGenerator
   end
   
   def import_blocks_until_done
-    unless ENV['FACET_V1_VM_DATABASE_URL']
-      raise "FACET_V1_VM_DATABASE_URL is not set"
-    end
-    
     MemeryExtensions.clear_all_caches!
     ensure_genesis_blocks
     
@@ -224,54 +224,61 @@ class LegacyMigrationDataGenerator
     
     ActiveRecord::Base.transaction do
       block_numbers.each_with_index do |block_number, index|
-        eth_block = EthBlock.from_rpc_result(block_by_number_responses[block_number]['result'])
+        begin
+          old_current_import_block_number = current_import_block_number
+          @current_import_block_number = block_number
+          
+          eth_block = EthBlock.from_rpc_result(block_by_number_responses[block_number]['result'])
 
-        eth_blocks << eth_block
-        
-        block_ethscriptions = Array.wrap(ethscriptions_by_block[block_number]).sort_by(&:transaction_index)
-        block_legacy_tx_receipts = Array.wrap(legacy_tx_receipts_by_block[block_number]).sort_by(&:transaction_index)
-        
-        eth_transactions.concat(block_ethscriptions.map { |e| EthTransaction.from_ethscription(e) })
-        
-        block_number = current_max_block_number + index + 1
-        
-        # Determine the head, safe, and finalized blocks
-        head_block = in_memory_blocks[block_number - 1] || earliest
-        safe_block = in_memory_blocks[block_number - 32] || earliest
-        finalized_block = in_memory_blocks[block_number - 64] || earliest
-        
-        facet_block, facet_txs, receipts = propose_facet_block(
-          eth_block,
-          block_ethscriptions,
-          block_legacy_tx_receipts,
-          block_number: block_number,
-          head_block: head_block,
-          safe_block: safe_block,
-          finalized_block: finalized_block
-        )
-        
-        # Update in-memory blocks
-        in_memory_blocks[block_number] = facet_block
-        
-        facet_blocks << facet_block
-        all_facet_txs.concat(facet_txs)
-        all_receipts.concat(receipts)
-        
-        imported_facet_transaction_receipts.concat(receipts)
-        imported_facet_transactions.concat(facet_txs)
+          eth_blocks << eth_block
+          
+          block_ethscriptions = Array.wrap(ethscriptions_by_block[block_number]).sort_by(&:transaction_index)
+          block_legacy_tx_receipts = Array.wrap(legacy_tx_receipts_by_block[block_number]).sort_by(&:transaction_index)
+          
+          eth_transactions.concat(block_ethscriptions.map { |e| EthTransaction.from_ethscription(e) })
+          
+          block_number = current_max_block_number + index + 1
+          
+          # Determine the head, safe, and finalized blocks
+          head_block = in_memory_blocks[block_number - 1] || earliest
+          safe_block = in_memory_blocks[block_number - 32] || earliest
+          finalized_block = in_memory_blocks[block_number - 64] || earliest
+          
+          facet_block, facet_txs, receipts = propose_facet_block(
+            eth_block,
+            block_ethscriptions,
+            block_legacy_tx_receipts,
+            block_number: block_number,
+            head_block: head_block,
+            safe_block: safe_block,
+            finalized_block: finalized_block
+          )
+          
+          # Update in-memory blocks
+          in_memory_blocks[block_number] = facet_block
+          
+          facet_blocks << facet_block
+          all_facet_txs.concat(facet_txs)
+          all_receipts.concat(receipts)
+          
+          imported_facet_transaction_receipts.concat(receipts)
+          imported_facet_transactions.concat(facet_txs)
 
-        receipts.each(&:set_legacy_contract_address_map)
-        receipts.each(&:update_real_withdrawal_id)
-        
-        validate_receipts(block_legacy_tx_receipts, receipts) if validate_import?
-        
-        block_ethscriptions.each(&:clear_caches_if_upgrade!)
-        
-        res << OpenStruct.new(
-          facet_block: facet_block,
-          transactions_imported: facet_txs,
-          receipts_imported: receipts
-        )
+          receipts.each(&:set_legacy_contract_address_map)
+          receipts.each(&:update_real_withdrawal_id)
+          
+          validate_receipts(block_legacy_tx_receipts, receipts) if validate_import?
+          
+          block_ethscriptions.each(&:clear_caches_if_upgrade!)
+          
+          res << OpenStruct.new(
+            facet_block: facet_block,
+            transactions_imported: facet_txs,
+            receipts_imported: receipts
+          )
+        ensure
+          @current_import_block_number = old_current_import_block_number
+        end
       end
       
       EthBlock.import!(eth_blocks)

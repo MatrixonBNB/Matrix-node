@@ -27,7 +27,7 @@ module EthscriptionEVMConverter
   rescue ContractMissing => e
     shim_val = "0x00000000000000000000000000000000000000c5"
     
-    EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+    LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
       legacy_value: parsed_content['data']['to'],
       new_value: shim_val
     )
@@ -303,16 +303,15 @@ module EthscriptionEVMConverter
     def calculate_to_address(legacy_to)
       legacy_to = legacy_to.downcase
       
-      begin
+      unless LegacyMigrationDataGenerator.instance.current_import_block_number
         return lookup_new_value(legacy_to)
-      rescue LegacyValueMapping::NoMappingSource
       end
       
-      EthscriptionsImporter.instance.imported_facet_transaction_receipts.each do |receipt|
+      LegacyMigrationDataGenerator.instance.imported_facet_transaction_receipts.each do |receipt|
         if receipt.legacy_contract_address_map.key?(legacy_to)
           new_to = receipt.legacy_contract_address_map[legacy_to]
           
-          EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+          LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
             legacy_value: legacy_to,
             new_value: new_to
           )
@@ -329,7 +328,7 @@ module EthscriptionEVMConverter
       
       new_to = deploy_receipt.legacy_contract_address_map[legacy_to]
       
-      EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
         legacy_value: legacy_to,
         new_value: new_to
       )
@@ -455,23 +454,22 @@ module EthscriptionEVMConverter
     memoize :lookup_new_value
     
     def real_withdrawal_id(user_withdrawal_id)
-      begin
+      unless LegacyMigrationDataGenerator.instance.current_import_block_number
         return lookup_new_value(user_withdrawal_id)
-      rescue LegacyValueMapping::NoMappingSource
       end
       
       # Check in-memory cache first
-      transaction = EthscriptionsImporter.instance.imported_facet_transactions.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
+      transaction = LegacyMigrationDataGenerator.instance.imported_facet_transactions.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
       
       if transaction
-        receipt = EthscriptionsImporter.instance.imported_facet_transaction_receipts.find { |r| r.transaction_hash == transaction.tx_hash }
+        receipt = LegacyMigrationDataGenerator.instance.imported_facet_transaction_receipts.find { |r| r.transaction_hash == transaction.tx_hash }
       else
         # Fallback to database query
         transaction = FacetTransaction.find_by(eth_transaction_hash: user_withdrawal_id)
         if transaction
           receipt = transaction.facet_transaction_receipt
         else
-          EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+          LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
             legacy_value: user_withdrawal_id,
             new_value: "0x" + "0" * 62 + "c5",
           )
@@ -481,7 +479,7 @@ module EthscriptionEVMConverter
       end
       
       unless receipt
-        EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+        LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
           legacy_value: user_withdrawal_id,
           new_value: "0x" + "0" * 62 + "c5",
         )
@@ -490,7 +488,7 @@ module EthscriptionEVMConverter
       end
       
       if receipt.status == 0
-        EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+        LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
           legacy_value: user_withdrawal_id,
           new_value: user_withdrawal_id,
         )
@@ -501,14 +499,14 @@ module EthscriptionEVMConverter
       new_withdrawal_id = receipt.decoded_logs.
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
       
-      EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
         legacy_value: user_withdrawal_id,
         new_value: new_withdrawal_id,
       )
       
       new_withdrawal_id
     rescue ActiveRecord::RecordNotFound => e
-      EthscriptionsImporter.instance.add_legacy_value_mapping_item(
+      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
         legacy_value: user_withdrawal_id,
         new_value: "0x" + "0" * 62 + "c5",
       )
