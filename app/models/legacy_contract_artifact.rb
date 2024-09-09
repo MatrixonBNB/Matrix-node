@@ -24,12 +24,24 @@ class LegacyContractArtifact < ApplicationRecord
   scope :oldest_first, -> { order(:block_number, :transaction_index, :internal_transaction_index) }
   scope :newest_first, -> { order(block_number: :desc, transaction_index: :desc, internal_transaction_index: :desc) }
   
+  def self.file_location(network = ENV.fetch('L1_NETWORK'))
+    Rails.root.join('config', "legacy-contract-artifacts-#{network}.json")
+  end
+  
+  def self.to_file(network = ENV.fetch("L1_NETWORK"))
+    json = JSON.pretty_generate(cached_all.map(&:as_json))
+    
+    File.write(file_location(network), json)
+  end
+  
   def self.all_json
     if base_url = LegacyValueMapping.oracle_base_url
       endpoint = '/legacy_value_mappings/contract_artifacts'
       
       response = HttpPartyWithRetry.get_with_retry("#{base_url}#{endpoint}")
       response.body
+    elsif File.exist?(file_location)
+      File.read(file_location)
     else
       LegacyContractArtifact.all.oldest_first.to_json
     end

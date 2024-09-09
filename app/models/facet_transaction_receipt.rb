@@ -65,12 +65,12 @@ class FacetTransactionReceipt < ApplicationRecord
       return
     end
     
-    if (our_event.nil? && their_event.nil?) || (EthscriptionEVMConverter.skip_import_validation? && status == 0)
+    if (our_event.nil? && their_event.nil?) || (Ethscription.skip_import_validation? && status == 0)
       return
     end
     
     unless our_event.present? && their_event.present?
-      return if EthscriptionEVMConverter.skip_import_validation?
+      return if Ethscription.skip_import_validation?
       binding.irb
       raise "One of the events is missing"
     end

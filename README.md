@@ -4,7 +4,7 @@
 
 `facet-node` works with `facet-geth` to trustlessly derive Facet state from Ethereum history. The system is heavily inspired by Optimism, with `facet-geth` forked from `op-geth` and `facet-node` modeled after `op-node`.
 
-`facet-node` is pre-release software and isn't yet production ready.
+`facet-node` is pre-release software and subject to rapid development.
 
 ### The Basic Idea
 
@@ -16,9 +16,13 @@ Here's how it works:
 
 3. `facet-node` constructs a Facet block with these Deposit transactions and sends the block to `facet-geth` using the [engine API](https://github.com/ethereum/execution-apis/tree/main/src/engine). This is the same API Ethereum consensus clients use to tell the execution layer about new blocks, so within the typical Ethereum model, `facet-node` functions as a consensus client.
 
-`facet-node` aims to be stateless. All data required to operate `facet-node` is stored in `facet-geth`, alongside all user-created state and history. This stateless design ensures that `facet-node` doesn't have to worry about keeping its state in sync with `facet-geth`'s.
+`facet-node` is stateless. All data required to operate `facet-node` is stored in `facet-geth` or the `facet-node` git repository. This stateless design ensures that `facet-node` doesn't have to worry about keeping its state in sync with `facet-geth`.
 
-`facet-node` can run statelessly today if you start a fresh chain from scratch. But to import existing Facet data from Facet V1 you'll need access to a Facet V1 "oracle." Once V2 launches this v1 data will be included in `facet-node` itself and no oracle will be necessary.
+## Facet V1 (Legacy) Migration
+
+This stateless design is complicated by the need to import historical data from Facet V1. Facet V1 operated under a very different model and it's not possible to translate V1 data to V2 directly using only on-chain data. Because of this a small amount of outside data is required and this data has been included in this repository.
+
+However, as Facet V1 will continue to be used until V2 launches, this data must be periodically refreshed (or looked up in real-time). Once V2 launches the V1 data will be frozen. For now the legacy data goes through block 20703687 on mainnet and 6661174 on Sepolia which should be enough for testing.
 
 ## Installation
 
@@ -86,7 +90,7 @@ Here's how it works:
     
     | Variable | Description |
     |----------|-------------|
-    | `ETHEREUM_CLIENT_BASE_URL` | The URL of your Ethereum RPC server. Facet blocks are derived from data that comes from this RPC endpoint. |
+    | `L1_RPC_URL` | The URL of your Ethereum RPC server. Facet blocks are derived from data that comes from this RPC endpoint. |
     | `BLOCK_IMPORT_BATCH_SIZE` | Number of blocks to import in each batch. This is how many simultaneous requests are made to the RPC endpoint. |
     | `L1_NETWORK` | The Ethereum network to derive blocks from. `sepolia` or `mainnet` |
     | `GETH_RPC_URL` | RPC URL for authenticated facet-geth connections. You can leave this as the default unless you plan to run multiple facet-geth instances simultaneously. |
@@ -94,11 +98,11 @@ Here's how it works:
     | `GETH_DISCOVERY_PORT` | Port used by facet-geth for peer discovery. You can leave this as the default unless you plan to run multiple facet-geth instances simultaneously. |
     | `JWT_SECRET` | Secret key for JWT authentication. **The value you put here must also go in `/tmp/jwtsecret` on your local machine** |
     | `DATABASE_URL` | URL your local postgresql db |
-    | `START_BLOCK` | The block number to start importing from (set higher to skip v1 blocks). To sync Facet mainnet from genesis set it to 18684900. To test in Sepolia with current data, set it to the current block number. |
-    | `V2_FORK_BLOCK` | Block number for v2 fork (set to 99999999999 to disable forking). Set to the same value as START_BLOCK to skip the v1 import. |
+    | `START_BLOCK` | The block number to start importing from (set higher to skip v1 blocks). To sync Facet mainnet from genesis set it to 18684900. To sync Sepolia from genesis set it to 5193575. To test in Sepolia with current data, set it to the current block number. |
+    | `V2_FORK_BLOCK` | Block number for v2 fork. After this block `facet-node` will use the new V2 logic to build blocks. Set to the same value as START_BLOCK to skip the v1 import. |
     | `LOCAL_GETH_DIR` | Location of the directory into which you cloned facet-geth |
     | `FACET_V1_VM_DATABASE_URL` | (Optional) URL for v1 database, if available. You probably won't need this. |
-    | `LEGACY_VALUE_ORACLE_URL` | URL for the legacy value oracle service. You can use one of the values from the sample. This is only necessary if you're doing a v1 import. |
+    | `LEGACY_VALUE_ORACLE_URL` | URL for the legacy value oracle service. You can use one of the values from the sample. This is only necessary if you're doing a v1 import that extends beyond the legacy data included in the repo. |
 
 8. Put your JWT_SECRET in `/tmp/jwtsecret` on your local machine:
 
@@ -121,7 +125,7 @@ Here's how it works:
 
 To use facet-geth to process blocks instead of just in a test:
 
-1. From the `facet-node` directory, generate the geth initialization command:
+1. From the `facet-node` directory, generate the geth initialization command. This will also set up your genesis.json file:
    ```
    bundle exec rake geth:init_command
    ```

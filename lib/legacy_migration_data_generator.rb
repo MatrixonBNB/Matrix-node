@@ -1,4 +1,4 @@
-class EthscriptionsImporter
+class LegacyMigrationDataGenerator
   include Singleton
   include Memery
   
@@ -13,7 +13,7 @@ class EthscriptionsImporter
     reset_state
     
     @ethereum_client ||= EthRpcClient.new(
-      base_url: ENV.fetch('ETHEREUM_CLIENT_BASE_URL')
+      base_url: ENV.fetch('L1_RPC_URL')
     )
   end
   
@@ -28,7 +28,7 @@ class EthscriptionsImporter
   end
   
   def validate_import?
-    EthscriptionEVMConverter.validate_import?
+    Ethscription.validate_import?
   end
   
   def in_v2?(block_number)

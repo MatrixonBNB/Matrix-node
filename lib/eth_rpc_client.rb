@@ -1,7 +1,7 @@
 class EthRpcClient
   attr_accessor :base_url
 
-  def initialize(base_url: ENV['ETHEREUM_CLIENT_BASE_URL'])
+  def initialize(base_url: ENV['L1_RPC_URL'])
     self.base_url = base_url
   end
 
