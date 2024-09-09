@@ -545,34 +545,23 @@ class LegacyMigrationDataGenerator
     (start_block...(start_block + n)).to_a
   end
 
-  def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, legacy_tx_receipts, facet_block)
-    # results = Parallel.map(ethscriptions.sort_by(&:transaction_index).each_with_index, in_threads: 10) do |(ethscription, idx)|
-    results = ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
+  def facet_txs_from_ethscriptions_in_block(ethscriptions, facet_block)
+    ethscriptions.sort_by(&:transaction_index).map do |ethscription|
       ethscription.clear_caches_if_upgrade!
       
-      legacy_tx_receipt = legacy_tx_receipts.find { |r| r.transaction_hash == ethscription.transaction_hash }
-      facet_tx = FacetTransaction.from_eth_tx_and_ethscription(
+      FacetTransaction.from_eth_tx_and_ethscription(
         ethscription,
-        idx,
-        eth_block,
         ethscriptions.count,
         facet_block
       )
-      
-      [idx, facet_tx] # Return the index and the result to preserve order
     end
-  
-    # Sort the results by their original indices and extract the facet transactions
-    results.sort_by { |idx, _| idx }.map { |_, facet_tx| facet_tx }
   end
   
   def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, head_block:, safe_block:, finalized_block:)
     facet_block = FacetBlock.from_eth_block(eth_block, block_number)
     
     facet_txs = facet_txs_from_ethscriptions_in_block(
-      eth_block,
       ethscriptions,
-      legacy_tx_receipts,
       facet_block
     )
     

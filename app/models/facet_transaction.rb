@@ -26,8 +26,6 @@ class FacetTransaction < ApplicationRecord
   
   def self.from_eth_tx_and_ethscription(
     ethscription,
-    idx,
-    eth_block,
     tx_count_in_block,
     facet_block
   )
@@ -39,13 +37,15 @@ class FacetTransaction < ApplicationRecord
     tx.input = ethscription.facet_tx_input
     
     tx.eth_transaction_hash = ethscription.transaction_hash
-    tx.eth_call_index = idx
+    tx.eth_call_index = ethscription.transaction_index
     tx.from_address = ethscription.creator
     tx.eth_call = EthCall.new(
-      call_index: idx
+      call_index: ethscription.transaction_index
     )
     
-    tx.l1_tx_origin = ethscription.l1_tx_origin
+    # TODO: use contract that will actually take the FCT out of circulation
+    burn_address = "0x0000000000000000000000000000000000000000"
+    tx.l1_tx_origin = burn_address
     
     payload = [
       ethscription.block_hash.hex_to_bytes,
@@ -58,21 +58,14 @@ class FacetTransaction < ApplicationRecord
       USER_DEPOSIT_SOURCE_DOMAIN
     )
     
-    user_current_balance = TransactionHelper.balance(tx.from_address)
-    next_block_base_fee = facet_block.calculated_base_fee_per_gas
-    
-    eth_base_fee = eth_block.base_fee_per_gas
-    
-    mint_amount = calculate_mint_amount(ethscription.content_uri.bytes_to_hex, eth_base_fee)
-    
-    user_next_balance = user_current_balance + mint_amount
+    # It gets set automatically later
+    tx.max_fee_per_gas = 0
     
     block_gas_limit = FacetBlock::GAS_LIMIT
-    per_tx_avg_gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
-    
-    tx.max_fee_per_gas = next_block_base_fee
-    tx.gas_limit = [user_next_balance / tx.max_fee_per_gas, per_tx_avg_gas_limit].min
-    tx.mint = mint_amount
+    tx.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
+
+    # The mint amount doesn't matter as the excess will be burned
+    tx.mint = 10.ether
     
     tx
   end
@@ -83,11 +76,6 @@ class FacetTransaction < ApplicationRecord
     non_zero_count = bytes.bytesize - zero_count
     
     zero_count * 4 + non_zero_count * 16
-  end
-  
-  def self.calculate_mint_amount(input_data, base_fee)
-    calldata_cost = calculate_calldata_cost(input_data)
-    calldata_cost * base_fee * 1024
   end
   
   def self.from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls, facet_block)
