@@ -99,7 +99,9 @@ class SolidityCompiler
       "solc",
       "--combined-json", "abi,bin,bin-runtime",
       "--optimize",
-      "--optimize-runs", "#{2 ** 32 - 1}",
+      # "--optimize-runs", "#{2 ** 32 - 1}",
+      # TODO: Switch back to the max optimize runs
+      "--optimize-runs", "200",
     ]
 
     # Append additional arguments if not legacy

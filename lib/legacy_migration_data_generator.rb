@@ -1,4 +1,4 @@
-class EthscriptionsImporter
+class LegacyMigrationDataGenerator
   include Singleton
   include Memery
   
