@@ -303,12 +303,9 @@ module EthscriptionEVMConverter
     def calculate_to_address(legacy_to)
       legacy_to = legacy_to.downcase
       
-      if LegacyValueMapping.oracle_base_url
-        new_value = lookup_new_value(legacy_to)
-        
-        return new_value if new_value
-        
-        raise "Legacy to address not found: #{legacy_to}"
+      begin
+        return lookup_new_value(legacy_to)
+      rescue LegacyValueMapping::NoMappingSource
       end
       
       EthscriptionsImporter.instance.imported_facet_transaction_receipts.each do |receipt|
@@ -443,36 +440,24 @@ module EthscriptionEVMConverter
     memoize :normalize_arg_value
     
     def lookup_new_value(legacy_value)
-      base_url = ENV.fetch('LEGACY_VALUE_ORACLE_URL')
-      endpoint = '/legacy_value_mappings/lookup'
-      query_params = {
-        legacy_value: legacy_value
-      }
-
-      response = HttpPartyWithRetry.get_with_retry("#{base_url}#{endpoint}", query: query_params)
-      parsed_response = JSON.parse(response.body)
-
-      if parsed_response['new_value']
-        if parsed_response['new_value'] == "0x00000000000000000000000000000000000000c5"
-          raise ContractMissing, "Contract #{legacy_value} not found"
-        end
-        
-        if parsed_response['new_value'] == "0x" + "0" * 62 + "c5"
-          raise InvalidArgValue, "Withdrawal ID not found: #{legacy_value}"
-        end
-        
-        return parsed_response['new_value']
+      new_value = LegacyValueMapping.lookup(legacy_value)
+      
+      if new_value == "0x00000000000000000000000000000000000000c5"
+        raise ContractMissing, "Contract #{legacy_value} not found"
       end
+      
+      if new_value == "0x" + "0" * 62 + "c5"
+        raise InvalidArgValue, "Withdrawal ID not found: #{legacy_value}"
+      end
+      
+      new_value
     end
     memoize :lookup_new_value
     
     def real_withdrawal_id(user_withdrawal_id)
-      if ENV['LEGACY_VALUE_ORACLE_URL']
-        new_value = lookup_new_value(user_withdrawal_id)
-        
-        return new_value if new_value
-        
-        raise "Withdrawal ID not found: #{user_withdrawal_id}"
+      begin
+        return lookup_new_value(user_withdrawal_id)
+      rescue LegacyValueMapping::NoMappingSource
       end
       
       # Check in-memory cache first

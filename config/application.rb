@@ -35,16 +35,6 @@ module SimpleVm
     
     additional_paths = %w(
       lib
-      lib/fvm
-      lib/fvm/utils
-      lib/fvm/tx
-      lib/fvm/tx/structs
-      lib/fvm/evm
-      lib/fvm/evm/structs
-      lib/fvm/vm
-      lib/fvm/vm/structs
-      lib/fvm/runner
-      lib/fvm/runner/structs
       lib/solidity
       lib/extensions
     ).map{|i| Rails.root.join(i)}
