@@ -18,7 +18,7 @@ class FacetTransaction < ApplicationRecord
   SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
   L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
   
-  PER_TX_GAS_LIMIT = 30_000_000
+  PER_TX_GAS_LIMIT = 50_000_000
   
   def within_gas_limit?
     gas_limit <= PER_TX_GAS_LIMIT
@@ -126,9 +126,9 @@ class FacetTransaction < ApplicationRecord
     tx = Eth::Rlp.decode bin
 
     # So people can add "extra data" to burn more gas
-    # unless tx.size == 6
-    #   raise Eth::Tx::ParameterError, "Transaction missing fields!"
-    # end
+    unless tx.size <= 7
+      raise Eth::Tx::ParameterError, "Transaction missing fields!"
+    end
 
     chain_id = Eth::Util.deserialize_big_endian_to_int tx[0]
     
@@ -263,25 +263,6 @@ class FacetTransaction < ApplicationRecord
       Eth::Tx::ParameterError,
       Eth::Tx::DecoderError
     ]
-  end
-  
-  def to_eth_payload
-    raise unless gas_limit > 0
-    
-    chain_id_bin = Eth::Util.serialize_int_to_big_endian(chain_id)
-    to_bin = Eth::Util.hex_to_bin(to_address.to_s)
-    value_bin = Eth::Util.serialize_int_to_big_endian(value)
-    max_gas_fee_bin = Eth::Util.serialize_int_to_big_endian(max_fee_per_gas)
-    gas_limit_bin = Eth::Util.serialize_int_to_big_endian(gas_limit)
-    data_bin = Eth::Util.hex_to_bin(input)
-
-    # Encode the fields using RLP
-    rlp_encoded = Eth::Rlp.encode([chain_id_bin, to_bin, value_bin, max_gas_fee_bin, gas_limit_bin, data_bin])
-
-    # Add the transaction type prefix and convert to hex
-    hex_payload = Eth::Util.bin_to_prefixed_hex([FACET_TX_TYPE].pack('C') + rlp_encoded)
-
-    hex_payload
   end
   
   def self.validated_address(str)
