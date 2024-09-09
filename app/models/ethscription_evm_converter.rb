@@ -303,9 +303,8 @@ module EthscriptionEVMConverter
     def calculate_to_address(legacy_to)
       legacy_to = legacy_to.downcase
       
-      begin
+      unless LegacyMigrationDataGenerator.instance.current_import_block_number
         return lookup_new_value(legacy_to)
-      rescue LegacyValueMapping::NoMappingSource
       end
       
       LegacyMigrationDataGenerator.instance.imported_facet_transaction_receipts.each do |receipt|
@@ -455,9 +454,8 @@ module EthscriptionEVMConverter
     memoize :lookup_new_value
     
     def real_withdrawal_id(user_withdrawal_id)
-      begin
+      unless LegacyMigrationDataGenerator.instance.current_import_block_number
         return lookup_new_value(user_withdrawal_id)
-      rescue LegacyValueMapping::NoMappingSource
       end
       
       # Check in-memory cache first

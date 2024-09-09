@@ -21,6 +21,10 @@ class LegacyValueMapping < ApplicationRecord
   end
   
   def self.lookup(legacy_value)
+    if LegacyMigrationDataGenerator.instance.current_import_block_number
+      raise "Legacy value mapping is not available during legacy data generation"
+    end
+    
     if oracle_base_url.present?
       oracle_lookup(legacy_value)
     elsif File.exist?(file_location)
