@@ -15,10 +15,6 @@ class LegacyMigrationDataGenerator
     @ethereum_client ||= EthRpcClient.new(
       base_url: ENV.fetch('L1_RPC_URL')
     )
-    
-    unless ENV['FACET_V1_VM_DATABASE_URL'].present?
-      raise "FACET_V1_VM_DATABASE_URL is not set"
-    end
   end
   
   def reset_state
@@ -137,6 +133,10 @@ class LegacyMigrationDataGenerator
   end
   
   def import_blocks(block_numbers, l1_rpc_responses)
+    unless ENV['FACET_V1_VM_DATABASE_URL'].present?
+      raise "FACET_V1_VM_DATABASE_URL is not set"
+    end
+    
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
