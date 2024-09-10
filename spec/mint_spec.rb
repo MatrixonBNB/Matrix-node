@@ -1,62 +1,102 @@
 require "rails_helper"
 
 RSpec.describe FctMintCalculator do
-  let(:block_base_fee) { 10.gwei }  # Example base fee in ether per gas unit
+  before do
+    allow(FacetBlock).to receive(:l1_genesis_block).and_return(1_000_000)
+    allow(FacetBlock).to receive(:v2_fork_block).and_return(1_500_000)
+  end
 
-  describe '#calculate_fct_minted_in_block' do
-    it 'calculates the correct FCT for a given gas usage and base fee' do
-      gas_units_used = 21000
-      fct_minted = FctMintCalculator.calculate_fct_minted_in_block(gas_units_used, block_base_fee)
-
-      expect(fct_minted).to be > 0
-      expect(fct_minted).to be_a(Numeric)
-    end
-
-    it 'caps the FCT minted at approximately 1 FCT when large amounts of gas are burned' do
-      large_gas_units_used = 100e7.to_i # Large gas usage
-      max_fct = FctMintCalculator.max_total_fct_minted_per_block_in_first_period
-      fct_minted = FctMintCalculator.calculate_fct_minted_in_block(large_gas_units_used, block_base_fee)
-      
-      # TODO: use fixed precision
-      epsilon = 0.000001
-      
-      expect(fct_minted).to be_within(epsilon).of(max_fct)
+  describe '.facet_v2_fork_block_number' do
+    it 'calculates the correct V2 fork block number' do
+      expect(FctMintCalculator.facet_v2_fork_block_number).to eq(500_000)
     end
   end
-  
+
+  describe '.in_v1?' do
+    it 'returns true for blocks before V2 fork' do
+      expect(FctMintCalculator.in_v1?(499_999)).to be true
+    end
+
+    it 'returns false for blocks after V2 fork' do
+      expect(FctMintCalculator.in_v1?(500_000)).to be false
+    end
+  end
+
+  describe '.calculated_mint_target' do
+    it 'returns INITIAL_FCT_PER_BLOCK_MINT_TARGET for V1 blocks' do
+      expect(FctMintCalculator.calculated_mint_target(499_999)).to eq(FctMintCalculator::INITIAL_FCT_PER_BLOCK_MINT_TARGET)
+    end
+
+    it 'calculates correct mint target for V2 blocks' do
+      blocks_in_halving_period = FctMintCalculator::HALVING_PERIOD_IN_BLOCKS
+      expect(FctMintCalculator.calculated_mint_target(500_000 + blocks_in_halving_period)).to eq(FctMintCalculator::INITIAL_FCT_PER_BLOCK_MINT_TARGET / 2)
+    end
+  end
+
+  describe '.calculate_next_block_fct_minted_per_gas' do
+    let(:prev_fct_mint_per_gas) { 1000.gwei }
+    let(:current_l2_block_number) { 600_000 }
+
+    context 'when prev_total_fct_minted equals target' do
+      it 'returns the previous fct_mint_per_gas' do
+        target = FctMintCalculator.calculated_mint_target(current_l2_block_number)
+        result = FctMintCalculator.calculate_next_block_fct_minted_per_gas(prev_fct_mint_per_gas, target, current_l2_block_number)
+        expect(result).to eq(prev_fct_mint_per_gas)
+      end
+    end
+
+    context 'when prev_total_fct_minted is less than target' do
+      it 'increases the fct_mint_per_gas' do
+        target = FctMintCalculator.calculated_mint_target(current_l2_block_number)
+        result = FctMintCalculator.calculate_next_block_fct_minted_per_gas(prev_fct_mint_per_gas, target - 1.ether, current_l2_block_number)
+        expect(result).to be > prev_fct_mint_per_gas
+      end
+    end
+
+    context 'when prev_total_fct_minted is greater than target' do
+      it 'decreases the fct_mint_per_gas' do
+        target = FctMintCalculator.calculated_mint_target(current_l2_block_number)
+        result = FctMintCalculator.calculate_next_block_fct_minted_per_gas(prev_fct_mint_per_gas, target + 1.ether, current_l2_block_number)
+        expect(result).to be < prev_fct_mint_per_gas
+      end
+    end
+  end
+
   describe '.assign_mint_amounts' do
-    let(:block_base_fee) { 10.gwei }
+    let(:facet_block) { double('FacetBlock', number: 600_000) }
+    let(:facet_tx) { double('FacetTx', l1_calldata_gas_used: 100_000) }
 
-    let(:facet_txs) do
-      [
-        instance_double('FacetTransaction', l1_calldata_gas_used: 21000, mint: 0),
-        instance_double('FacetTransaction', l1_calldata_gas_used: 50000, mint: 0),
-        instance_double('FacetTransaction', l1_calldata_gas_used: 100000, mint: 0)
-      ]
-    end
+    context 'in V1' do
+      before do
+        allow(FctMintCalculator).to receive(:in_v1?).and_return(true)
+      end
 
-    before do
-      facet_txs.each do |tx|
-        allow(tx).to receive(:mint=)
+      it 'assigns fixed mint amount and uses initial values' do
+        expect(facet_tx).to receive(:mint=).with(10.ether)
+        expect(facet_block).to receive(:assign_attributes).with(
+          total_fct_minted: FctMintCalculator::INITIAL_FCT_PER_BLOCK_MINT_TARGET,
+          fct_mint_per_gas: FctMintCalculator::INITIAL_FCT_MINT_PER_GAS
+        )
+
+        FctMintCalculator.assign_mint_amounts([facet_tx], facet_block)
       end
     end
 
-    it 'assigns FCT mints based on calldata gas used in each transaction' do
-      total_l1_calldata_gas_used = facet_txs.sum(&:l1_calldata_gas_used)
-      total_fct_minted = FctMintCalculator.calculate_fct_minted_in_block(total_l1_calldata_gas_used, block_base_fee)
-      
-      FctMintCalculator.assign_mint_amounts(facet_txs, block_base_fee)
-
-      expected_mints = facet_txs.map do |tx|
-        tx.l1_calldata_gas_used * total_fct_minted / total_l1_calldata_gas_used
+    context 'in V2' do
+      before do
+        allow(FctMintCalculator).to receive(:in_v1?).and_return(false)
+        allow(GethDriver.client).to receive(:get_l1_attributes).and_return(
+          fct_minted_per_gas: 900.gwei,
+          total_fct_minted: 5.ether
+        )
       end
 
-      facet_txs.zip(expected_mints).each do |tx, expected_mint|
-        expect(tx).to have_received(:mint=).with(expected_mint)
-      end
+      it 'calculates and assigns mint amounts' do
+        expect(facet_tx).to receive(:mint=)
+        expect(facet_block).to receive(:assign_attributes)
 
-      total_assigned_mint = expected_mints.sum
-      expect(total_assigned_mint).to be_within(facet_txs.length).of(total_fct_minted)
+        FctMintCalculator.assign_mint_amounts([facet_tx], facet_block)
+      end
     end
   end
 end

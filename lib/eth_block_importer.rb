@@ -6,7 +6,7 @@ class EthBlockImporter
   class TraceTimeoutError < StandardError; end
   
   attr_accessor :l1_rpc_results, :facet_block_cache, :ethereum_client, :eth_block_cache
-  delegate :genesis_block, :v2_fork_block, to: :FacetBlock
+  delegate :l1_genesis_block, :v2_fork_block, to: :FacetBlock
   
   def initialize
     @l1_rpc_results = {}
@@ -74,13 +74,13 @@ class EthBlockImporter
     
     if latest_block['number'].to_i(16) == 0
       facet_block_cache[0] = FacetBlock.from_rpc_result(latest_block)
-      eth_block_cache[genesis_block] = EthBlock.from_rpc_result(ethereum_client.get_block(genesis_block)['result'])
+      eth_block_cache[l1_genesis_block] = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block)['result'])
       
       return
     end
     
     attributes_tx = latest_block['transactions'].first
-        
+    
     attributes = L1AttributesTxCalldata.decode(attributes_tx['input'])
     
     start_number_candidate = attributes[:number]
@@ -329,7 +329,7 @@ class EthBlockImporter
   end
   
   def facet_txs_from_ethscriptions_in_block(ethscriptions, facet_block)
-    ethscriptions.sort_by(&:transaction_index).map do |ethscription|
+    facet_txs = ethscriptions.sort_by(&:transaction_index).map do |ethscription|
       ethscription.clear_caches_if_upgrade!
       
       FacetTransaction.from_eth_tx_and_ethscription(
@@ -338,6 +338,10 @@ class EthBlockImporter
         facet_block
       )
     end
+    
+    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
+    
+    facet_txs
   rescue => e
     binding.irb
     raise
@@ -356,12 +360,15 @@ class EthBlockImporter
     else
       ethscriptions = Ethscription.from_eth_transactions(eth_transactions)
       
+      facet_block.fct_mint_per_gas = FctMintCalculator::INITIAL_FCT_MINT_PER_GAS
+      facet_block.total_fct_minted = FctMintCalculator::FCT_PER_BLOCK_MINT_TARGET
+      
       facet_txs_from_ethscriptions_in_block(
         ethscriptions,
         facet_block
       )
     end
-
+    
     attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(eth_block, facet_block)
     facet_txs = facet_txs.unshift(attributes_tx)
 

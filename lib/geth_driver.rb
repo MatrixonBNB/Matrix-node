@@ -30,7 +30,7 @@ module GethDriver
       "#{geth_dir}/build/bin/geth",
       "--datadir", @temp_datadir,
       "--http",
-      "--http.api", "eth,net,web3,debug",
+      "--http.api", "eth,net,web3,debug,txpool,engine",
       "--http.vhosts", "*",
       "--authrpc.jwtsecret", "/tmp/jwtsecret",
       "--http.port", http_port,
@@ -54,7 +54,8 @@ module GethDriver
     
     FileUtils.rm(log_file_location) if File.exist?(log_file_location)
     
-    pid = Process.spawn(*geth_command)
+    pid = Process.spawn(*geth_command, [:out, :err] => [log_file_location, 'w'])
+
     Process.detach(pid)
     
     File.write('tmp/geth_pid', pid)
@@ -104,7 +105,7 @@ module GethDriver
       "./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} &&",
       "./build/bin/geth --datadir ./datadir",
       "--http",
-      "--http.api 'eth,net,web3,debug'",
+      "--http.api 'eth,net,web3,debug,txpool,engine'",
       "--http.vhosts=\"*\"",
       "--authrpc.jwtsecret /tmp/jwtsecret",
       "--http.port #{http_port}",

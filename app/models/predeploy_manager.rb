@@ -159,6 +159,7 @@ module PredeployManager
       regolithTime: 0,
       canyonTime: 0,
       ecotoneTime: 0,
+      deltaTime: 0,
       optimism: {
         eip1559Elasticity: 2,
         eip1559Denominator: 8,

@@ -7,7 +7,7 @@ class LegacyMigrationDataGenerator
   attr_accessor :imported_facet_transaction_receipts, :imported_facet_transactions,
     :ethereum_client, :legacy_value_mapping, :current_import_block_number
     
-  delegate :genesis_block, :v2_fork_block, to: :FacetBlock
+  delegate :l1_genesis_block, :v2_fork_block, to: :FacetBlock
 
   def initialize
     reset_state
@@ -113,7 +113,7 @@ class LegacyMigrationDataGenerator
         raise "Facet genesis block is not the same as the latest block on geth"
       end
       
-      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + genesis_block.to_s(16), false])
+      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + l1_genesis_block.to_s(16), false])
       
       eth_block = EthBlock.from_rpc_result(genesis_eth_block['result'])
       eth_block.save!
@@ -546,7 +546,7 @@ class LegacyMigrationDataGenerator
   end
 
   def facet_txs_from_ethscriptions_in_block(ethscriptions, facet_block)
-    ethscriptions.sort_by(&:transaction_index).map do |ethscription|
+    facet_txs = ethscriptions.sort_by(&:transaction_index).map do |ethscription|
       ethscription.clear_caches_if_upgrade!
       
       FacetTransaction.from_eth_tx_and_ethscription(
@@ -555,6 +555,10 @@ class LegacyMigrationDataGenerator
         facet_block
       )
     end
+    
+    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
+    
+    facet_txs
   end
   
   def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, head_block:, safe_block:, finalized_block:)

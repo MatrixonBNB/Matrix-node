@@ -64,9 +64,6 @@ class FacetTransaction < ApplicationRecord
     block_gas_limit = FacetBlock::GAS_LIMIT
     tx.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
 
-    # The mint amount doesn't matter as the excess will be burned
-    tx.mint = 10.ether
-    
     tx
   end
   
@@ -94,7 +91,7 @@ class FacetTransaction < ApplicationRecord
       facet_tx
     end.flatten.compact
     
-    FctMintCalculator.assign_mint_amounts(facet_txs, eth_block.base_fee_per_gas)
+    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
     
     facet_txs
   end
@@ -170,7 +167,9 @@ class FacetTransaction < ApplicationRecord
       timestamp: eth_block.timestamp,
       number: eth_block.number,
       base_fee: eth_block.base_fee_per_gas,
-      hash: eth_block.block_hash
+      hash: eth_block.block_hash,
+      fct_minted_per_gas: facet_block.fct_mint_per_gas,
+      total_fct_minted: facet_block.total_fct_minted
     )
     
     tx = new
