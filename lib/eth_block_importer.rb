@@ -360,9 +360,6 @@ class EthBlockImporter
     else
       ethscriptions = Ethscription.from_eth_transactions(eth_transactions)
       
-      facet_block.fct_mint_per_gas = FctMintCalculator::INITIAL_FCT_MINT_PER_GAS
-      facet_block.total_fct_minted = FctMintCalculator::FCT_PER_BLOCK_MINT_TARGET
-      
       facet_txs_from_ethscriptions_in_block(
         ethscriptions,
         facet_block
