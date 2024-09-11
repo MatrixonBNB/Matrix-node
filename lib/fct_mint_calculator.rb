@@ -9,6 +9,11 @@ module FctMintCalculator
   INITIAL_FCT_MINT_PER_GAS = 1000.gwei
   INITIAL_FCT_PER_BLOCK_MINT_TARGET = 10.ether
   FCT_PER_BLOCK_MINT_CHANGE_DENOMINATOR = 8
+  
+  MAX_FCT_PER_BLOCK_MINT_FACTOR = 1024
+  L1_BLOCK_GAS_LIMIT = 30_000_000
+  MAX_FCT_PER_BLOCK_MINT = MAX_FCT_PER_BLOCK_MINT_FACTOR * INITIAL_FCT_PER_BLOCK_MINT_TARGET
+  MAX_FCT_PER_GAS = MAX_FCT_PER_BLOCK_MINT / L1_BLOCK_GAS_LIMIT
 
   def calculated_mint_target(current_l2_block_number)
     if in_v1?(current_l2_block_number)
@@ -47,7 +52,7 @@ module FctMintCalculator
       next_rate = [prev_fct_mint_per_gas - rate_delta, 0].max
     end
     
-    next_rate
+    [next_rate, MAX_FCT_PER_GAS].min
   end
   
   def assign_mint_amounts(facet_txs, facet_block)
