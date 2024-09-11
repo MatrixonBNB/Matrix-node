@@ -16,7 +16,7 @@ module EVMTestHelper
     function:,
     args: [],
     value: 0,
-    gas_limit: 10_000_000,
+    gas_limit: 1_000_000,
     max_fee_per_gas: 1.gwei,
     expect_failure: false,
     expect_blank: false,
@@ -42,7 +42,7 @@ module EVMTestHelper
     contract:,
     args: [],
     value: 0,
-    gas_limit: 10_000_000,
+    gas_limit: 1_000_000,
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
@@ -67,7 +67,7 @@ module EVMTestHelper
     implementation:,
     args: [],
     value: 0,
-    gas_limit: 10_000_000,
+    gas_limit: 1_000_000,
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
@@ -142,7 +142,7 @@ module EVMTestHelper
     block_timestamp: nil,
     max_fee_per_gas: 10.gwei,
     sub_calls: [],
-    gas_limit: 10_000_000,
+    gas_limit: 1_000_000,
     eth_base_fee: 200.gwei,
     eth_gas_used: 1e18.to_i,
     chain_id: ChainIdManager.current_l2_chain_id,
@@ -364,7 +364,7 @@ module EVMTestHelper
       to_address: payload[:to],
       value: payload[:data][:value] || 0,
       max_fee_per_gas: payload[:data][:max_fee_per_gas] || 10.gwei,
-      gas_limit: payload[:data][:gas_limit] || 10_000_000,
+      gas_limit: payload[:data][:gas_limit] || 1_000_000,
       expect_failure: expect_failure,
       block_timestamp: block_timestamp
     )
@@ -382,7 +382,7 @@ module EVMTestHelper
         implementation: payload[:data][:type],
         args: (payload[:data][:args].is_a?(Hash) ? payload[:data][:args].values : payload[:data][:args]),
         value: payload[:data][:value] || 0,
-        gas_limit: payload[:data][:gas_limit] || 10_000_000,
+        gas_limit: payload[:data][:gas_limit] || 1_000_000,
         max_fee_per_gas: payload[:data][:max_fee_per_gas] || 10.gwei,
         expect_failure: false
       )

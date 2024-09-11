@@ -7,7 +7,7 @@ class LegacyMigrationDataGenerator
   attr_accessor :imported_facet_transaction_receipts, :imported_facet_transactions,
     :ethereum_client, :legacy_value_mapping, :current_import_block_number
     
-  delegate :genesis_block, :v2_fork_block, to: :FacetBlock
+  delegate :l1_genesis_block, :v2_fork_block, to: :FacetBlock
 
   def initialize
     reset_state
@@ -15,10 +15,6 @@ class LegacyMigrationDataGenerator
     @ethereum_client ||= EthRpcClient.new(
       base_url: ENV.fetch('L1_RPC_URL')
     )
-    
-    unless ENV['FACET_V1_VM_DATABASE_URL'].present?
-      raise "FACET_V1_VM_DATABASE_URL is not set"
-    end
   end
   
   def reset_state
@@ -113,7 +109,7 @@ class LegacyMigrationDataGenerator
         raise "Facet genesis block is not the same as the latest block on geth"
       end
       
-      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + genesis_block.to_s(16), false])
+      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + l1_genesis_block.to_s(16), false])
       
       eth_block = EthBlock.from_rpc_result(genesis_eth_block['result'])
       eth_block.save!
@@ -137,6 +133,10 @@ class LegacyMigrationDataGenerator
   end
   
   def import_blocks(block_numbers, l1_rpc_responses)
+    unless ENV['FACET_V1_VM_DATABASE_URL'].present?
+      raise "FACET_V1_VM_DATABASE_URL is not set"
+    end
+    
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
@@ -545,34 +545,27 @@ class LegacyMigrationDataGenerator
     (start_block...(start_block + n)).to_a
   end
 
-  def facet_txs_from_ethscriptions_in_block(eth_block, ethscriptions, legacy_tx_receipts, facet_block)
-    # results = Parallel.map(ethscriptions.sort_by(&:transaction_index).each_with_index, in_threads: 10) do |(ethscription, idx)|
-    results = ethscriptions.sort_by(&:transaction_index).map.with_index do |ethscription, idx|
+  def facet_txs_from_ethscriptions_in_block(ethscriptions, facet_block)
+    facet_txs = ethscriptions.sort_by(&:transaction_index).map do |ethscription|
       ethscription.clear_caches_if_upgrade!
       
-      legacy_tx_receipt = legacy_tx_receipts.find { |r| r.transaction_hash == ethscription.transaction_hash }
-      facet_tx = FacetTransaction.from_eth_tx_and_ethscription(
+      FacetTransaction.from_eth_tx_and_ethscription(
         ethscription,
-        idx,
-        eth_block,
         ethscriptions.count,
         facet_block
       )
-      
-      [idx, facet_tx] # Return the index and the result to preserve order
     end
-  
-    # Sort the results by their original indices and extract the facet transactions
-    results.sort_by { |idx, _| idx }.map { |_, facet_tx| facet_tx }
+    
+    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
+    
+    facet_txs
   end
   
   def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, head_block:, safe_block:, finalized_block:)
     facet_block = FacetBlock.from_eth_block(eth_block, block_number)
     
     facet_txs = facet_txs_from_ethscriptions_in_block(
-      eth_block,
       ethscriptions,
-      legacy_tx_receipts,
       facet_block
     )
     

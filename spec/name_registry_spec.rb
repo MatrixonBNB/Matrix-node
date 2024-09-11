@@ -20,6 +20,7 @@ RSpec.describe "Name Registry" do
     res = deploy_contract_with_proxy(
       implementation: 'contracts/StubERC20',
       args: ["WETH"],
+      gas_limit: 5_000_000,
       from: from_address
     )
     
@@ -377,6 +378,7 @@ RSpec.describe "Name Registry" do
       payload: {
         to: registry_address,
         data: {
+          gas_limit: 5_000_000,
           function: "createSticker",
           args: {
             name: "First Sticker",

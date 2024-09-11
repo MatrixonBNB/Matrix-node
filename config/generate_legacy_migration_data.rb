@@ -22,6 +22,10 @@ module Clockwork
   end
 
   every(6.seconds, 'import_blocks_until_done') do
+    unless ENV['FACET_V1_VM_DATABASE_URL'].present?
+      raise "FACET_V1_VM_DATABASE_URL is not set"
+    end
+    
     LegacyMigrationDataGenerator.instance.import_blocks_until_done
   end
 end

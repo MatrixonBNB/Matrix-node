@@ -54,7 +54,8 @@ module GethDriver
     
     FileUtils.rm(log_file_location) if File.exist?(log_file_location)
     
-    pid = Process.spawn(*geth_command)
+    pid = Process.spawn(*geth_command, [:out, :err] => [log_file_location, 'w'])
+
     Process.detach(pid)
     
     File.write('tmp/geth_pid', pid)

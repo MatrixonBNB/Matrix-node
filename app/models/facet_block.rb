@@ -6,9 +6,9 @@ class FacetBlock < ApplicationRecord
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   
   GAS_LIMIT = 300e6.to_i
-  attr_accessor :in_memory_txs
+  attr_accessor :in_memory_txs, :total_fct_minted, :fct_mint_per_gas
   
-  def self.genesis_block
+  def self.l1_genesis_block
     ENV.fetch("START_BLOCK").to_i - 1
   end
   

@@ -5,7 +5,7 @@ class FacetTransaction < ApplicationRecord
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
   
-  attr_accessor :chain_id, :eth_call, :l1_tx_origin
+  attr_accessor :chain_id, :eth_call, :l1_tx_origin, :l1_calldata_gas_used
   
   FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
@@ -26,8 +26,6 @@ class FacetTransaction < ApplicationRecord
   
   def self.from_eth_tx_and_ethscription(
     ethscription,
-    idx,
-    eth_block,
     tx_count_in_block,
     facet_block
   )
@@ -39,13 +37,15 @@ class FacetTransaction < ApplicationRecord
     tx.input = ethscription.facet_tx_input
     
     tx.eth_transaction_hash = ethscription.transaction_hash
-    tx.eth_call_index = idx
+    tx.eth_call_index = ethscription.transaction_index
     tx.from_address = ethscription.creator
     tx.eth_call = EthCall.new(
-      call_index: idx
+      call_index: ethscription.transaction_index
     )
     
-    tx.l1_tx_origin = ethscription.l1_tx_origin
+    # TODO: use contract that will actually take the FCT out of circulation
+    burn_address = "0x0000000000000000000000000000000000000000"
+    tx.l1_tx_origin = burn_address
     
     payload = [
       ethscription.block_hash.hex_to_bytes,
@@ -58,22 +58,12 @@ class FacetTransaction < ApplicationRecord
       USER_DEPOSIT_SOURCE_DOMAIN
     )
     
-    user_current_balance = TransactionHelper.balance(tx.from_address)
-    next_block_base_fee = facet_block.calculated_base_fee_per_gas
-    
-    eth_base_fee = eth_block.base_fee_per_gas
-    
-    mint_amount = calculate_mint_amount(ethscription.content_uri.bytes_to_hex, eth_base_fee)
-    
-    user_next_balance = user_current_balance + mint_amount
+    # It gets set automatically later
+    tx.max_fee_per_gas = 0
     
     block_gas_limit = FacetBlock::GAS_LIMIT
-    per_tx_avg_gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
-    
-    tx.max_fee_per_gas = next_block_base_fee
-    tx.gas_limit = [user_next_balance / tx.max_fee_per_gas, per_tx_avg_gas_limit].min
-    tx.mint = mint_amount
-    
+    tx.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
+
     tx
   end
   
@@ -85,11 +75,6 @@ class FacetTransaction < ApplicationRecord
     zero_count * 4 + non_zero_count * 16
   end
   
-  def self.calculate_mint_amount(input_data, base_fee)
-    calldata_cost = calculate_calldata_cost(input_data)
-    calldata_cost * base_fee * 1024
-  end
-  
   def self.from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls, facet_block)
     facet_txs = eth_calls.map do |call|
       next unless call.to_address == FACET_INBOX_ADDRESS
@@ -99,12 +84,14 @@ class FacetTransaction < ApplicationRecord
       
       facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
       
-      facet_tx&.mint = calculate_mint_amount(call.input, eth_block.base_fee_per_gas)
+      facet_tx&.l1_calldata_gas_used = calculate_calldata_cost(call.input)
       
       facet_tx&.facet_block = facet_block
       
       facet_tx
     end.flatten.compact
+    
+    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
     
     facet_txs
   end
@@ -180,7 +167,9 @@ class FacetTransaction < ApplicationRecord
       timestamp: eth_block.timestamp,
       number: eth_block.number,
       base_fee: eth_block.base_fee_per_gas,
-      hash: eth_block.block_hash
+      hash: eth_block.block_hash,
+      fct_minted_per_gas: facet_block.fct_mint_per_gas,
+      total_fct_minted: facet_block.total_fct_minted
     )
     
     tx = new
