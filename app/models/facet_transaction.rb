@@ -43,9 +43,9 @@ class FacetTransaction < ApplicationRecord
       call_index: ethscription.transaction_index
     )
     
-    # TODO: use contract that will actually take the FCT out of circulation
-    burn_address = "0x0000000000000000000000000000000000000000"
-    tx.l1_tx_origin = burn_address
+    # It has a burn function
+    l2_to_l1_message_passer = "0x4200000000000000000000000000000000000016"
+    tx.l1_tx_origin = l2_to_l1_message_passer
     
     payload = [
       ethscription.block_hash.hex_to_bytes,

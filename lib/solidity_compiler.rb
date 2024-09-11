@@ -102,6 +102,7 @@ class SolidityCompiler
       # "--optimize-runs", "#{2 ** 32 - 1}",
       # TODO: Switch back to the max optimize runs
       "--optimize-runs", "200",
+      "--base-path", Rails.root.join("lib", "solidity").to_s
     ]
 
     # Append additional arguments if not legacy
@@ -109,7 +110,6 @@ class SolidityCompiler
       solc_args += [
         "--via-ir",
         "--include-path", "node_modules/",
-        "--base-path", Rails.root.join("lib", "solidity").to_s
       ]
     end
     
