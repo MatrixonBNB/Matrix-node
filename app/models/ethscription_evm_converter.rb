@@ -147,6 +147,11 @@ module EthscriptionEVMConverter
         args[1] = cooked_metadata.hex_to_bytes
       elsif data['function'] == 'bridgeAndCall'
         base64_input = data['args'].is_a?(Hash) ? data['args']['base64Calldata'] : data['args'].last
+        
+        if base64_input.nil? && skip_import_validation?
+          raise InvalidArgValue, "Invalid base64 input"
+        end
+        
         decoded_input = Base64.strict_decode64(base64_input)
         
         to_address = calculate_to_address(data['args'].is_a?(Hash) ? data['args']['addressToCall'] : data['args'].third)
