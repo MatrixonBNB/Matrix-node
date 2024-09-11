@@ -68,7 +68,7 @@ module FctMintCalculator
       prev_l2_block_number = facet_block.number - 1
 
       if prev_l2_block_number == 0
-        prev_fct_mint_per_gas = INITIAL_FCT_MINT_PER_GAS
+        fct_mint_per_gas = INITIAL_FCT_MINT_PER_GAS
       else
         prev_l1_attributes = GethDriver.client.get_l1_attributes(prev_l2_block_number)
     
