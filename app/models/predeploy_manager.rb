@@ -33,6 +33,7 @@ module PredeployManager
     
     map["0x00000000000000000000000000000000000000c5"] = "NonExistentContractShim"
     map["0x4200000000000000000000000000000000000015"] = "L1Block"
+    map["0x4200000000000000000000000000000000000016"] = "L2ToL1MessagePasser"
     
     map
   end
