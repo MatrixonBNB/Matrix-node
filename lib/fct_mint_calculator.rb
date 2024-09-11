@@ -66,16 +66,21 @@ module FctMintCalculator
       fct_mint_per_gas = INITIAL_FCT_MINT_PER_GAS
     else
       prev_l2_block_number = facet_block.number - 1
-      prev_l1_attributes = GethDriver.client.get_l1_attributes(prev_l2_block_number)
+
+      if prev_l2_block_number == 0
+        prev_fct_mint_per_gas = INITIAL_FCT_MINT_PER_GAS
+      else
+        prev_l1_attributes = GethDriver.client.get_l1_attributes(prev_l2_block_number)
     
-      prev_fct_mint_per_gas = prev_l1_attributes[:fct_minted_per_gas]
-      prev_total_fct_minted = prev_l1_attributes[:total_fct_minted]
-      
-      fct_mint_per_gas = calculate_next_block_fct_minted_per_gas(
-        prev_fct_mint_per_gas,
-        prev_total_fct_minted,
-        facet_block.number
-      )
+        prev_fct_mint_per_gas = prev_l1_attributes[:fct_minted_per_gas]
+        prev_total_fct_minted = prev_l1_attributes[:total_fct_minted]
+        
+        fct_mint_per_gas = calculate_next_block_fct_minted_per_gas(
+          prev_fct_mint_per_gas,
+          prev_total_fct_minted,
+          facet_block.number
+        )
+      end
       
       total_l1_calldata_gas_used = facet_txs.sum(&:l1_calldata_gas_used)
       

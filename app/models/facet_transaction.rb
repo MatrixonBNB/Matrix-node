@@ -113,6 +113,7 @@ class FacetTransaction < ApplicationRecord
     tx = Eth::Rlp.decode bin
 
     # So people can add "extra data" to burn more gas
+    # TODO: require it to be exactly 7
     unless tx.size <= 7
       raise Eth::Tx::ParameterError, "Transaction missing fields!"
     end
