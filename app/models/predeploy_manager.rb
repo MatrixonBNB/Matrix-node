@@ -136,7 +136,7 @@ module PredeployManager
     puts "Generated predeploy_info.json"
   end
   
-  def generate_full_genesis_json(l1_network_name)
+  def generate_full_genesis_json(l1_network_name, l1_genesis_block = FacetBlock.l1_genesis_block)
     config = {
       chainId: ChainIdManager.l2_chain_id_from_l1_network_name(l1_network_name),
       homesteadBlock: 0,
@@ -168,10 +168,9 @@ module PredeployManager
       }
     }
     
-    timestamp = l1_network_name == "mainnet" ? 1701353099 : 1706742588
-    mix_hash = l1_network_name == "mainnet" ?
-      "0xf9202de594a3697695c54a4ee8a392f686ca1fc26337eb821e4ca6deb71b2dd7" :
-      "0xc4b4bbd867f5566c344e8ba74372ca493c91c00bb3e10f85a45bd9e89344a977"
+    l1_block_result = l1_rpc_client.get_block(l1_genesis_block)['result']
+    timestamp = l1_block_result['timestamp'].to_i(16)
+    mix_hash = l1_block_result['mixHash']
     
     {
       config: config,
@@ -212,5 +211,11 @@ module PredeployManager
     end
     
     generate_predeploy_info_json
+  end
+  
+  def l1_rpc_client
+    @_l1_rpc_client ||= EthRpcClient.new(
+      base_url: ENV.fetch('L1_RPC_URL')
+    )
   end
 end
