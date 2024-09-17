@@ -9,12 +9,12 @@ module L1AttributesTxCalldata
     base_fee:,
     blob_base_fee: 1,
     hash:,
+    sequence_number:,
     fct_minted_per_gas:,
     total_fct_minted:
   )
     base_fee_scalar = 0
     blob_base_fee_scalar = 1
-    sequence_number = 0
     batcher_hash = "\x00" * 32
     
     hash = hash.hex_to_bin

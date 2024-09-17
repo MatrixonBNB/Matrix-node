@@ -38,7 +38,14 @@ class EthBlockImporter
     
     results = Parallel.map(last_64_block_numbers, in_threads: 10) do |block_number|
       hex_block_number = "0x" + block_number.to_s(16)
-      FacetBlock.from_rpc_result(geth_driver.client.call("eth_getBlockByNumber", [hex_block_number, true]))
+      l2_block = geth_driver.client.call("eth_getBlockByNumber", [hex_block_number, true])
+      fb = FacetBlock.from_rpc_result(l2_block)
+      if block_number > 0
+        fb.sequence_number = L1AttributesTxCalldata.decode(l2_block['transactions'].first['input'])[:sequence_number]
+      else
+        fb.sequence_number = 0
+      end
+      fb
     end
     
     facet_block_cache.merge!(results.index_by { |result| result.number })
@@ -101,6 +108,13 @@ class EthBlockImporter
       if l1_hash == our_hash && our_number == start_number_candidate
         eth_block_cache[start_number_candidate] = EthBlock.from_rpc_result(l1_result)
         facet_block_cache[l2_start_number_candidate] = FacetBlock.from_rpc_result(l2_block)
+        
+        if l2_block['number'].to_i(16) > 0
+          facet_block_cache[l2_start_number_candidate].sequence_number = l2_attributes[:sequence_number]
+        else
+          facet_block_cache[l2_start_number_candidate].sequence_number = 0
+        end
+        
         return
       else
         l2_start_number_candidate -= 1
@@ -242,16 +256,17 @@ class EthBlockImporter
         new_eth_calls = EthCall.from_trace_result(trace_result, eth_block)
       end
 
-      facet_block = propose_facet_block(
+      imported_facet_blocks = propose_facet_block(
         eth_block,
         eth_calls: new_eth_calls,
         eth_transactions: new_eth_transactions,
         facet_block_number: current_max_facet_block_number + 1
       )
       
-      facet_block = FacetBlock.from_rpc_result(facet_block)
+      imported_facet_blocks.each do |facet_block|
+        facet_block_cache[facet_block.number] = facet_block
+      end
       
-      facet_block_cache[facet_block.number] = facet_block
       eth_block_cache[eth_block.number] = eth_block
       
       facet_block_threshold = current_max_facet_block_number - 65
@@ -263,12 +278,12 @@ class EthBlockImporter
       # Remove old entries from imported_eth_blocks
       eth_block_cache.delete_if { |number, _| number < eth_block_threshold }
       
-      facet_blocks << facet_block
+      facet_blocks.concat(imported_facet_blocks)
       eth_blocks << eth_block
       
       res << OpenStruct.new(
-        facet_block: facet_block,
-        transactions_imported: facet_block.in_memory_txs.length
+        facet_block: imported_facet_blocks.last,
+        transactions_imported: imported_facet_blocks.last.in_memory_txs.length
       )
     end
   
@@ -339,8 +354,6 @@ class EthBlockImporter
       )
     end
     
-    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
-    
     facet_txs
   rescue => e
     binding.irb
@@ -366,17 +379,12 @@ class EthBlockImporter
       )
     end
     
-    attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(eth_block, facet_block)
-    facet_txs = facet_txs.unshift(attributes_tx)
-
-    payload = facet_txs.map(&:to_facet_payload)
-    
     geth_driver.propose_block(
-      payload,
-      facet_block,
-      current_facet_head_block,
-      current_facet_safe_block,
-      current_facet_finalized_block
+      transactions: facet_txs,
+      new_facet_block: facet_block,
+      head_block: current_facet_head_block,
+      safe_block: current_facet_safe_block,
+      finalized_block: current_facet_finalized_block
     )
   rescue => e
     binding.irb

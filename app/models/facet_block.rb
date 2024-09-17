@@ -6,7 +6,9 @@ class FacetBlock < ApplicationRecord
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   
   GAS_LIMIT = 300e6.to_i
-  attr_accessor :in_memory_txs, :total_fct_minted, :fct_mint_per_gas
+  attr_accessor :in_memory_txs, :total_fct_minted, :fct_mint_per_gas,
+    :sequence_number, :eth_block_mix_hash,  
+    :eth_block_base_fee_per_gas, :eth_block_timestamp
   
   def self.l1_genesis_block
     ENV.fetch("START_BLOCK").to_i - 1
@@ -20,11 +22,37 @@ class FacetBlock < ApplicationRecord
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
       eth_block_number: eth_block.number,
+      eth_block_mix_hash: eth_block.mix_hash,
+      eth_block_timestamp: eth_block.timestamp,
+      eth_block_base_fee_per_gas: eth_block.base_fee_per_gas,
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
       number: block_number,
       timestamp: eth_block.timestamp,
-      prev_randao: eth_block.mix_hash
+      sequence_number: 0,
+      eth_block: eth_block,
     )
+  end
+  
+  def prev_randao
+    Eth::Util.keccak256(eth_block_mix_hash.hex_to_bytes + sequence_number.zpad(32)).bytes_to_hex
+  end
+  
+  def self.next_in_sequence_from_facet_block(facet_block)
+    FacetBlock.new(
+      eth_block_hash: facet_block.eth_block_hash,
+      eth_block_number: facet_block.eth_block_number,
+      eth_block_timestamp: facet_block.eth_block_timestamp,
+      eth_block_mix_hash: facet_block.eth_block_mix_hash,
+      eth_block_base_fee_per_gas: facet_block.eth_block_base_fee_per_gas,
+      parent_beacon_block_root: facet_block.parent_beacon_block_root,
+      number: facet_block.number + 1,
+      timestamp: facet_block.timestamp + 12,
+      sequence_number: facet_block.sequence_number + 1
+    )
+  end
+  
+  def attributes_tx
+    FacetTransaction.l1_attributes_tx_from_blocks(self)
   end
   
   def self.from_rpc_result(res)

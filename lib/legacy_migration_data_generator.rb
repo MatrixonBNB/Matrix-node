@@ -569,7 +569,7 @@ class LegacyMigrationDataGenerator
       facet_block
     )
     
-    attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(eth_block, facet_block)
+    attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(facet_block)
     
     facet_txs = facet_txs.sort_by(&:eth_call_index).unshift(attributes_tx)
     payload = facet_txs.map(&:to_facet_payload)

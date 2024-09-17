@@ -165,7 +165,24 @@ module GethDriver
     }])
   end
   
-  def propose_block(transactions, new_facet_block, head_block, safe_block, finalized_block, reorg: false)
+  def propose_block(
+    transactions:,
+    new_facet_block:,
+    head_block:,
+    safe_block:,
+    finalized_block:
+  )
+    # Create filler blocks if necessary and update head_block
+    filler_blocks = create_filler_blocks(
+      head_block: head_block,
+      new_facet_block: new_facet_block,
+      safe_block: safe_block,
+      finalized_block: finalized_block
+    )
+    
+    head_block = filler_blocks.last || head_block
+    
+    # Update block hashes after filler blocks have been added
     head_block_hash = head_block.block_hash
     safe_block_hash = safe_block.block_hash
     finalized_block_hash = finalized_block.block_hash
@@ -175,6 +192,11 @@ module GethDriver
       safeBlockHash: safe_block_hash,
       finalizedBlockHash: finalized_block_hash,
     }
+    
+    FctMintCalculator.assign_mint_amounts(transactions, new_facet_block)
+    
+    transactions = transactions.unshift(new_facet_block.attributes_tx)
+    transactions = transactions.map(&:to_facet_payload)
     
     payload_attributes = {
       timestamp: "0x" + new_facet_block.timestamp.to_s(16),
@@ -194,26 +216,27 @@ module GethDriver
     end
     
     fork_choice_response = client.call("engine_forkchoiceUpdatedV#{version}", [fork_choice_state, payload_attributes])
-    raise "Fork choice update failed: #{fork_choice_response['error']}" if fork_choice_response['error']
+    if fork_choice_response['error']
+      raise "Fork choice update failed: #{fork_choice_response['error']}"
+    end
     
     payload_id = fork_choice_response['payloadId']
     unless payload_id
-      binding.irb
       raise "Fork choice update did not return a payload ID"
     end
 
     get_payload_response = client.call("engine_getPayloadV#{version}", [payload_id])
-    raise "Get payload failed: #{get_payload_response['error']}" if get_payload_response['error']
+    if get_payload_response['error']
+      raise "Get payload failed: #{get_payload_response['error']}"
+    end
 
     payload = get_payload_response['executionPayload']
     
     if payload['transactions'].empty?
-      raise "no transactions in returned payload"
+      raise "No transactions in returned payload"
     end
 
-    new_payload_request = [
-      payload
-    ]
+    new_payload_request = [payload]
     
     if version == 3
       new_payload_request << []
@@ -228,7 +251,7 @@ module GethDriver
     end
     
     unless new_payload_response['latestValidHash'] == payload['blockHash']
-      raise "New payload was not valid: #{status}"
+      raise "New payload latestValidHash mismatch: #{new_payload_response['latestValidHash']}"
     end
   
     new_safe_block = safe_block
@@ -236,7 +259,7 @@ module GethDriver
     
     fork_choice_state = {
       headBlockHash: payload['blockHash'],
-      safeBlockHash: new_safe_block.block_hash, # should this also be payload blockhash?
+      safeBlockHash: new_safe_block.block_hash,
       finalizedBlockHash: new_finalized_block.block_hash
     }
     
@@ -248,10 +271,55 @@ module GethDriver
     end
     
     unless fork_choice_response['payloadStatus']['latestValidHash'] == payload['blockHash']
-      binding.irb
-      raise "New payload was not valid: #{status}"
+      raise "Fork choice update latestValidHash mismatch: #{fork_choice_response['payloadStatus']['latestValidHash']}"
     end
     
-    payload
+    new_facet_block.from_rpc_response(payload)
+    filler_blocks + [new_facet_block]
+  end
+
+  def create_filler_blocks(
+    head_block:,
+    new_facet_block:,
+    safe_block:,
+    finalized_block:
+  )
+    max_filler_blocks = 100
+    block_interval = 12
+    last_block = head_block
+    filler_blocks = []
+
+    diff = new_facet_block.timestamp - last_block.timestamp
+    
+    if diff > block_interval
+      num_intervals = (diff / block_interval).to_i
+      aligns_exactly = (diff % block_interval).zero?
+      num_filler_blocks = aligns_exactly ? num_intervals - 1 : num_intervals
+      
+      if num_filler_blocks > max_filler_blocks
+        raise "Too many filler blocks"
+      end
+      
+      puts "Diff: #{diff}, Num filler blocks: #{num_filler_blocks}, L1 block: #{head_block.eth_block_number}"
+
+      num_filler_blocks.times do
+        filler_block = FacetBlock.next_in_sequence_from_facet_block(last_block)
+        
+        puts "Filler block: #{filler_block.number}"
+
+        proposed_blocks = GethDriver.propose_block(
+          transactions: [],
+          new_facet_block: filler_block,
+          head_block: last_block,
+          safe_block: safe_block,
+          finalized_block: finalized_block,
+        ).sort_by(&:number)
+
+        filler_blocks.concat(proposed_blocks)
+        last_block = proposed_blocks.last
+      end
+    end
+
+    filler_blocks.sort_by(&:number)
   end
 end
