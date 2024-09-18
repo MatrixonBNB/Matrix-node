@@ -129,11 +129,11 @@ class FacetTransaction < ApplicationRecord
     data = tx[5].bytes_to_hex
 
     tx = new
-    tx.chain_id = chain_id.to_i
+    tx.chain_id = clamp_uint(chain_id, 256)
     tx.to_address = validated_address(to)
-    tx.value = value.to_i
-    tx.max_fee_per_gas = max_gas_fee.to_i
-    tx.gas_limit = gas_limit.to_i
+    tx.value = clamp_uint(value, 256)
+    tx.max_fee_per_gas = clamp_uint(max_gas_fee, 256)
+    tx.gas_limit = clamp_uint(gas_limit, 64)
     tx.input = data
     
     return unless tx.within_gas_limit?
@@ -268,5 +268,9 @@ class FacetTransaction < ApplicationRecord
   
   def trace
     GethDriver.trace_transaction(tx_hash)
+  end
+  
+  def self.clamp_uint(input, max_bits)
+    [input.to_i, 2 ** max_bits - 1].min
   end
 end
