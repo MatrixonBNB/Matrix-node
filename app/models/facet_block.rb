@@ -17,6 +17,18 @@ class FacetBlock < ApplicationRecord
     ENV.fetch("V2_FORK_BLOCK").to_i
   end
   
+  def assign_l1_attributes(l1_attributes)
+    assign_attributes(
+      sequence_number: l1_attributes.fetch(:sequence_number),
+      eth_block_hash: l1_attributes.fetch(:hash),
+      eth_block_number: l1_attributes.fetch(:number),
+      eth_block_timestamp: l1_attributes.fetch(:timestamp),
+      eth_block_base_fee_per_gas: l1_attributes.fetch(:base_fee),
+      fct_mint_per_gas: l1_attributes.fetch(:fct_minted_per_gas),
+      total_fct_minted: l1_attributes.fetch(:total_fct_minted),
+    )
+  end
+  
   def self.from_eth_block(eth_block, block_number)
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
@@ -73,6 +85,10 @@ class FacetBlock < ApplicationRecord
       in_memory_txs: resp['transactions'],
       # transactions_root: resp['transactionsRoot'],
     )
+    
+    if resp['parentBeaconBlockRoot']
+      self.parent_beacon_block_root = resp['parentBeaconBlockRoot']
+    end
   rescue => e
     binding.irb
     raise

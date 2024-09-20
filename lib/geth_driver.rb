@@ -300,12 +300,8 @@ module GethDriver
         raise "Too many filler blocks"
       end
       
-      puts "Diff: #{diff}, Num filler blocks: #{num_filler_blocks}, L1 block: #{head_block.eth_block_number}"
-
       num_filler_blocks.times do
         filler_block = FacetBlock.next_in_sequence_from_facet_block(last_block)
-        
-        puts "Filler block: #{filler_block.number}"
 
         proposed_blocks = GethDriver.propose_block(
           transactions: [],
