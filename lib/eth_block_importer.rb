@@ -38,26 +38,21 @@ class EthBlockImporter
     current_block_number = current_max_facet_block_number - 1
     
     while epochs_found < 64 && current_block_number >= 0
-      begin
-        hex_block_number = "0x#{current_block_number.to_s(16)}"
-        block_data = geth_driver.client.call("eth_getBlockByNumber", [hex_block_number, false])
-        current_block = FacetBlock.from_rpc_result(block_data)
-        l1_attributes = GethDriver.client.get_l1_attributes(current_block.number)
-        
-        current_block.assign_l1_attributes(l1_attributes)
-        
-        facet_block_cache[current_block.number] = current_block
+      hex_block_number = "0x#{current_block_number.to_s(16)}"
+      block_data = geth_driver.client.call("eth_getBlockByNumber", [hex_block_number, false])
+      current_block = FacetBlock.from_rpc_result(block_data)
+      l1_attributes = GethDriver.client.get_l1_attributes(current_block.number)
+      
+      current_block.assign_l1_attributes(l1_attributes)
+      
+      facet_block_cache[current_block.number] = current_block
 
-        if current_block.sequence_number == 0 || current_block_number == 0
-          epochs_found += 1
-          logger.info "Found epoch #{epochs_found} at block #{current_block_number}"
-        end
-
-        current_block_number -= 1
-      rescue StandardError => e
-        logger.error "Error processing block #{current_block_number}: #{e.message}"
-        break
+      if current_block.sequence_number == 0 || current_block_number == 0
+        epochs_found += 1
+        logger.info "Found epoch #{epochs_found} at block #{current_block_number}"
       end
+
+      current_block_number -= 1
     end
 
     logger.info "Populated facet block cache with #{facet_block_cache.size} blocks from #{epochs_found} epochs"
@@ -141,6 +136,8 @@ class EthBlockImporter
         facet_block_cache[l2_candidate] = facet_block
         return [l1_candidate, l2_candidate]
       else
+        logger.info "Mismatch on block #{l2_candidate}: #{l1_hash} != #{l1_attributes[:hash]}, decrementing"
+        
         l2_candidate -= 1
         l1_candidate -= 1
       end
@@ -239,8 +236,6 @@ class EthBlockImporter
     facet_block_cache.delete_if do |_, facet_block|
       facet_block.eth_block_number < oldest_eth_block_to_keep
     end
-  
-    logger.info "Pruned caches. Remaining: #{eth_block_cache.size} ETH blocks, #{facet_block_cache.size} Facet blocks"
   end
   
   def current_facet_block(type)
@@ -361,11 +356,11 @@ class EthBlockImporter
     average_gas_per_block_millions = (total_gas / blocks.length / 1_000_000.0).round(2)
     gas_per_second_millions = (total_gas / elapsed_time / 1_000_000.0).round(2)
   
-    puts "Time elapsed: #{elapsed_time.round(2)} s"
-    puts "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
-    puts "Imported #{total_transactions} transactions (#{transactions_per_second} / s)"
-    puts "Total gas used: #{total_gas_millions} million (avg: #{average_gas_per_block_millions} million / block)"
-    puts "Gas per second: #{gas_per_second_millions} million / s"
+    logger.info "Time elapsed: #{elapsed_time.round(2)} s"
+    logger.info "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
+    logger.info "Imported #{total_transactions} transactions (#{transactions_per_second} / s)"
+    logger.info "Total gas used: #{total_gas_millions} million (avg: #{average_gas_per_block_millions} million / block)"
+    logger.info "Gas per second: #{gas_per_second_millions} million / s"
   
     [facet_blocks, eth_blocks]
   end
@@ -418,9 +413,6 @@ class EthBlockImporter
     end
     
     facet_txs
-  rescue => e
-    binding.irb
-    raise
   end
   
   def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, facet_block_number:)
