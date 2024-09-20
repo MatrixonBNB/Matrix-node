@@ -7,8 +7,7 @@ class FacetBlock < ApplicationRecord
   
   GAS_LIMIT = 300e6.to_i
   attr_accessor :in_memory_txs, :total_fct_minted, :fct_mint_per_gas,
-    :sequence_number, :eth_block_mix_hash,  
-    :eth_block_base_fee_per_gas, :eth_block_timestamp
+    :sequence_number, :eth_block_base_fee_per_gas, :eth_block_timestamp
   
   def self.l1_genesis_block
     ENV.fetch("START_BLOCK").to_i - 1
@@ -22,7 +21,7 @@ class FacetBlock < ApplicationRecord
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
       eth_block_number: eth_block.number,
-      eth_block_mix_hash: eth_block.mix_hash,
+      prev_randao: eth_block.mix_hash,
       eth_block_timestamp: eth_block.timestamp,
       eth_block_base_fee_per_gas: eth_block.base_fee_per_gas,
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
@@ -33,16 +32,12 @@ class FacetBlock < ApplicationRecord
     )
   end
   
-  def prev_randao
-    Eth::Util.keccak256(eth_block_mix_hash.hex_to_bytes + sequence_number.zpad(32)).bytes_to_hex
-  end
-  
   def self.next_in_sequence_from_facet_block(facet_block)
     FacetBlock.new(
       eth_block_hash: facet_block.eth_block_hash,
       eth_block_number: facet_block.eth_block_number,
       eth_block_timestamp: facet_block.eth_block_timestamp,
-      eth_block_mix_hash: facet_block.eth_block_mix_hash,
+      prev_randao: facet_block.prev_randao,
       eth_block_base_fee_per_gas: facet_block.eth_block_base_fee_per_gas,
       parent_beacon_block_root: facet_block.parent_beacon_block_root,
       number: facet_block.number + 1,
