@@ -3,17 +3,15 @@ module FctMintCalculator
   
   SECONDS_PER_YEAR = 31_556_952 # length of a gregorian year (365.2425 days)
   SECONDS_PER_BLOCK = 12
-  HALVING_PERIOD_LENGTH = 4 * SECONDS_PER_YEAR
+  HALVING_PERIOD_LENGTH = 1 * SECONDS_PER_YEAR
   HALVING_PERIOD_IN_BLOCKS = HALVING_PERIOD_LENGTH / SECONDS_PER_BLOCK
 
-  INITIAL_FCT_MINT_PER_GAS = 1000.gwei
-  INITIAL_FCT_PER_BLOCK_MINT_TARGET = 10.ether
+  INITIAL_FCT_MINT_PER_GAS = 2500.gwei
+  INITIAL_FCT_PER_BLOCK_MINT_TARGET = 40.ether
   FCT_PER_BLOCK_MINT_CHANGE_DENOMINATOR = 8
   
-  MAX_FCT_PER_BLOCK_MINT_FACTOR = 1024
+  MINT_CHANGE_ELASTICITY = 2
   L1_BLOCK_GAS_LIMIT = 30_000_000
-  MAX_FCT_PER_BLOCK_MINT = MAX_FCT_PER_BLOCK_MINT_FACTOR * INITIAL_FCT_PER_BLOCK_MINT_TARGET
-  MAX_FCT_PER_GAS = MAX_FCT_PER_BLOCK_MINT / L1_BLOCK_GAS_LIMIT
 
   def calculated_mint_target(current_l2_block_number)
     if in_v1?(current_l2_block_number)
@@ -27,6 +25,14 @@ module FctMintCalculator
     current_mint_target = INITIAL_FCT_PER_BLOCK_MINT_TARGET / (2 ** halving_periods_passed)
     
     current_mint_target
+  end
+  
+  def calculated_max_fct_per_gas(current_l2_block_number)
+    mint_target = calculated_mint_target(current_l2_block_number)
+    
+    max_total = MINT_CHANGE_ELASTICITY * mint_target
+    
+    max_total / L1_BLOCK_GAS_LIMIT
   end
   
   def calculate_next_block_fct_minted_per_gas(
@@ -52,7 +58,9 @@ module FctMintCalculator
       next_rate = [prev_fct_mint_per_gas - rate_delta, 0].max
     end
     
-    [next_rate, MAX_FCT_PER_GAS].min
+    max_per_gas = calculated_max_fct_per_gas(current_l2_block_number)
+    
+    [next_rate, max_per_gas].min
   end
   
   def assign_mint_amounts(facet_txs, facet_block)

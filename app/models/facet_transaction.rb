@@ -91,8 +91,6 @@ class FacetTransaction < ApplicationRecord
       facet_tx
     end.flatten.compact
     
-    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
-    
     facet_txs
   end
   
@@ -131,11 +129,11 @@ class FacetTransaction < ApplicationRecord
     data = tx[5].bytes_to_hex
 
     tx = new
-    tx.chain_id = chain_id.to_i
+    tx.chain_id = clamp_uint(chain_id, 256)
     tx.to_address = validated_address(to)
-    tx.value = value.to_i
-    tx.max_fee_per_gas = max_gas_fee.to_i
-    tx.gas_limit = gas_limit.to_i
+    tx.value = clamp_uint(value, 256)
+    tx.max_fee_per_gas = clamp_uint(max_gas_fee, 256)
+    tx.gas_limit = clamp_uint(gas_limit, 64)
     tx.input = data
     
     return unless tx.within_gas_limit?
@@ -163,14 +161,15 @@ class FacetTransaction < ApplicationRecord
     nil
   end
   
-  def self.l1_attributes_tx_from_blocks(eth_block, facet_block)
+  def self.l1_attributes_tx_from_blocks(facet_block)
     calldata = L1AttributesTxCalldata.build(
-      timestamp: eth_block.timestamp,
-      number: eth_block.number,
-      base_fee: eth_block.base_fee_per_gas,
-      hash: eth_block.block_hash,
+      timestamp: facet_block.eth_block_timestamp,
+      number: facet_block.eth_block_number,
+      base_fee: facet_block.eth_block_base_fee_per_gas,
+      hash: facet_block.eth_block_hash,
+      sequence_number: facet_block.sequence_number,
       fct_minted_per_gas: facet_block.fct_mint_per_gas,
-      total_fct_minted: facet_block.total_fct_minted
+      total_fct_minted: facet_block.total_fct_minted,
     )
     
     tx = new
@@ -186,8 +185,8 @@ class FacetTransaction < ApplicationRecord
     tx.facet_block = facet_block
     
     payload = [
-      eth_block.block_hash.hex_to_bytes,
-      0.zpad(32)
+      facet_block.eth_block_hash.hex_to_bytes,
+      facet_block.sequence_number.zpad(32)
     ].join
     
     tx.source_hash = FacetTransaction.compute_source_hash(
@@ -269,5 +268,9 @@ class FacetTransaction < ApplicationRecord
   
   def trace
     GethDriver.trace_transaction(tx_hash)
+  end
+  
+  def self.clamp_uint(input, max_bits)
+    [input.to_i, 2 ** max_bits - 1].min
   end
 end

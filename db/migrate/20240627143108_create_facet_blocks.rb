@@ -19,6 +19,10 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       t.string :transactions_root#, null: false
       t.string :prev_randao, null: false
       
+      t.bigint :eth_block_timestamp
+      t.bigint :eth_block_base_fee_per_gas
+      t.integer :sequence_number, null: false
+      
       t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "parent_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "prev_randao ~ '^0x[a-f0-9]{64}$'"
@@ -28,8 +32,6 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
 
     add_index :facet_blocks, :number, unique: true
     add_index :facet_blocks, :block_hash, unique: true
-    add_index :facet_blocks, :eth_block_hash, unique: true
-    add_index :facet_blocks, :eth_block_number, unique: true
 
     add_foreign_key :facet_blocks, :eth_blocks, column: :eth_block_hash, primary_key: :block_hash, on_delete: :cascade
     

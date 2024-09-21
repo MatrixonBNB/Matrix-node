@@ -16,15 +16,48 @@ class FacetBlock < ApplicationRecord
     ENV.fetch("V2_FORK_BLOCK").to_i
   end
   
-  def self.from_eth_block(eth_block, block_number)
+  def assign_l1_attributes(l1_attributes)
+    assign_attributes(
+      sequence_number: l1_attributes.fetch(:sequence_number),
+      eth_block_hash: l1_attributes.fetch(:hash),
+      eth_block_number: l1_attributes.fetch(:number),
+      eth_block_timestamp: l1_attributes.fetch(:timestamp),
+      eth_block_base_fee_per_gas: l1_attributes.fetch(:base_fee),
+      fct_mint_per_gas: l1_attributes.fetch(:fct_minted_per_gas),
+      total_fct_minted: l1_attributes.fetch(:total_fct_minted),
+    )
+  end
+  
+  def self.from_eth_block(eth_block)
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
       eth_block_number: eth_block.number,
+      prev_randao: eth_block.mix_hash,
+      eth_block_timestamp: eth_block.timestamp,
+      eth_block_base_fee_per_gas: eth_block.base_fee_per_gas,
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
-      number: block_number,
       timestamp: eth_block.timestamp,
-      prev_randao: eth_block.mix_hash
+      sequence_number: 0,
+      eth_block: eth_block,
     )
+  end
+  
+  def self.next_in_sequence_from_facet_block(facet_block)
+    FacetBlock.new(
+      eth_block_hash: facet_block.eth_block_hash,
+      eth_block_number: facet_block.eth_block_number,
+      eth_block_timestamp: facet_block.eth_block_timestamp,
+      prev_randao: facet_block.prev_randao,
+      eth_block_base_fee_per_gas: facet_block.eth_block_base_fee_per_gas,
+      parent_beacon_block_root: facet_block.parent_beacon_block_root,
+      number: facet_block.number + 1,
+      timestamp: facet_block.timestamp + 12,
+      sequence_number: facet_block.sequence_number + 1
+    )
+  end
+  
+  def attributes_tx
+    FacetTransaction.l1_attributes_tx_from_blocks(self)
   end
   
   def self.from_rpc_result(res)
@@ -50,6 +83,10 @@ class FacetBlock < ApplicationRecord
       in_memory_txs: resp['transactions'],
       # transactions_root: resp['transactionsRoot'],
     )
+    
+    if resp['parentBeaconBlockRoot']
+      self.parent_beacon_block_root = resp['parentBeaconBlockRoot']
+    end
   rescue => e
     binding.irb
     raise

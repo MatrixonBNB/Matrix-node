@@ -34,14 +34,28 @@ class EthBlockImporter
   end
   
   def populate_facet_block_cache
-    last_64_block_numbers = ([0, current_max_facet_block_number - 64].max..current_max_facet_block_number).to_a
+    epochs_found = 0
+    current_block_number = current_max_facet_block_number - 1
     
-    results = Parallel.map(last_64_block_numbers, in_threads: 10) do |block_number|
-      hex_block_number = "0x" + block_number.to_s(16)
-      FacetBlock.from_rpc_result(geth_driver.client.call("eth_getBlockByNumber", [hex_block_number, true]))
+    while epochs_found < 64 && current_block_number >= 0
+      hex_block_number = "0x#{current_block_number.to_s(16)}"
+      block_data = geth_driver.client.call("eth_getBlockByNumber", [hex_block_number, false])
+      current_block = FacetBlock.from_rpc_result(block_data)
+      l1_attributes = GethDriver.client.get_l1_attributes(current_block.number)
+      
+      current_block.assign_l1_attributes(l1_attributes)
+      
+      facet_block_cache[current_block.number] = current_block
+
+      if current_block.sequence_number == 0 || current_block_number == 0
+        epochs_found += 1
+        logger.info "Found epoch #{epochs_found} at block #{current_block_number}"
+      end
+
+      current_block_number -= 1
     end
-    
-    facet_block_cache.merge!(results.index_by { |result| result.number })
+
+    logger.info "Populated facet block cache with #{facet_block_cache.size} blocks from #{epochs_found} epochs"
   end
   
   def logger
@@ -69,47 +83,69 @@ class EthBlockImporter
     [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
   end
   
-  def set_eth_block_starting_points
-    latest_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", true])
+  def find_first_l2_block_in_epoch(l2_block_number_candidate)
+    l1_attributes = GethDriver.client.get_l1_attributes(l2_block_number_candidate)
     
-    if latest_block['number'].to_i(16) == 0
-      facet_block_cache[0] = FacetBlock.from_rpc_result(latest_block)
-      eth_block_cache[l1_genesis_block] = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block)['result'])
-      
-      return
+    if l1_attributes[:sequence_number] == 0
+      return l2_block_number_candidate
     end
     
-    attributes_tx = latest_block['transactions'].first
+    return find_first_l2_block_in_epoch(l2_block_number_candidate - 1)
+  end
+  
+  def set_eth_block_starting_points
+    latest_l2_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])
+    latest_l2_block_number = latest_l2_block['number'].to_i(16)
     
-    attributes = L1AttributesTxCalldata.decode(attributes_tx['input'])
+    if latest_l2_block_number == 0
+      facet_block = FacetBlock.from_rpc_result(latest_l2_block)
+      facet_block.eth_block_number = l1_genesis_block
+      
+      facet_block_cache[0] = facet_block
+      
+      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block)['result'])
+      eth_block_cache[l1_genesis_block] = eth_block
+      
+      return [l1_genesis_block, 0]
+    end
     
-    start_number_candidate = attributes[:number]
+    l1_attributes = GethDriver.client.get_l1_attributes(latest_l2_block_number)
     
-    l2_start_number_candidate = latest_block['number'].to_i(16)
+    l1_candidate = l1_attributes[:number]
+    l2_candidate = latest_l2_block_number
     
-    loop do
-      l1_result = ethereum_client.get_block(start_number_candidate)['result']
+    max_iterations = 1000
+    iterations = 0
+    
+    while iterations < max_iterations
+      l2_candidate = find_first_l2_block_in_epoch(l2_candidate)
+      
+      l1_result = ethereum_client.get_block(l1_candidate)['result']
       l1_hash = l1_result['hash']
       
-      # Fetch the corresponding L2 block and decode its attributes
-      l2_block = GethDriver.client.call("eth_getBlockByNumber", ["0x#{l2_start_number_candidate.to_s(16)}", true])
-      l2_attributes_tx = l2_block['transactions'].first
-      l2_attributes = L1AttributesTxCalldata.decode(l2_attributes_tx['input'])
-      our_hash = l2_attributes[:hash]
-      our_number = l2_attributes[:number]
-
-      if l1_hash == our_hash && our_number == start_number_candidate
-        eth_block_cache[start_number_candidate] = EthBlock.from_rpc_result(l1_result)
-        facet_block_cache[l2_start_number_candidate] = FacetBlock.from_rpc_result(l2_block)
-        return
+      l1_attributes = GethDriver.client.get_l1_attributes(l2_candidate)
+      
+      l2_block = GethDriver.client.call("eth_getBlockByNumber", ["0x#{l2_candidate.to_s(16)}", false])
+      
+      if l1_hash == l1_attributes[:hash] && l1_attributes[:number] == l1_candidate
+        eth_block_cache[l1_candidate] = EthBlock.from_rpc_result(l1_result)
+        
+        facet_block = FacetBlock.from_rpc_result(l2_block)
+        facet_block.assign_l1_attributes(l1_attributes)
+        
+        facet_block_cache[l2_candidate] = facet_block
+        return [l1_candidate, l2_candidate]
       else
-        l2_start_number_candidate -= 1
-        start_number_candidate -= 1
+        logger.info "Mismatch on block #{l2_candidate}: #{l1_hash} != #{l1_attributes[:hash]}, decrementing"
+        
+        l2_candidate -= 1
+        l1_candidate -= 1
       end
       
-      binding.irb
-      raise "No starting block found"
+      iterations += 1
     end
+    
+    raise "No starting block found after #{max_iterations} iterations"
   end
   
   def import_blocks_until_done
@@ -187,16 +223,59 @@ class EthBlockImporter
     facet_block_cache.fetch(block_number)
   end
   
+  def prune_caches
+    eth_block_threshold = current_max_eth_block_number - 65
+  
+    # Remove old entries from eth_block_cache
+    eth_block_cache.delete_if { |number, _| number < eth_block_threshold }
+  
+    # Find the oldest Ethereum block number we want to keep
+    oldest_eth_block_to_keep = eth_block_cache.keys.min
+  
+    # Remove old entries from facet_block_cache based on Ethereum block number
+    facet_block_cache.delete_if do |_, facet_block|
+      facet_block.eth_block_number < oldest_eth_block_to_keep
+    end
+  end
+  
+  def current_facet_block(type)
+    case type
+    when :head
+      fetch_block_from_cache(current_max_facet_block_number)
+    when :safe
+      find_block_by_epoch_offset(32)
+    when :finalized
+      find_block_by_epoch_offset(64)
+    else
+      raise ArgumentError, "Invalid block type: #{type}"
+    end
+  end
+    
+  def find_block_by_epoch_offset(offset)
+    current_eth_block_number = current_facet_head_block.eth_block_number
+    target_eth_block_number = current_eth_block_number - (offset - 1)
+
+    matching_block = facet_block_cache.values
+      .select { |block| block.eth_block_number <= target_eth_block_number }
+      .max_by(&:number)
+
+    matching_block || oldest_known_facet_block
+  end
+  
+  def oldest_known_facet_block
+    facet_block_cache.values.min_by(&:number)
+  end
+  
   def current_facet_head_block
-    fetch_block_from_cache(current_max_facet_block_number)
+    current_facet_block(:head)
   end
   
   def current_facet_safe_block
-    fetch_block_from_cache(current_max_facet_block_number - 32)
+    current_facet_block(:safe)
   end
   
   def current_facet_finalized_block
-    fetch_block_from_cache(current_max_facet_block_number - 64)
+    current_facet_block(:finalized)
   end
   
   def import_blocks(block_numbers)
@@ -242,33 +321,26 @@ class EthBlockImporter
         new_eth_calls = EthCall.from_trace_result(trace_result, eth_block)
       end
 
-      facet_block = propose_facet_block(
+      imported_facet_blocks = propose_facet_block(
         eth_block,
         eth_calls: new_eth_calls,
-        eth_transactions: new_eth_transactions,
-        facet_block_number: current_max_facet_block_number + 1
+        eth_transactions: new_eth_transactions
       )
       
-      facet_block = FacetBlock.from_rpc_result(facet_block)
+      imported_facet_blocks.each do |facet_block|
+        facet_block_cache[facet_block.number] = facet_block
+      end
       
-      facet_block_cache[facet_block.number] = facet_block
       eth_block_cache[eth_block.number] = eth_block
       
-      facet_block_threshold = current_max_facet_block_number - 65
-      eth_block_threshold = current_max_eth_block_number - 65
+      prune_caches
       
-      # Remove old entries from facet_block_cache
-      facet_block_cache.delete_if { |number, _| number < facet_block_threshold }
-      
-      # Remove old entries from imported_eth_blocks
-      eth_block_cache.delete_if { |number, _| number < eth_block_threshold }
-      
-      facet_blocks << facet_block
+      facet_blocks.concat(imported_facet_blocks)
       eth_blocks << eth_block
       
       res << OpenStruct.new(
-        facet_block: facet_block,
-        transactions_imported: facet_block.in_memory_txs.length
+        facet_block: imported_facet_blocks.last,
+        transactions_imported: imported_facet_blocks.last.in_memory_txs.length
       )
     end
   
@@ -283,11 +355,11 @@ class EthBlockImporter
     average_gas_per_block_millions = (total_gas / blocks.length / 1_000_000.0).round(2)
     gas_per_second_millions = (total_gas / elapsed_time / 1_000_000.0).round(2)
   
-    puts "Time elapsed: #{elapsed_time.round(2)} s"
-    puts "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
-    puts "Imported #{total_transactions} transactions (#{transactions_per_second} / s)"
-    puts "Total gas used: #{total_gas_millions} million (avg: #{average_gas_per_block_millions} million / block)"
-    puts "Gas per second: #{gas_per_second_millions} million / s"
+    logger.info "Time elapsed: #{elapsed_time.round(2)} s"
+    logger.info "Imported #{block_numbers.length} blocks. #{blocks_per_second} blocks / s"
+    logger.info "Imported #{total_transactions} transactions (#{transactions_per_second} / s)"
+    logger.info "Total gas used: #{total_gas_millions} million (avg: #{average_gas_per_block_millions} million / block)"
+    logger.info "Gas per second: #{gas_per_second_millions} million / s"
   
     [facet_blocks, eth_blocks]
   end
@@ -339,16 +411,11 @@ class EthBlockImporter
       )
     end
     
-    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
-    
     facet_txs
-  rescue => e
-    binding.irb
-    raise
   end
   
-  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, facet_block_number:)
-    facet_block = FacetBlock.from_eth_block(eth_block, facet_block_number)
+  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:)
+    facet_block = FacetBlock.from_eth_block(eth_block)
     
     facet_txs = if in_v2?(eth_block.number)
       FacetTransaction.from_eth_transactions_in_block(
@@ -366,17 +433,12 @@ class EthBlockImporter
       )
     end
     
-    attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(eth_block, facet_block)
-    facet_txs = facet_txs.unshift(attributes_tx)
-
-    payload = facet_txs.map(&:to_facet_payload)
-    
     geth_driver.propose_block(
-      payload,
-      facet_block,
-      current_facet_head_block,
-      current_facet_safe_block,
-      current_facet_finalized_block
+      transactions: facet_txs,
+      new_facet_block: facet_block,
+      head_block: current_facet_head_block,
+      safe_block: current_facet_safe_block,
+      finalized_block: current_facet_finalized_block
     )
   rescue => e
     binding.irb

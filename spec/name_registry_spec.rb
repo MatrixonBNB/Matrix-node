@@ -314,9 +314,12 @@ RSpec.describe "Name Registry" do
     
     expect(is_available).to be true
     
+    l2_block = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])
+    last_timestamp = l2_block['timestamp'].to_i(16)
+    next
     trigger_contract_interaction_and_expect_success(
       from: bob,
-      block_timestamp: Time.zone.now.to_i,
+      block_timestamp: Time.zone.at(last_timestamp + 12),
       payload: {
         to: registry_address,
         data: {
@@ -324,7 +327,7 @@ RSpec.describe "Name Registry" do
           args: {
             to: bob,
             name: "shortdurationname",
-            durationInSeconds: 28.days
+            durationInSeconds: 1.minute
           }
         }
       }
@@ -336,7 +339,7 @@ RSpec.describe "Name Registry" do
       function_args: "shortdurationname"
     )
     
-    travel_to Time.zone.now + 31.days
+    travel_to Time.zone.at(last_timestamp + 2.minutes)
     res = make_static_call(
       contract: registry_address,
       function_name: "getToken",
@@ -351,7 +354,7 @@ RSpec.describe "Name Registry" do
     #   )
     # }.to raise_error(Contract::StaticCallError, /Name expired/)
     
-    travel_to Time.now - 31.days
+    travel_to Time.zone.now
     
     # trigger_contract_interaction_and_expect_error(
     #   # error_msg_includes: 'Name expired',

@@ -116,8 +116,9 @@ class LegacyMigrationDataGenerator
       
       current_max_block_number = FacetBlock.maximum(:number).to_i
       
-      facet_block = FacetBlock.from_eth_block(eth_block, current_max_block_number + 1)
+      facet_block = FacetBlock.from_eth_block(eth_block)
       facet_block.from_rpc_response(facet_genesis_block)
+      facet_block.number = 0
       facet_block.save!
     end
   end
@@ -219,7 +220,6 @@ class LegacyMigrationDataGenerator
     earliest = FacetBlock.order(number: :asc).first
     
     # Initialize in-memory representation of blocks
-    # TODO: this grows unbounded, need to trim it to last 64 blocks
     in_memory_blocks = FacetBlock.where(number: (current_max_block_number - 64 - block_numbers.size)..current_max_block_number).index_by(&:number)
     
     ActiveRecord::Base.transaction do
@@ -244,7 +244,7 @@ class LegacyMigrationDataGenerator
           safe_block = in_memory_blocks[block_number - 32] || earliest
           finalized_block = in_memory_blocks[block_number - 64] || earliest
           
-          facet_block, facet_txs, receipts = propose_facet_block(
+          imported_facet_blocks, facet_txs, receipts = propose_facet_block(
             eth_block,
             block_ethscriptions,
             block_legacy_tx_receipts,
@@ -254,10 +254,11 @@ class LegacyMigrationDataGenerator
             finalized_block: finalized_block
           )
           
-          # Update in-memory blocks
-          in_memory_blocks[block_number] = facet_block
+          imported_facet_blocks.each do |facet_block|
+            in_memory_blocks[block_number] = facet_block
+          end
           
-          facet_blocks << facet_block
+          facet_blocks.concat(imported_facet_blocks)
           all_facet_txs.concat(facet_txs)
           all_receipts.concat(receipts)
           
@@ -267,12 +268,12 @@ class LegacyMigrationDataGenerator
           receipts.each(&:set_legacy_contract_address_map)
           receipts.each(&:update_real_withdrawal_id)
           
-          validate_receipts(block_legacy_tx_receipts, receipts) if validate_import?
+          validate_receipts(block_legacy_tx_receipts, receipts, facet_txs) if validate_import?
           
           block_ethscriptions.each(&:clear_caches_if_upgrade!)
           
           res << OpenStruct.new(
-            facet_block: facet_block,
+            facet_block: imported_facet_blocks.first,
             transactions_imported: facet_txs,
             receipts_imported: receipts
           )
@@ -355,14 +356,7 @@ class LegacyMigrationDataGenerator
     end
   end
   
-  def validate_receipts(legacy_tx_receipts, facet_receipts)
-    l1_attributes_tx_receipt = facet_receipts.shift
-    
-    unless l1_attributes_tx_receipt.status == 1
-      binding.irb
-      raise "L1 attributes transaction failed"
-    end
-    
+  def validate_receipts(legacy_tx_receipts, facet_receipts, facet_txs)
     unless legacy_tx_receipts.size == facet_receipts.size
       raise "Mismatched number of legacy and facet receipts"
     end
@@ -370,6 +364,7 @@ class LegacyMigrationDataGenerator
     legacy_tx_receipts.each_with_index do |legacy_receipt, index|
       facet_receipt = facet_receipts[index]
       facet_status = facet_receipt.status == 1 ? 'success' : 'failure'
+      # facet_tx = facet_txs.find { |tx| tx.tx_hash == facet_receipt.transaction_hash }
       
       special_cases = global_special_cases
       
@@ -556,88 +551,104 @@ class LegacyMigrationDataGenerator
       )
     end
     
-    FctMintCalculator.assign_mint_amounts(facet_txs, facet_block)
-    
     facet_txs
   end
   
   def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, head_block:, safe_block:, finalized_block:)
-    facet_block = FacetBlock.from_eth_block(eth_block, block_number)
+    facet_block = FacetBlock.from_eth_block(eth_block)
     
     facet_txs = facet_txs_from_ethscriptions_in_block(
       ethscriptions,
       facet_block
     )
     
-    attributes_tx = FacetTransaction.l1_attributes_tx_from_blocks(eth_block, facet_block)
-    
-    facet_txs = facet_txs.sort_by(&:eth_call_index).unshift(attributes_tx)
-    payload = facet_txs.map(&:to_facet_payload)
-    
-    response = geth_driver.propose_block(
-      payload,
-      facet_block,
-      head_block,
-      safe_block,
-      finalized_block
+    imported_facet_blocks = geth_driver.propose_block(
+      transactions: facet_txs,
+      new_facet_block: facet_block,
+      head_block: head_block,
+      safe_block: safe_block,
+      finalized_block: finalized_block
     )
-  
-    geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [response['blockNumber'], true]) }
-    receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [response['blockNumber']]) }
-
-    # Wait for both futures to complete
-    geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
-    
-    facet_block.from_rpc_response(geth_block)
-    receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
-    
-    facet_txs_by_source_hash = facet_txs.index_by(&:source_hash)
     
     receipts = []
     
-    geth_block['transactions'].each do |tx|
-      receipt_details = receipts_data_by_hash[tx['hash']]
+    imported_facet_blocks.each do |imported_facet_block|
+      geth_block_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockByNumber", [imported_facet_block.number.to_hex_string, true]) }
+      receipts_data_future = Concurrent::Promises.future { geth_driver.client.call("eth_getBlockReceipts", [imported_facet_block.number.to_hex_string]) }
+  
+      # Wait for both futures to complete
+      geth_block, receipts_data = Concurrent::Promises.zip(geth_block_future, receipts_data_future).value!
       
-      facet_tx = facet_txs_by_source_hash[tx['sourceHash']]
-      raise unless facet_tx
-
-      facet_tx.assign_attributes(
-        tx_hash: tx['hash'],
-        block_hash: response['blockHash'],
-        block_number: response['blockNumber'].to_i(16),
-        transaction_index: receipt_details['transactionIndex'].to_i(16),
-        deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
-        gas_limit: tx['gas'].to_i(16),
-        tx_type: tx['type']
-      )
+      imported_facet_block.from_rpc_response(geth_block)
+      receipts_data_by_hash = receipts_data.index_by { |receipt| receipt['transactionHash'] }
       
-      facet_receipt = FacetTransactionReceipt.new(
-        transaction_hash: tx['hash'],
-        block_hash: response['blockHash'],
-        block_number: response['blockNumber'].to_i(16),
-        contract_address: receipt_details['contractAddress'],
-        cumulative_gas_used: receipt_details['cumulativeGasUsed'].to_i(16),
-        deposit_nonce: tx['nonce'].to_i(16),
-        deposit_receipt_version: tx['type'].to_i(16),
-        effective_gas_price: receipt_details['effectiveGasPrice'].to_i(16),
-        from_address: tx['from'],
-        gas_used: receipt_details['gasUsed'].to_i(16),
-        logs: receipt_details['logs'],
-        logs_bloom: receipt_details['logsBloom'],
-        status: receipt_details['status'].to_i(16),
-        to_address: tx['to'],
-        transaction_index: receipt_details['transactionIndex'].to_i(16),
-        tx_type: tx['type']
-      )
+      facet_txs_by_source_hash = facet_txs.index_by(&:source_hash)
       
-      # Pair the receipt with its legacy counterpart
-      legacy_receipt = legacy_tx_receipts.find { |legacy_tx| legacy_tx.transaction_hash == facet_tx.eth_transaction_hash }
-      facet_receipt.legacy_receipt = legacy_receipt
-      
-      receipts << facet_receipt
+      geth_block['transactions'].each do |tx|
+        if tx['from'] == '0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001' && tx['transactionIndex'] == '0x0'
+          facet_txs.unshift(FacetTransaction.new(
+            from_address: tx['from'],
+            to_address: tx['to'],
+            value: tx['value'].to_i(16),
+            gas_limit: tx['gas'].to_i(16),
+            input: tx['input'],
+            block_hash: tx['blockHash'],
+            block_number: tx['blockNumber'].to_i(16),
+            transaction_index: tx['transactionIndex'].to_i(16),
+            deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
+            source_hash: tx['sourceHash'],
+            tx_type: tx['type'],
+            tx_hash: tx['hash'],
+            mint: tx['mint']
+          ))
+          
+          next
+        end
+        
+        receipt_details = receipts_data_by_hash[tx['hash']]
+        
+        facet_tx = facet_txs_by_source_hash[tx['sourceHash']]
+        
+        raise "Missing facet tx" unless facet_tx
+  
+        facet_tx.assign_attributes(
+          tx_hash: tx['hash'],
+          block_hash: imported_facet_block.block_hash,
+          block_number: imported_facet_block.number,
+          transaction_index: receipt_details['transactionIndex'].to_i(16),
+          deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
+          gas_limit: tx['gas'].to_i(16),
+          tx_type: tx['type']
+        )
+        
+        facet_receipt = FacetTransactionReceipt.new(
+          transaction_hash: tx['hash'],
+          block_hash: imported_facet_block.block_hash,
+          block_number: imported_facet_block.number,
+          contract_address: receipt_details['contractAddress'],
+          cumulative_gas_used: receipt_details['cumulativeGasUsed'].to_i(16),
+          deposit_nonce: tx['nonce'].to_i(16),
+          deposit_receipt_version: tx['type'].to_i(16),
+          effective_gas_price: receipt_details['effectiveGasPrice'].to_i(16),
+          from_address: tx['from'],
+          gas_used: receipt_details['gasUsed'].to_i(16),
+          logs: receipt_details['logs'],
+          logs_bloom: receipt_details['logsBloom'],
+          status: receipt_details['status'].to_i(16),
+          to_address: tx['to'],
+          transaction_index: receipt_details['transactionIndex'].to_i(16),
+          tx_type: tx['type']
+        )
+        
+        # Pair the receipt with its legacy counterpart
+        legacy_receipt = legacy_tx_receipts.find { |legacy_tx| legacy_tx.transaction_hash == facet_tx.eth_transaction_hash }
+        facet_receipt.legacy_receipt = legacy_receipt
+        
+        receipts << facet_receipt
+      end
     end
     
-    [facet_block, facet_txs, receipts]
+    [imported_facet_blocks, facet_txs, receipts]
   rescue => e
     binding.irb
     raise

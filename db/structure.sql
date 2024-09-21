@@ -266,6 +266,9 @@ CREATE TABLE public.facet_blocks (
     "timestamp" bigint NOT NULL,
     transactions_root character varying,
     prev_randao character varying NOT NULL,
+    eth_block_timestamp bigint,
+    eth_block_base_fee_per_gas bigint,
+    sequence_number integer NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_e289f61f63 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
@@ -649,20 +652,6 @@ CREATE UNIQUE INDEX index_eth_transactions_on_tx_hash ON public.eth_transactions
 --
 
 CREATE UNIQUE INDEX index_facet_blocks_on_block_hash ON public.facet_blocks USING btree (block_hash);
-
-
---
--- Name: index_facet_blocks_on_eth_block_hash; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_facet_blocks_on_eth_block_hash ON public.facet_blocks USING btree (eth_block_hash);
-
-
---
--- Name: index_facet_blocks_on_eth_block_number; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_facet_blocks_on_eth_block_number ON public.facet_blocks USING btree (eth_block_number);
 
 
 --

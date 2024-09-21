@@ -34,7 +34,7 @@ RSpec.describe FctMintCalculator do
   end
 
   describe '.calculate_next_block_fct_minted_per_gas' do
-    let(:prev_fct_mint_per_gas) { 1000.gwei }
+    let(:prev_fct_mint_per_gas) { 500.gwei }
     let(:current_l2_block_number) { 600_000 }
 
     context 'when prev_total_fct_minted equals target' do
