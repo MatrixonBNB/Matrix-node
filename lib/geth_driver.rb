@@ -182,6 +182,8 @@ module GethDriver
     
     head_block = filler_blocks.last || head_block
     
+    new_facet_block.number = head_block.number + 1
+    
     # Update block hashes after filler blocks have been added
     head_block_hash = head_block.block_hash
     safe_block_hash = safe_block.block_hash
@@ -195,8 +197,8 @@ module GethDriver
     
     FctMintCalculator.assign_mint_amounts(transactions, new_facet_block)
     
-    transactions = transactions.unshift(new_facet_block.attributes_tx)
-    transactions = transactions.map(&:to_facet_payload)
+    transactions_with_attributes = [new_facet_block.attributes_tx] + transactions
+    transaction_payloads = transactions_with_attributes.map(&:to_facet_payload)
     
     payload_attributes = {
       timestamp: "0x" + new_facet_block.timestamp.to_s(16),
@@ -204,7 +206,7 @@ module GethDriver
       suggestedFeeRecipient: "0x0000000000000000000000000000000000000000",
       withdrawals: [],
       noTxPool: true,
-      transactions: transactions,
+      transactions: transaction_payloads,
       gasLimit: "0x" + FacetBlock::GAS_LIMIT.to_s(16),
     }
     

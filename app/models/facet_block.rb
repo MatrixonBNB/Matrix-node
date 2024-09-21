@@ -6,8 +6,7 @@ class FacetBlock < ApplicationRecord
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   
   GAS_LIMIT = 300e6.to_i
-  attr_accessor :in_memory_txs, :total_fct_minted, :fct_mint_per_gas,
-    :sequence_number, :eth_block_base_fee_per_gas, :eth_block_timestamp
+  attr_accessor :in_memory_txs, :total_fct_minted, :fct_mint_per_gas
   
   def self.l1_genesis_block
     ENV.fetch("START_BLOCK").to_i - 1
@@ -29,7 +28,7 @@ class FacetBlock < ApplicationRecord
     )
   end
   
-  def self.from_eth_block(eth_block, block_number)
+  def self.from_eth_block(eth_block)
     FacetBlock.new(
       eth_block_hash: eth_block.block_hash,
       eth_block_number: eth_block.number,
@@ -37,7 +36,6 @@ class FacetBlock < ApplicationRecord
       eth_block_timestamp: eth_block.timestamp,
       eth_block_base_fee_per_gas: eth_block.base_fee_per_gas,
       parent_beacon_block_root: eth_block.parent_beacon_block_root,
-      number: block_number,
       timestamp: eth_block.timestamp,
       sequence_number: 0,
       eth_block: eth_block,

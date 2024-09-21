@@ -37,4 +37,12 @@ class Integer
   def zpad(bytes)
     Eth::Util.zpad_int(self, bytes)
   end
+  
+  def to_hex_string
+    "0x" + to_s(16)
+  end
+  
+  def to_hex_string_no_prefix
+    to_s(16)
+  end
 end

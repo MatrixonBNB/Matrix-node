@@ -324,8 +324,7 @@ class EthBlockImporter
       imported_facet_blocks = propose_facet_block(
         eth_block,
         eth_calls: new_eth_calls,
-        eth_transactions: new_eth_transactions,
-        facet_block_number: current_max_facet_block_number + 1
+        eth_transactions: new_eth_transactions
       )
       
       imported_facet_blocks.each do |facet_block|
@@ -415,8 +414,8 @@ class EthBlockImporter
     facet_txs
   end
   
-  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:, facet_block_number:)
-    facet_block = FacetBlock.from_eth_block(eth_block, facet_block_number)
+  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:)
+    facet_block = FacetBlock.from_eth_block(eth_block)
     
     facet_txs = if in_v2?(eth_block.number)
       FacetTransaction.from_eth_transactions_in_block(
