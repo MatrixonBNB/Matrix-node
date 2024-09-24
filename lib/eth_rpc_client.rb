@@ -93,10 +93,14 @@ class EthRpcClient
     )
   end
   
-  def get_code_at_address(address)
+  def get_code_at_address(address, block_number = "latest")
+    if block_number.is_a?(Integer)
+      block_number = "0x" + block_number.to_s(16)
+    end
+    
     query_api(
       method: 'eth_getCode',
-      params: [address, 'latest']
+      params: [address, block_number]
     )['result']
   end
   

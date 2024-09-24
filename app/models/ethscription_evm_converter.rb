@@ -549,7 +549,8 @@ module EthscriptionEVMConverter
       
       puts "is_smart_contract_on_l1? #{address}"
       
-      LegacyMigrationDataGenerator.instance.ethereum_client.get_code_at_address(address) != "0x"
+      block = LegacyMigrationDataGenerator.instance.current_import_block_number
+      LegacyMigrationDataGenerator.instance.ethereum_client.get_code_at_address(address, block) != "0x"
     end
     memoize :is_smart_contract_on_l1?
     
