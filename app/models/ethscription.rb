@@ -13,20 +13,9 @@ class Ethscription < T::Struct
   const :l1_tx_origin, String
   const :initial_owner, String
   const :content_uri, String
-  const :gas_used, Integer
   
-  def self.from_legacy_ethscription(legacy_ethscription, l1_tx_origin)
-    relevant_attrs = legacy_ethscription.attributes.symbolize_keys.slice(*props.keys)
-    relevant_attrs[:l1_tx_origin] = l1_tx_origin
-    
-    new(**relevant_attrs)
-  rescue => e
-    binding.irb
-    raise
-  end
-  
-  def self.from_eth_transactions(eth_transactions)
-    eth_transactions.map(&:init_ethscription).compact.flatten
+  def contract_initiated?
+    l1_tx_origin != creator
   end
   
   def valid_data_uri?

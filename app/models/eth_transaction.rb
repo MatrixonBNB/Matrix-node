@@ -1,148 +1,149 @@
-class EthTransaction < ApplicationRecord
-  belongs_to :eth_block, primary_key: :block_hash, foreign_key: :block_hash
-  has_many :eth_calls, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
-  has_many :facet_transactions, -> { order(eth_call_index: :asc) },
-    primary_key: :tx_hash, foreign_key: :eth_transaction_hash, dependent: :destroy
-    
-  attr_accessor :initialized_ethscription
+class EthTransaction < T::Struct
+  const :block_hash, String
+  const :block_number, Integer
+  const :tx_hash, String
+  const :transaction_index, Integer
+  const :input, T.nilable(String)
+  const :chain_id, T.nilable(Integer)
+  const :from_address, T.nilable(String)
+  const :to_address, T.nilable(String)
+  const :status, T.nilable(Integer)
+  const :logs, T::Array[T.untyped], default: []
+  const :eth_block, T.nilable(EthBlock)
+  const :facet_transactions, T::Array[FacetTransaction], default: []
   
-  def self.from_rpc_result(block_result, receipt_result = nil)
-    block_hash = block_result['hash']
-    block_number = block_result['number'].to_i(16)
-    
-    if receipt_result.present?
-      indexed_receipts = receipt_result.index_by{|el| el['transactionHash']}
-    end
-    
-    block_result['transactions'].map do |tx|
-      tx = EthTransaction.new(
-        block_hash: block_hash,
-        block_number: block_number,
-        tx_hash: tx['hash'],
-        y_parity: tx['yParity']&.to_i(16),
-        access_list: tx['accessList'],
-        transaction_index: tx['transactionIndex'].to_i(16),
-        tx_type: tx['type'].to_i(16),
-        nonce: tx['nonce'].to_i(16),
-        input: tx['input'],
-        r: tx['r'],
-        s: tx['s'],
-        chain_id: tx['chainId']&.to_i(16),
-        v: tx['v'].to_i(16),
-        gas: tx['gas'].to_i(16),
-        max_priority_fee_per_gas: tx['maxPriorityFeePerGas']&.to_i(16),
-        from_address: tx['from'],
-        to_address: tx['to'],
-        max_fee_per_gas: tx['maxFeePerGas']&.to_i(16),
-        value: tx['value'].to_i(16),
-        gas_price: tx['gasPrice'].to_i(16)
-      )
-      
-      if indexed_receipts.present?
-        current_receipt = indexed_receipts[tx.tx_hash]
-        
-        tx.status = current_receipt['status'].to_i(16)
-        tx.logs = current_receipt['logs']
-        tx.gas_used = current_receipt['gasUsed'].to_i(16)
-      end
-      
-      tx
-    end
-  end
+  delegate :in_v2?, to: :FacetBlock
   
-  def self.from_ethscription(ethscription)
-    EthTransaction.new(
-      block_hash: ethscription.block_blockhash,
-      block_number: ethscription.block_number,
-      tx_hash: ethscription.transaction_hash,
-      transaction_index: ethscription.transaction_index,
-      from_address: ethscription.creator,
-      to_address: ethscription.initial_owner,
-      input: ethscription.content_uri,
-      gas: ethscription.gas_used,
-    )
-  end
-  
-  def utf8_input
-    HexDataProcessor.hex_to_utf8(
-      input,
-      support_gzip: self.class.esip7_enabled?(block_number)
-    )
-  end
+  FacetLogInboxEventSig = "0x00000000000000000000000000000000000000000000000000000000000face7"
   
   def self.event_signature(event_name)
     "0x" + Eth::Util.bin_to_hex(Eth::Util.keccak256(event_name))
   end
-  
-  def ethscription_creation_events
-    logs.select do |log|
-      !log['removed'] && CreateEthscriptionEventSig == log['topics'].first
-    end.sort_by { |log| log['logIndex'].to_i(16) }
-  end
-    
-  def self.esip7_enabled?(block_number)
-    on_testnet? || block_number >= 19376500
-  end
-  
+
   CreateEthscriptionEventSig = event_signature("ethscriptions_protocol_CreateEthscription(address,string)")
-  
-  def init_ethscription_from_input
-    unless to_address == Ethscription::REQUIRED_INITIAL_OWNER
-      return
-    end
+
+  def self.from_rpc_result(block_result, receipt_result)
+    block_hash = block_result['hash']
+    block_number = block_result['number'].to_i(16)
     
-    attrs = ethscription_attrs({
+    indexed_receipts = receipt_result.index_by{|el| el['transactionHash']}
+    
+    block_result['transactions'].map do |tx|
+      current_receipt = indexed_receipts[tx['hash']]
+      
+      EthTransaction.new(
+        block_hash: block_hash,
+        block_number: block_number,
+        tx_hash: tx['hash'],
+        transaction_index: tx['transactionIndex'].to_i(16),
+        input: tx['input'],
+        chain_id: tx['chainId']&.to_i(16),
+        from_address: tx['from'],
+        to_address: tx['to'],
+        status: current_receipt['status'].to_i(16),
+        logs: current_receipt['logs'],
+      )
+    end
+  end
+  
+  def self.facet_txs_from_rpc_results(block_results, receipt_results)
+    eth_txs = from_rpc_result(block_results, receipt_results)
+    eth_txs.sort_by(&:transaction_index).map(&:to_facet_tx).compact
+  end
+  
+  def to_facet_tx
+    return unless is_success?
+    
+    in_v2?(block_number) ? to_facet_tx_v2 : to_facet_tx_v1
+  end
+  
+  def to_facet_tx_v2
+    return unless is_success?
+    
+    facet_tx_from_input || try_facet_tx_from_events
+  end
+  
+  def to_facet_tx_v1
+    ethscription = to_ethscription
+    return unless ethscription
+    
+    FacetTransaction.from_ethscription(ethscription)
+  end
+  
+  def to_ethscription
+    return unless is_success?
+    
+    find_ethscription_from_input || find_ethscription_from_events
+  end
+  
+  def facet_tx_from_input
+    return unless to_address == FacetTransaction::FACET_INBOX_ADDRESS
+    
+    FacetTransaction.from_payload(
+      l1_tx_origin: from_address,
+      from_address: from_address,
+      input: input,
+      tx_hash: tx_hash,
+      block_hash: block_hash
+    )
+  end
+  
+  def try_facet_tx_from_events
+    facet_tx_creation_events.each do |log|
+      facet_tx = FacetTransaction.from_payload(
+        l1_tx_origin: from_address,
+        from_address: log['address'],
+        input: log['data'],
+        tx_hash: tx_hash,
+        block_hash: block_hash
+      )
+      return facet_tx if facet_tx
+    end
+    nil
+  end
+  
+  def find_ethscription_from_input
+    return unless to_address == Ethscription::REQUIRED_INITIAL_OWNER
+
+    create_potentially_valid_ethscription(
       creator: from_address,
       l1_tx_origin: from_address,
       initial_owner: to_address,
-      content_uri: utf8_input,
-    })
-    
-    potentially_valid = Ethscription.new(**attrs.symbolize_keys)
-    
-    init_if_valid_and_no_ethscription_initialized(potentially_valid)
+      content_uri: utf8_input
+    )
   end
-  
-  def init_ethscription_from_events
-    ethscription_creation_events.each do |creation_event|
-      next if creation_event['topics'].length != 2
-    
-      begin
-        initial_owner = Eth::Abi.decode(['address'], creation_event['topics'].second).first
-        
-        content_uri_data = Eth::Abi.decode(['string'], creation_event['data']).first
-        content_uri = HexDataProcessor.clean_utf8(content_uri_data)
-      rescue Eth::Abi::DecodingError
-        next
-      end
-         
-      attrs = ethscription_attrs({
-        creator: creation_event['address'],
-        l1_tx_origin: from_address,
-        initial_owner: initial_owner,
-        content_uri: content_uri
-      })
-      
-      potentially_valid = Ethscription.new(**attrs.symbolize_keys)
-      
-      init_if_valid_and_no_ethscription_initialized(potentially_valid)
+
+  def find_ethscription_from_events
+    ethscription_creation_events.each do |event|
+      ethscription = create_ethscription_from_event(event)
+      return ethscription if ethscription
     end
+    nil
+  end  
+  
+  def create_ethscription_from_event(event)
+    begin
+      initial_owner = Eth::Abi.decode(['address'], event['topics'].second).first
+      content_uri = HexDataProcessor.clean_utf8(Eth::Abi.decode(['string'], event['data']).first)
+    rescue Eth::Abi::DecodingError
+      return nil
+    end
+    
+    create_potentially_valid_ethscription(
+      creator: event['address'],
+      l1_tx_origin: from_address,
+      initial_owner: initial_owner,
+      content_uri: content_uri
+    )
   end
   
-  def init_ethscription
-    return unless status == 1
-    init_ethscription_from_input
-    init_ethscription_from_events
-    
-    initialized_ethscription
+  def create_potentially_valid_ethscription(attrs)
+    ethscription = Ethscription.new(**ethscription_attrs(attrs).symbolize_keys)
+    ethscription.valid? ? ethscription : nil
   end
-  
-  def init_if_valid_and_no_ethscription_initialized(potentially_valid)
-    return if initialized_ethscription.present?
-    return unless potentially_valid.valid?
-    
-    self.initialized_ethscription = potentially_valid
-    initialized_ethscription
+
+  def is_success?
+    status == 1
   end
   
   def ethscription_attrs(to_merge = {})
@@ -151,11 +152,29 @@ class EthTransaction < ApplicationRecord
       block_number: block_number,
       block_blockhash: block_hash,
       transaction_index: transaction_index,
-      gas_used: gas_used
     }.merge(to_merge)
   end
   
-  def self.on_testnet?
-    ChainIdManager.on_testnet?
+  def facet_tx_creation_events
+    logs.select do |log|
+      !log['removed'] && log['topics'].length == 1 &&
+        FacetLogInboxEventSig == log['topics'].first
+    end.sort_by { |log| log['logIndex'].to_i(16) }
+  end
+  
+  def ethscription_creation_events
+    logs.select do |log|
+      !log['removed'] && log['topics'].length == 2 &&
+        CreateEthscriptionEventSig == log['topics'].first
+    end.sort_by { |log| log['logIndex'].to_i(16) }
+  end
+  
+  def utf8_input
+    esip7_enabled = ChainIdManager.on_testnet? || block_number >= 19376500  
+    
+    HexDataProcessor.hex_to_utf8(
+      input,
+      support_gzip: esip7_enabled
+    )
   end
 end

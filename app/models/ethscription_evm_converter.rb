@@ -19,6 +19,8 @@ module EthscriptionEVMConverter
     delegate :get_implementation, to: :class
     delegate :validate_import?, to: :class
     delegate :skip_import_validation?, to: :class
+    delegate :is_smart_contract_on_l1?, to: :class
+    delegate :alias_address_if_necessary, to: :class
   end
   
   def facet_tx_to
@@ -342,6 +344,12 @@ module EthscriptionEVMConverter
     end
     memoize :calculate_to_address
     
+    def safe_calculate_to_address(arg)
+      mapped = Ethscription.calculate_to_address(arg)
+    rescue EthscriptionEVMConverter::ContractMissing, LegacyValueMapping::NoMappingSource, KeyError
+      arg
+    end
+    
     def convert_args(contract, function_name, args)
       contract_name = contract.name
       function = contract.functions.find { |f| f.name == function_name }
@@ -430,12 +438,26 @@ module EthscriptionEVMConverter
     memoize :normalize_args
     
     def normalize_arg_value(arg_value, input)
-      if arg_value.is_a?(String) && (input.type.starts_with?('uint') || input.type.starts_with?('int'))
+      if input.respond_to?(:parsed_type)
+        type = input.parsed_type
+      else
+        type = input
+      end
+      
+      if arg_value.is_a?(String) && type.base_type == "uint" || type.base_type == "int"
         base = arg_value.start_with?('0x') ? 16 : 10
         Integer(arg_value, base)
+      elsif arg_value.is_a?(String) && type.base_type == "address"
+        arg_value = arg_value.downcase
+        
+        unless arg_value.match?(/\A0x[0-9a-f]{40}\z/)
+          raise InvalidArgValue, "Invalid address: #{arg_value.inspect}!"
+        end
+        
+        alias_address_if_necessary(safe_calculate_to_address(arg_value))
       elsif arg_value.is_a?(Array)
         arg_value.map do |val|
-          normalize_arg_value(val, input)
+          normalize_arg_value(val, type.nested_sub)
         end
       else
         arg_value
@@ -519,5 +541,39 @@ module EthscriptionEVMConverter
       raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
     end
     memoize :real_withdrawal_id
+    
+    def is_smart_contract_on_l1?(address)
+      unless address.match?(/\A0x[0-9a-f]{40}\z/i)
+        return false
+      end
+      
+      puts "is_smart_contract_on_l1? #{address}"
+      
+      block = LegacyMigrationDataGenerator.instance.current_import_block_number
+      LegacyMigrationDataGenerator.instance.ethereum_client.get_code_at_address(address, block) != "0x"
+    end
+    memoize :is_smart_contract_on_l1?
+    
+    def alias_address_if_necessary(address)
+      hashed_address = Eth::Util.keccak256(address.hex_to_bytes).bytes_to_hex
+
+      unless LegacyMigrationDataGenerator.instance.current_import_block_number
+        return lookup_new_value(hashed_address)
+      end
+      
+      aliased_address = if is_smart_contract_on_l1?(address)
+        AddressAliasHelper.apply_l1_to_l2_alias(address)
+      else
+        address
+      end
+      
+      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
+        legacy_value: hashed_address,
+        new_value: aliased_address,
+      )
+      
+      aliased_address
+    end
+    memoize :alias_address_if_necessary
   end
 end

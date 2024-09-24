@@ -120,6 +120,7 @@ contract NameRegistryV139 is FacetERC721, Upgradeable, Initializable, FacetOwnab
         _initializeOwner(owner);
         _initializePausable(true);
         _initializeUpgradeAdmin(msg.sender);
+        _initializeFacetEIP712(msg.sender);
         s().WETH = _WETH;
         s().usdWeiCentsInOneEth = usdWeiCentsInOneEth;
         s().charCountToUsdWeiCentsPrice = charCountToUsdWeiCentsPrice;

@@ -28,9 +28,22 @@ RSpec.describe "Uniswap" do
     Ethscription.new(**hsh.slice(*Ethscription.props.keys))
   }
   
+  before(:each) do
+    allow(LegacyMigrationDataGenerator.instance).to receive(:current_import_block_number).and_return(1)
+  end
+  
   before(:all) do
     GethDriver.setup_rspec_geth
     Singleton.__init__(EthBlockImporter)
+  end
+  
+  def calculate_address(deployer, nonce)
+    data = [
+      deployer.hex_to_bytes,
+      Eth::Util.serialize_int_to_big_endian(nonce)
+    ]
+    
+    Eth::Util.keccak256(Eth::Rlp.encode(data)).last(20).bytes_to_hex
   end
   
   it 'imports old tx #1' do
@@ -44,11 +57,11 @@ RSpec.describe "Uniswap" do
     )
     
     expect(proxy_res.receipts_imported.first.contract_address).to eq(
-      first_tx_receipt.created_contract_address
+      calculate_address(first_tx_receipt.from_address, 0)
     )
-    
-    input = second_ethscription.facet_tx_input
     next
+    input = second_ethscription.facet_tx_input
+    
     proxy_res = create_and_import_block(
       facet_data: input,
       to_address: second_tx_receipt.to_contract_address,

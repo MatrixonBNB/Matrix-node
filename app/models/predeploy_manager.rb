@@ -168,9 +168,7 @@ module PredeployManager
       }
     }
     
-    l1_block_result = l1_rpc_client.get_block(l1_genesis_block)['result']
-    timestamp = l1_block_result['timestamp'].to_i(16)
-    mix_hash = l1_block_result['mixHash']
+    timestamp, mix_hash = get_timestamp_and_mix_hash(l1_genesis_block)
     
     {
       config: config,
@@ -181,6 +179,13 @@ module PredeployManager
       mixHash: mix_hash,
       alloc: generate_alloc_for_genesis
     }
+  end
+  
+  def get_timestamp_and_mix_hash(l1_block_number)
+    l1_block_result = l1_rpc_client.get_block(l1_block_number)['result']
+    timestamp = l1_block_result['timestamp'].to_i(16)
+    mix_hash = l1_block_result['mixHash']
+    [timestamp, mix_hash, l1_block_result['timestamp']]
   end
   
   def cancun_timestamp(l1_network_name)
