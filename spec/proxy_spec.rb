@@ -28,6 +28,10 @@ RSpec.describe "Uniswap" do
     Ethscription.new(**hsh.slice(*Ethscription.props.keys))
   }
   
+  before(:each) do
+    allow(LegacyMigrationDataGenerator.instance).to receive(:current_import_block_number).and_return(1)
+  end
+  
   before(:all) do
     GethDriver.setup_rspec_geth
     Singleton.__init__(EthBlockImporter)
