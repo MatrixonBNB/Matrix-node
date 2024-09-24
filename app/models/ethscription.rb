@@ -25,6 +25,10 @@ class Ethscription < T::Struct
     raise
   end
   
+  def contract_initiated?
+    l1_tx_origin != creator
+  end
+  
   def self.from_eth_transactions(eth_transactions)
     eth_transactions.map(&:init_ethscription).compact.flatten
   end

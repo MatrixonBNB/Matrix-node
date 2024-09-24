@@ -32,6 +32,10 @@ contract FacetSwapRouterV099 is Initializable, Upgradeable {
         _initializeUpgradeAdmin(msg.sender);
     }
 
+    function getFactory() public view returns (address) {
+        return s().factory;
+    }
+
     function _addLiquidity(
         address tokenA,
         address tokenB,

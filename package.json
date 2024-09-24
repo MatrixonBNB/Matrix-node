@@ -8,6 +8,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "5.0.2",
     "@openzeppelin/contracts-upgradeable": "5.0.2",
-    "solady": "0.0.232"
+    "forge": "^2.3.0",
+    "solady": "0.0.243"
   }
 }

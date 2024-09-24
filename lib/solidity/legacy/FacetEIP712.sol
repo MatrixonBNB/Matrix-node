@@ -4,10 +4,64 @@ pragma solidity 0.8.24;
 import "solady/src/utils/EIP712.sol";
 import "solady/src/utils/ECDSA.sol";
 import "solady/src/utils/LibString.sol";
+import "solady/src/utils/LibRLP.sol";
 
 abstract contract FacetEIP712 is EIP712 {
+    using LibRLP for LibRLP.List;
+
+    struct FacetEIP712Storage {
+        address legacyContractAddress;
+    }
+    
+    function getFacetEIP712Storage() internal pure returns (FacetEIP712Storage storage fs) {
+        bytes32 position = keccak256("FacetEIP712Storage.contract.storage.v1");
+        assembly {
+            fs.slot := position
+        }
+    }
+    
     using ECDSA for bytes32;
     using LibString for *;
+    
+    function getDeployerNonce() internal view returns (uint256 nonce) {
+        address deployer = msg.sender;
+        address computedAddress;
+        uint256 maxAttempts = 1000;
+        
+        // Iterate until we find the nonce that produces this contract's address
+        while (true) {
+            computedAddress = compAddr(deployer, nonce);
+            
+            if (computedAddress == address(this)) {
+                return nonce;
+            }
+            
+            // Prevent infinite loop in case of an error
+            require(nonce <= maxAttempts, "Nonce not found");
+            
+            nonce++;
+        }
+    }
+    
+    function compAddr(address deployer, uint256 nonce) pure internal returns (address) {
+        return address(uint160(uint256(keccak256(LibRLP.p(deployer).p(nonce).encode()))));
+    }
+    
+    function compAddrLegacy(address deployer, uint256 nonce) pure internal returns (address) {
+        return address(uint160(uint256(keccak256(LibRLP.p(deployer).p(nonce).p('facet').encode()))));
+    }
+    
+    function computeLegacyAddress(address deployer) internal view returns (address) {
+        return compAddrLegacy(deployer, getDeployerNonce());
+    }
+    
+    function _initializeFacetEIP712(address deployer) internal {
+        getFacetEIP712Storage().legacyContractAddress = computeLegacyAddress(deployer);
+    }
+    
+    function getLegacyContractAddress() internal view returns (address) {
+        return getFacetEIP712Storage().legacyContractAddress;
+    }
     
     function verifySignatureAgainstNewAndOldChainId(bytes memory message, bytes memory signature, address signer) internal view {
         uint256 newChainId = block.chainid;
@@ -24,13 +78,15 @@ abstract contract FacetEIP712 is EIP712 {
         
         bool valid = oldTypedDataHash.recover(signature) == signer || newTypedDataHash.recover(signature) == signer;
         
-        require(valid, "FacetEIP712: signature does not match any valid chain id");
+        require(valid, "FacetEIP712: signature does not match any valid chain id, legacy contract address: ".concat(getLegacyContractAddress().toHexString()));
     }
   
     /// @dev Returns the EIP-712 domain separator.
     function _buildDomainSeparator(uint256 chainId) private view returns (bytes32 separator) {
         // We will use `separator` to store the name hash to save a bit of gas.
         bytes32 versionHash;
+        
+        address verifyingAddress = getFacetEIP712Storage().legacyContractAddress;
         
         (string memory name, string memory version) = _domainNameAndVersion();
         separator = keccak256(bytes(name));
@@ -42,7 +98,7 @@ abstract contract FacetEIP712 is EIP712 {
             mstore(add(m, 0x20), separator) // Name hash.
             mstore(add(m, 0x40), versionHash)
             mstore(add(m, 0x60), chainId)
-            mstore(add(m, 0x80), address())
+            mstore(add(m, 0x80), verifyingAddress)
             separator := keccak256(m, 0xa0)
         }
     }

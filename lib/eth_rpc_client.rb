@@ -93,6 +93,13 @@ class EthRpcClient
     )
   end
   
+  def get_code_at_address(address)
+    query_api(
+      method: 'eth_getCode',
+      params: [address, 'latest']
+    )['result']
+  end
+  
   def get_block_number
     query_api(method: 'eth_blockNumber')['result'].to_i(16)
   end

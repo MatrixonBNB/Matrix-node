@@ -39,6 +39,7 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
         s().feeBps = _feeBps;
         _initializeUpgradeAdmin(_upgradeAdmin);
         _initializeOwner(_owner);
+        _initializeFacetEIP712(msg.sender);
         _pause();
     }
 

@@ -6,7 +6,7 @@ class FacetTransaction < ApplicationRecord
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
   
-  attr_accessor :chain_id, :eth_call, :l1_tx_origin, :l1_calldata_gas_used
+  attr_accessor :chain_id, :eth_call, :l1_tx_origin, :l1_calldata_gas_used, :contract_initiated
   
   FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
@@ -43,6 +43,8 @@ class FacetTransaction < ApplicationRecord
     tx.eth_call = EthCall.new(
       call_index: ethscription.transaction_index
     )
+    
+    tx.contract_initiated = ethscription.contract_initiated?
     
     # It has a burn function
     l2_to_l1_message_passer = "0x4200000000000000000000000000000000000016"
@@ -148,6 +150,8 @@ class FacetTransaction < ApplicationRecord
     tx.l1_tx_origin = eth_tx.from_address
     tx.eth_call = eth_call
     
+    tx.contract_initiated = tx.l1_tx_origin != tx.from_address
+    
     payload = [
       eth_tx.block_hash.hex_to_bytes,
       eth_call.transaction_hash.hex_to_bytes,
@@ -217,7 +221,7 @@ class FacetTransaction < ApplicationRecord
     tx_data = []
     tx_data.push(Eth::Util.hex_to_bin(source_hash))
     tx_data.push(Eth::Util.hex_to_bin(l1_tx_origin.to_s))
-    tx_data.push(Eth::Util.hex_to_bin(from_address))
+    tx_data.push(Eth::Util.hex_to_bin(calculated_from_address))
     tx_data.push(Eth::Util.hex_to_bin(to_address.to_s))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(mint))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(value))
@@ -267,6 +271,14 @@ class FacetTransaction < ApplicationRecord
   
   def trace
     GethDriver.trace_transaction(tx_hash)
+  end
+  
+  def calculated_from_address
+    if contract_initiated
+      AddressAliasHelper.apply_l1_to_l2_alias(from_address)
+    else
+      from_address
+    end
   end
   
   def self.clamp_uint(input, max_bits)

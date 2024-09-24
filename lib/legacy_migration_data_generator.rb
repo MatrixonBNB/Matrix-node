@@ -40,7 +40,7 @@ class LegacyMigrationDataGenerator
   end
   
   def import_batch_size
-    [blocks_behind, 100].min
+    [blocks_behind, 50].min
   end
   
   def add_legacy_value_mapping_item(legacy_value:, new_value:)
@@ -501,6 +501,10 @@ class LegacyMigrationDataGenerator
         ]
 
         if (legacy_value != facet_value && !both_blank) && !special_cases.include?(legacy_receipt.transaction_hash)
+          if Ethscription.is_smart_contract_on_l1?(legacy_value) && AddressAliasHelper.apply_l1_to_l2_alias(legacy_value) == facet_value
+            next
+          end
+          
           binding.irb
           raise "#{event_name} attribute mismatch: Legacy #{legacy_attribute} #{legacy_value} does not match Facet #{facet_attribute} #{facet_value}"
         end
