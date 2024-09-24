@@ -90,14 +90,18 @@ class EthBlockImporter
     
     if latest_l2_block_number == 0
       facet_block = FacetBlock.from_rpc_result(latest_l2_block)
-      facet_block.eth_block_number = l1_genesis_block
+      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block)['result'])
+      
+      facet_block.eth_block_number = eth_block.number
+      facet_block.sequence_number = 0
+      facet_block.eth_block_hash = eth_block.block_hash
+      facet_block.eth_block_base_fee_per_gas = eth_block.base_fee_per_gas
+      facet_block.eth_block_timestamp = eth_block.timestamp
       
       facet_block_cache[0] = facet_block
+      eth_block_cache[eth_block.number] = eth_block
       
-      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block)['result'])
-      eth_block_cache[l1_genesis_block] = eth_block
-      
-      return [l1_genesis_block, 0]
+      return [eth_block.number, 0]
     end
     
     l1_attributes = GethDriver.client.get_l1_attributes(latest_l2_block_number)
