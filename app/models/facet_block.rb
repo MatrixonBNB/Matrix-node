@@ -16,6 +16,14 @@ class FacetBlock < ApplicationRecord
     ENV.fetch("V2_FORK_BLOCK").to_i
   end
   
+  def self.in_v2?(block_number)
+    v2_fork_block.blank? || block_number >= v2_fork_block
+  end
+  
+  def self.in_v1?(block_number)
+    !in_v2?(block_number)
+  end
+  
   def assign_l1_attributes(l1_attributes)
     assign_attributes(
       sequence_number: l1_attributes.fetch(:sequence_number),
@@ -99,7 +107,7 @@ class FacetBlock < ApplicationRecord
   end
   memoize :calculated_base_fee_per_gas
   
-  def self.compare_geth_instances(geth_rpc_url, other_rpc_url)
+  def self.compare_geth_instances(other_rpc_url, geth_rpc_url = ENV.fetch('NON_AUTH_GETH_RPC_URL'))
     geth_client = GethClient.new(geth_rpc_url)
     other_client = GethClient.new(other_rpc_url)
 
@@ -167,7 +175,11 @@ class FacetBlock < ApplicationRecord
     other_txs.each_with_index do |tx_hash, index|
       if tx_hash != geth_txs[index]
         puts "Transaction mismatch found at index #{index} in block number #{block_number}: #{tx_hash} != #{geth_txs[index]}"
+        puts "Their tx: "
         ap geth_client.call("eth_getTransactionByHash", [geth_txs[index]])
+        puts "Our tx: "
+        ap other_client.call("eth_getTransactionByHash", [tx_hash])
+        return
       end
     end
   end

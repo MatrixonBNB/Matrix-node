@@ -346,7 +346,7 @@ module EthscriptionEVMConverter
     
     def safe_calculate_to_address(arg)
       mapped = Ethscription.calculate_to_address(arg)
-    rescue EthscriptionEVMConverter::ContractMissing, LegacyValueMapping::NoMappingSource
+    rescue EthscriptionEVMConverter::ContractMissing, LegacyValueMapping::NoMappingSource, KeyError
       arg
     end
     

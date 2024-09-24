@@ -125,15 +125,22 @@ class LegacyMigrationDataGenerator
   
   def get_blocks_promises(block_numbers)
     block_numbers.map do |block_number|
-      promise = Concurrent::Promise.execute do
+      block_promise = Concurrent::Promise.execute do
          ethereum_client.get_block(block_number, true)
       end
       
-      [block_number, promise]
+      receipt_promise = Concurrent::Promise.execute do
+        ethereum_client.get_transaction_receipts(block_number)
+      end
+      
+      [block_number, {
+        block: block_promise,
+        receipts: receipt_promise
+      }.with_indifferent_access]
     end.to_h
   end
   
-  def import_blocks(block_numbers, l1_rpc_responses)
+  def import_blocks(block_numbers, l1_rpc_results)
     unless ENV['FACET_V1_VM_DATABASE_URL'].present?
       raise "FACET_V1_VM_DATABASE_URL is not set"
     end
@@ -146,15 +153,17 @@ class LegacyMigrationDataGenerator
     # Fetch the latest block from the database once
     latest_db_block = EthBlock.order(number: :desc).first
     
-    block_by_number_responses = l1_rpc_responses.select do |block_number, promise|
+    block_responses = l1_rpc_results.select do |block_number, _|
       block_numbers.include?(block_number)
-    end.to_h.transform_values(&:value!)
-    
-    l1_rpc_responses.reject! { |block_number, promise| block_by_number_responses.key?(block_number) }
+    end.to_h.transform_values do |hsh|
+      hsh.transform_values(&:value!)
+    end
+  
+    l1_rpc_results.reject! { |block_number, _| block_responses.key?(block_number) }
     
     # Check for reorg at the start of the batch
     first_block_number = block_numbers.first
-    first_block_data = block_by_number_responses[first_block_number]['result']
+    first_block_data = block_responses[first_block_number]['block']['result']
     
     if latest_db_block
       if first_block_number == latest_db_block.number + 1
@@ -174,9 +183,8 @@ class LegacyMigrationDataGenerator
       end
     end
     
-    legacy_eth_blocks_future, ethscriptions_future, legacy_tx_receipts_future = [
+    legacy_eth_blocks_future, legacy_tx_receipts_future = [
       LegacyEthBlock.where(block_number: block_numbers).load_async,
-      LegacyEthscription.where(block_number: block_numbers).load_async,
       LegacyFacetTransactionReceipt.where(block_number: block_numbers).load_async
     ]
     
@@ -186,25 +194,11 @@ class LegacyMigrationDataGenerator
       raise "Requested blocks have not yet been processed on the V1 VM: #{legacy_eth_blocks.map(&:block_number).join(', ')}"
     end
     
-    # Create a hash mapping transaction hashes to their "from" addresses
-    tx_hash_to_from = {}
-    block_by_number_responses.each do |_, block_data|
-      block_data['result']['transactions'].each do |tx|
-        tx_hash_to_from[tx['hash']] = tx['from']
-      end
-    end
-    
-    ethscriptions = ethscriptions_future.to_a.map do |e|
-      Ethscription.from_legacy_ethscription(e, tx_hash_to_from[e.transaction_hash])
-    end.select(&:valid?)
-    
     legacy_tx_receipts = legacy_tx_receipts_future.to_a
     
-    ethscriptions_by_block = ethscriptions.group_by(&:block_number)
     legacy_tx_receipts_by_block = legacy_tx_receipts.group_by(&:block_number)
     
     eth_blocks = []
-    eth_transactions = []
     all_ethscriptions = []
     facet_blocks = []
     all_facet_txs = []
@@ -228,14 +222,24 @@ class LegacyMigrationDataGenerator
           old_current_import_block_number = current_import_block_number
           @current_import_block_number = block_number
           
-          eth_block = EthBlock.from_rpc_result(block_by_number_responses[block_number]['result'])
+          block_response = block_responses[block_number]
+      
+          block_result = block_response['block']['result']
+          receipt_result = block_response['receipts']['result']
+                    
+          eth_block = EthBlock.from_rpc_result(block_result)
+          facet_block = FacetBlock.from_eth_block(eth_block)
 
           eth_blocks << eth_block
           
-          block_ethscriptions = Array.wrap(ethscriptions_by_block[block_number]).sort_by(&:transaction_index)
           block_legacy_tx_receipts = Array.wrap(legacy_tx_receipts_by_block[block_number]).sort_by(&:transaction_index)
           
-          eth_transactions.concat(block_ethscriptions.map { |e| EthTransaction.from_ethscription(e) })
+          facet_txs = EthTransaction.facet_txs_from_rpc_results(block_result, receipt_result)
+          
+          facet_txs.each do |facet_tx|
+            facet_tx.facet_block = facet_block
+            facet_tx.assign_gas_limit_from_tx_count_in_block(facet_txs.count)
+          end
           
           block_number = current_max_block_number + index + 1
           
@@ -245,13 +249,12 @@ class LegacyMigrationDataGenerator
           finalized_block = in_memory_blocks[block_number - 64] || earliest
           
           imported_facet_blocks, facet_txs, receipts = propose_facet_block(
-            eth_block,
-            block_ethscriptions,
-            block_legacy_tx_receipts,
-            block_number: block_number,
+            facet_block: facet_block,
+            facet_txs: facet_txs,
             head_block: head_block,
             safe_block: safe_block,
-            finalized_block: finalized_block
+            finalized_block: finalized_block,
+            legacy_tx_receipts: block_legacy_tx_receipts
           )
           
           imported_facet_blocks.each do |facet_block|
@@ -265,12 +268,16 @@ class LegacyMigrationDataGenerator
           imported_facet_transaction_receipts.concat(receipts)
           imported_facet_transactions.concat(facet_txs)
 
-          receipts.each(&:set_legacy_contract_address_map)
-          receipts.each(&:update_real_withdrawal_id)
+          receipts.each do |receipt|
+            receipt.set_legacy_contract_address_map
+            receipt.update_real_withdrawal_id
+          end
           
           validate_receipts(block_legacy_tx_receipts, receipts, facet_txs) if validate_import?
           
-          block_ethscriptions.each(&:clear_caches_if_upgrade!)
+          facet_txs.each do |facet_tx|
+            facet_tx.ethscription.clear_caches_if_upgrade!
+          end
           
           res << OpenStruct.new(
             facet_block: imported_facet_blocks.first,
@@ -283,7 +290,6 @@ class LegacyMigrationDataGenerator
       end
       
       EthBlock.import!(eth_blocks)
-      EthTransaction.import!(eth_transactions)
       
       FacetBlock.import!(facet_blocks)
       FacetTransaction.import!(all_facet_txs)
@@ -543,29 +549,15 @@ class LegacyMigrationDataGenerator
     
     (start_block...(start_block + n)).to_a
   end
-
-  def facet_txs_from_ethscriptions_in_block(ethscriptions, facet_block)
-    facet_txs = ethscriptions.sort_by(&:transaction_index).map do |ethscription|
-      ethscription.clear_caches_if_upgrade!
-      
-      FacetTransaction.from_eth_tx_and_ethscription(
-        ethscription,
-        ethscriptions.count,
-        facet_block
-      )
-    end
-    
-    facet_txs
-  end
   
-  def propose_facet_block(eth_block, ethscriptions, legacy_tx_receipts, block_number:, head_block:, safe_block:, finalized_block:)
-    facet_block = FacetBlock.from_eth_block(eth_block)
-    
-    facet_txs = facet_txs_from_ethscriptions_in_block(
-      ethscriptions,
-      facet_block
-    )
-    
+  def propose_facet_block(
+    facet_block:,
+    facet_txs:,
+    head_block:,
+    safe_block:,
+    finalized_block:,
+    legacy_tx_receipts:
+  )
     imported_facet_blocks = geth_driver.propose_block(
       transactions: facet_txs,
       new_facet_block: facet_block,
@@ -590,22 +582,6 @@ class LegacyMigrationDataGenerator
       
       geth_block['transactions'].each do |tx|
         if tx['from'] == '0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001' && tx['transactionIndex'] == '0x0'
-          facet_txs.unshift(FacetTransaction.new(
-            from_address: tx['from'],
-            to_address: tx['to'],
-            value: tx['value'].to_i(16),
-            gas_limit: tx['gas'].to_i(16),
-            input: tx['input'],
-            block_hash: tx['blockHash'],
-            block_number: tx['blockNumber'].to_i(16),
-            transaction_index: tx['transactionIndex'].to_i(16),
-            deposit_receipt_version: tx['depositReceiptVersion'].to_i(16),
-            source_hash: tx['sourceHash'],
-            tx_type: tx['type'],
-            tx_hash: tx['hash'],
-            mint: tx['mint']
-          ))
-          
           next
         end
         

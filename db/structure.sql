@@ -187,63 +187,6 @@ ALTER SEQUENCE public.eth_calls_id_seq OWNED BY public.eth_calls.id;
 
 
 --
--- Name: eth_transactions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.eth_transactions (
-    id bigint NOT NULL,
-    block_hash character varying NOT NULL,
-    block_number bigint NOT NULL,
-    tx_hash character varying NOT NULL,
-    y_parity integer,
-    access_list jsonb,
-    transaction_index integer,
-    tx_type integer,
-    nonce integer,
-    input text,
-    r character varying,
-    s character varying,
-    chain_id integer,
-    v integer,
-    gas bigint,
-    max_priority_fee_per_gas numeric(78,0),
-    from_address character varying,
-    to_address character varying,
-    max_fee_per_gas numeric(78,0),
-    value numeric(78,0) DEFAULT 0.0 NOT NULL,
-    gas_price numeric(78,0),
-    gas_used bigint,
-    status integer,
-    logs jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT chk_rails_33391faf33 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
-    CONSTRAINT chk_rails_37ed5d6017 CHECK (((to_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
-    CONSTRAINT chk_rails_a4d3f41974 CHECK (((from_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
-    CONSTRAINT chk_rails_c0881feb4c CHECK (((tx_hash)::text ~ '^0x[a-f0-9]{64}$'::text))
-);
-
-
---
--- Name: eth_transactions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.eth_transactions_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: eth_transactions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.eth_transactions_id_seq OWNED BY public.eth_transactions.id;
-
-
---
 -- Name: facet_blocks; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -457,13 +400,6 @@ ALTER TABLE ONLY public.eth_calls ALTER COLUMN id SET DEFAULT nextval('public.et
 
 
 --
--- Name: eth_transactions id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.eth_transactions ALTER COLUMN id SET DEFAULT nextval('public.eth_transactions_id_seq'::regclass);
-
-
---
 -- Name: facet_blocks id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -513,14 +449,6 @@ ALTER TABLE ONLY public.eth_blocks
 
 ALTER TABLE ONLY public.eth_calls
     ADD CONSTRAINT eth_calls_pkey PRIMARY KEY (id);
-
-
---
--- Name: eth_transactions eth_transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.eth_transactions
-    ADD CONSTRAINT eth_transactions_pkey PRIMARY KEY (id);
 
 
 --
@@ -624,27 +552,6 @@ CREATE INDEX index_eth_calls_on_block_number ON public.eth_calls USING btree (bl
 --
 
 CREATE INDEX index_eth_calls_on_transaction_hash ON public.eth_calls USING btree (transaction_hash);
-
-
---
--- Name: index_eth_transactions_on_block_hash; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_eth_transactions_on_block_hash ON public.eth_transactions USING btree (block_hash);
-
-
---
--- Name: index_eth_transactions_on_block_number; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_eth_transactions_on_block_number ON public.eth_transactions USING btree (block_number);
-
-
---
--- Name: index_eth_transactions_on_tx_hash; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_eth_transactions_on_tx_hash ON public.eth_transactions USING btree (tx_hash);
 
 
 --
@@ -760,14 +667,6 @@ CREATE TRIGGER trigger_check_legacy_value_conflict BEFORE INSERT OR UPDATE ON pu
 
 
 --
--- Name: eth_calls fk_rails_2bd24c7340; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.eth_calls
-    ADD CONSTRAINT fk_rails_2bd24c7340 FOREIGN KEY (transaction_hash) REFERENCES public.eth_transactions(tx_hash) ON DELETE CASCADE;
-
-
---
 -- Name: facet_blocks fk_rails_31974ea46f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -800,14 +699,6 @@ ALTER TABLE ONLY public.eth_calls
 
 
 --
--- Name: eth_transactions fk_rails_db1761e6d4; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.eth_transactions
-    ADD CONSTRAINT fk_rails_db1761e6d4 FOREIGN KEY (block_hash) REFERENCES public.eth_blocks(block_hash) ON DELETE CASCADE;
-
-
---
 -- Name: facet_transaction_receipts fk_rails_ed7d5973ff; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -828,6 +719,5 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20240627143934'),
 ('20240627143407'),
 ('20240627143108'),
-('20240627142725'),
 ('20240627142124');
 

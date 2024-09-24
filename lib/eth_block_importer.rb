@@ -3,10 +3,9 @@ class EthBlockImporter
   include Memery
   
   class BlockNotReadyToImportError < StandardError; end
-  class TraceTimeoutError < StandardError; end
   
   attr_accessor :l1_rpc_results, :facet_block_cache, :ethereum_client, :eth_block_cache
-  delegate :l1_genesis_block, :v2_fork_block, to: :FacetBlock
+  delegate :l1_genesis_block, :v2_fork_block, :in_v2?, :in_v1?, to: :FacetBlock
   
   def initialize
     @l1_rpc_results = {}
@@ -60,14 +59,6 @@ class EthBlockImporter
   
   def logger
     Rails.logger
-  end
-  
-  def in_v2?(block_number)
-    v2_fork_block.blank? || block_number >= v2_fork_block
-  end
-  
-  def in_v1?(block_number)
-    !in_v2?(block_number)
   end
   
   def blocks_behind
@@ -192,27 +183,13 @@ class EthBlockImporter
          ethereum_client.get_block(block_number, true)
       end
       
-      if block_numbers.any? { |block_number| in_v2?(block_number) }
-        trace_promise = Concurrent::Promise.execute do
-          ethereum_client.debug_trace_block_by_number(block_number)
-        end
+      receipt_promise = Concurrent::Promise.execute do
+        ethereum_client.get_transaction_receipts(block_number)
       end
-      
-      if block_numbers.any? { |block_number| in_v1?(block_number) }
-        receipt_promise = Concurrent::Promise.execute do
-          ethereum_client.get_transaction_receipts(
-            block_number,
-            blocks_behind: 1_000
-          )
-        end
-      end
-      
-      empty_promise = Concurrent::Promise.execute { {} }
       
       [block_number, {
         block: block_promise,
-        trace: trace_promise || empty_promise,
-        receipts: receipt_promise || empty_promise
+        receipts: receipt_promise
       }.with_indifferent_access]
     end.to_h
   end
@@ -298,7 +275,6 @@ class EthBlockImporter
       block_response = block_responses[block_number]
       
       block_result = block_response['block']['result']
-      trace_result = block_response['trace']['result']
       receipt_result = block_response['receipts']['result']
       
       parent_eth_block = eth_block_cache[block_number - 1]
@@ -315,16 +291,21 @@ class EthBlockImporter
       
       eth_block = EthBlock.from_rpc_result(block_result)
 
-      new_eth_transactions = EthTransaction.from_rpc_result(block_result, receipt_result)
-              
-      if trace_result
-        new_eth_calls = EthCall.from_trace_result(trace_result, eth_block)
+      facet_block = FacetBlock.from_eth_block(eth_block)
+      
+      facet_txs = EthTransaction.facet_txs_from_rpc_results(block_result, receipt_result)
+      
+      facet_txs.each do |facet_tx|
+        facet_tx.facet_block = facet_block
+        
+        if in_v1?(eth_block.number)
+          facet_tx.assign_gas_limit_from_tx_count_in_block(facet_txs.count)
+        end
       end
-
+      
       imported_facet_blocks = propose_facet_block(
-        eth_block,
-        eth_calls: new_eth_calls,
-        eth_transactions: new_eth_transactions
+        facet_block: facet_block,
+        facet_txs: facet_txs
       )
       
       imported_facet_blocks.each do |facet_block|
@@ -364,22 +345,6 @@ class EthBlockImporter
     [facet_blocks, eth_blocks]
   end
   
-  def validate_ready_to_import!(block_by_number_response, trace_response)
-    if trace_response.dig('error', 'code') == -32000
-      raise TraceTimeoutError, "Trace timed out on block #{block_by_number_response.dig('result', 'number').inspect}"
-    end
-    
-    is_ready = block_by_number_response.present? &&
-      block_by_number_response.dig('result', 'hash').present? &&
-      trace_response.present? &&
-      trace_response.dig('error', 'code') != -32600 &&
-      trace_response.dig('error', 'message') != "Block being processed - please try again later"
-    
-    unless is_ready
-      raise BlockNotReadyToImportError.new("Block not ready")
-    end
-  end
-  
   def import_next_block
     block_number = next_block_to_import
     
@@ -400,39 +365,7 @@ class EthBlockImporter
     (start_block...(start_block + n)).to_a
   end
   
-  def facet_txs_from_ethscriptions_in_block(ethscriptions, facet_block)
-    facet_txs = ethscriptions.sort_by(&:transaction_index).map do |ethscription|
-      ethscription.clear_caches_if_upgrade!
-      
-      FacetTransaction.from_eth_tx_and_ethscription(
-        ethscription,
-        ethscriptions.count,
-        facet_block
-      )
-    end
-    
-    facet_txs
-  end
-  
-  def propose_facet_block(eth_block, eth_calls: nil, eth_transactions:)
-    facet_block = FacetBlock.from_eth_block(eth_block)
-    
-    facet_txs = if in_v2?(eth_block.number)
-      FacetTransaction.from_eth_transactions_in_block(
-        eth_block,
-        eth_transactions,
-        eth_calls,
-        facet_block
-      )
-    else
-      ethscriptions = Ethscription.from_eth_transactions(eth_transactions)
-      
-      facet_txs_from_ethscriptions_in_block(
-        ethscriptions,
-        facet_block
-      )
-    end
-    
+  def propose_facet_block(facet_block:, facet_txs:)
     geth_driver.propose_block(
       transactions: facet_txs,
       new_facet_block: facet_block,

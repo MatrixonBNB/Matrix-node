@@ -4,9 +4,8 @@ class FacetTransaction < ApplicationRecord
   
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
-  belongs_to :eth_transaction, primary_key: :tx_hash, foreign_key: :eth_transaction_hash, optional: true
   
-  attr_accessor :chain_id, :eth_call, :l1_tx_origin, :l1_calldata_gas_used, :contract_initiated
+  attr_accessor :chain_id, :l1_tx_origin, :l1_calldata_gas_used, :contract_initiated, :ethscription
   
   FACET_TX_TYPE = 70
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
@@ -25,24 +24,16 @@ class FacetTransaction < ApplicationRecord
     gas_limit <= PER_TX_GAS_LIMIT
   end
   
-  def self.from_eth_tx_and_ethscription(
-    ethscription,
-    tx_count_in_block,
-    facet_block
-  )
+  def self.from_ethscription(ethscription)
     tx = new
-    tx.facet_block = facet_block
+    tx.ethscription = ethscription
     tx.chain_id = ChainIdManager.current_l2_chain_id
     tx.to_address = ethscription.facet_tx_to
     tx.value = 0
     tx.input = ethscription.facet_tx_input
     
     tx.eth_transaction_hash = ethscription.transaction_hash
-    tx.eth_call_index = ethscription.transaction_index
     tx.from_address = ethscription.creator
-    tx.eth_call = EthCall.new(
-      call_index: ethscription.transaction_index
-    )
     
     tx.contract_initiated = ethscription.contract_initiated?
     
@@ -64,44 +55,34 @@ class FacetTransaction < ApplicationRecord
     # It gets set automatically later
     tx.max_fee_per_gas = 0
     
-    block_gas_limit = FacetBlock::GAS_LIMIT
-    tx.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
-
     tx
   end
   
-  def self.calculate_calldata_cost(hex_string)
+  def assign_gas_limit_from_tx_count_in_block(tx_count_in_block)
+    block_gas_limit = FacetBlock::GAS_LIMIT
+    self.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
+  end
+  
+  def self.calculate_calldata_cost(hex_string, contract_initiated:)
     bytes = hex_string.hex_to_bytes
     zero_count = bytes.count("\x00")
     non_zero_count = bytes.bytesize - zero_count
     
-    zero_count * 4 + non_zero_count * 16
+    if contract_initiated
+      bytes.bytesize * 8
+    else
+      zero_count * 4 + non_zero_count * 16
+    end
   end
   
-  def self.from_eth_transactions_in_block(eth_block, eth_transactions, eth_calls, facet_block)
-    facet_txs = eth_calls.map do |call|
-      next unless call.to_address == FACET_INBOX_ADDRESS
-      next if call.error.present?
-      
-      eth_tx = eth_transactions.detect { |tx| tx.tx_hash == call.transaction_hash }
-      
-      facet_tx = FacetTransaction.from_eth_call_and_tx(call, eth_tx)
-      
-      facet_tx&.l1_calldata_gas_used = calculate_calldata_cost(call.input)
-      
-      facet_tx&.facet_block = facet_block
-      
-      facet_tx
-    end.flatten.compact
-    
-    facet_txs
-  end
-  
-  def self.from_eth_call_and_tx(eth_call, eth_tx)
-    return unless eth_call.to_address == FACET_INBOX_ADDRESS
-    return if eth_call.error.present?
-    
-    hex = eth_call.input
+  def self.from_payload(
+    l1_tx_origin:,
+    from_address:,
+    input:,
+    tx_hash:,
+    block_hash:
+  )
+    hex = input
     
     hex = Eth::Util.remove_hex_prefix hex
     type = hex[0, 2]
@@ -143,19 +124,21 @@ class FacetTransaction < ApplicationRecord
       raise TxOutsideGasLimit, "Transaction outside gas limit!"
     end
     
-    tx.eth_transaction = eth_tx
-    tx.eth_transaction_hash = eth_call.transaction_hash
-    tx.eth_call_index = eth_call.call_index
-    tx.from_address = eth_call.from_address
-    tx.l1_tx_origin = eth_tx.from_address
-    tx.eth_call = eth_call
+    tx.eth_transaction_hash = tx_hash
+    tx.from_address = from_address
+    tx.l1_tx_origin = l1_tx_origin
     
     tx.contract_initiated = tx.l1_tx_origin != tx.from_address
     
+    tx.l1_calldata_gas_used = calculate_calldata_cost(
+      input,
+      contract_initiated: tx.contract_initiated
+    )
+    
     payload = [
-      eth_tx.block_hash.hex_to_bytes,
-      eth_call.transaction_hash.hex_to_bytes,
-      eth_call.order_in_tx.zpad(32)
+      block_hash.hex_to_bytes,
+      tx_hash.hex_to_bytes,
+      0.zpad(32)
     ].join
     
     tx.source_hash = FacetTransaction.compute_source_hash(
