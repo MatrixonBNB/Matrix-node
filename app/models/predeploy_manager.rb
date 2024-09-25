@@ -31,9 +31,7 @@ module PredeployManager
       end
     end 
     
-    map["0x00000000000000000000000000000000000000c5"] = "NonExistentContractShim"
-    map["0x4200000000000000000000000000000000000015"] = "L1Block"
-    map["0x4200000000000000000000000000000000000016"] = "L2ToL1MessagePasser"
+    map["0x11110000000000000000000000000000000000c5"] = "NonExistentContractShim"
     
     map
   end
@@ -97,18 +95,29 @@ module PredeployManager
 
     hex_result = result.zpad(32).bytes_to_hex
     
-    predeploy_to_local_map.map do |address, alloc|
+    our_allocs = predeploy_to_local_map.map do |address, alloc|
       [
         address,
         {
           "code" => "0x" + get_code(address),
-          "balance" => 0,
+          "balance" => "0x0",
+          "nonce" => "0x1",
           "storage" => {
             initializable_slot => hex_result
           }
         }
       ]
     end.to_h
+    
+    optimism_file = Rails.root.join('config', 'facet-optimism-genesis-allocs.json')
+    optimism_allocs = JSON.parse(File.read(optimism_file))
+    
+    duplicates = our_allocs.keys & optimism_allocs.keys
+    if duplicates.any?
+      raise KeyError, "Duplicate keys found: #{duplicates.join(', ')}"
+    end
+    
+    optimism_allocs.merge(our_allocs)
   end
   
   def generate_predeploy_info_json
