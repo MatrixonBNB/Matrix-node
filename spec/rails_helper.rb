@@ -45,11 +45,11 @@ RSpec.configure do |config|
   config.fail_fast = true
   
   config.before(:suite) do
-    GethDriver.setup_rspec_geth
+    GethTestHelper.setup_rspec_geth
   end
 
   config.after(:suite) do
-    GethDriver.teardown_rspec_geth
+    GethTestHelper.teardown_rspec_geth
   end
   
   # You can uncomment this line to turn off ActiveRecord support entirely.
