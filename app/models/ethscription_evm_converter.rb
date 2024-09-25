@@ -547,10 +547,39 @@ module EthscriptionEVMConverter
         return false
       end
       
-      puts "is_smart_contract_on_l1? #{address}"
+      known_l1_contracts = [
+        "0xd729345aa12c5af2121d96f87b673987f354496b",
+        "0x03f84c2b50442332802b7ca8dbbefad1633f2547",
+        "0xee752cb3e8bf9e01f721113e26baecdf429efa8d",
+        "0xb2b01decb6cd36e7396b78d3744482627f22c525",
+        "0xb3b1e568a70bc315e7b448affa4c3ab437bbe9bc",
+        "0xd729a94d6366a4feac4a6869c8b3573cee4701a9",
+        "0x720ea6e5fb47d69744559063b4a3adcd903932b6",
+        "0xafd1c394f054ef0845e64429aaaf8c6ca8f51306",
+        "0x91dc93cd8336d30a4679b1d29c9592c117a896fd",
+        "0x061eaf68b2069ed7708af1893f4499960a0156c5",
+        "0xb01278c0fc86d1cd4de513ca03bf7dacc2dbd1a4",
+        "0x342979c2edad4fe8dc3fff12d429b0b608c1699c",
+        "0xbc77ce4b8465dc6ed1fe4930c5c63ff8e8d45fc9"
+      ]
+      
+      if known_l1_contracts.include?(address)
+        return true
+      end
       
       block = LegacyMigrationDataGenerator.instance.current_import_block_number
-      LegacyMigrationDataGenerator.instance.ethereum_client.get_code_at_address(address, block) != "0x"
+      
+      if block < 19000649
+        return false
+      end
+      
+      is_smart_contract = LegacyMigrationDataGenerator.instance.ethereum_client.get_code_at_address(address, block) != "0x"
+      
+      if is_smart_contract
+        L1SmartContract.create_with(block_number: block).find_or_create_by!(address: address)
+      end
+      
+      is_smart_contract
     end
     memoize :is_smart_contract_on_l1?
     

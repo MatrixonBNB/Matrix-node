@@ -344,6 +344,39 @@ ALTER SEQUENCE public.facet_transactions_id_seq OWNED BY public.facet_transactio
 
 
 --
+-- Name: l1_smart_contracts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.l1_smart_contracts (
+    id bigint NOT NULL,
+    address character varying NOT NULL,
+    block_number bigint NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT chk_rails_ef594e2006 CHECK (((address)::text ~ '^0x[0-9a-f]{40}$'::text))
+);
+
+
+--
+-- Name: l1_smart_contracts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.l1_smart_contracts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: l1_smart_contracts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.l1_smart_contracts_id_seq OWNED BY public.l1_smart_contracts.id;
+
+
+--
 -- Name: legacy_value_mappings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -421,6 +454,13 @@ ALTER TABLE ONLY public.facet_transactions ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
+-- Name: l1_smart_contracts id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.l1_smart_contracts ALTER COLUMN id SET DEFAULT nextval('public.l1_smart_contracts_id_seq'::regclass);
+
+
+--
 -- Name: legacy_value_mappings id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -473,6 +513,14 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 
 ALTER TABLE ONLY public.facet_transactions
     ADD CONSTRAINT facet_transactions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: l1_smart_contracts l1_smart_contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.l1_smart_contracts
+    ADD CONSTRAINT l1_smart_contracts_pkey PRIMARY KEY (id);
 
 
 --
@@ -639,6 +687,13 @@ CREATE UNIQUE INDEX index_facet_transactions_on_tx_hash ON public.facet_transact
 
 
 --
+-- Name: index_l1_smart_contracts_on_address; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_l1_smart_contracts_on_address ON public.l1_smart_contracts USING btree (address);
+
+
+--
 -- Name: index_legacy_value_mappings_on_legacy_value; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -713,6 +768,7 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20240924215928'),
 ('20240905151756'),
 ('20240813133726'),
 ('20240628125033'),

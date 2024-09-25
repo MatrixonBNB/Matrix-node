@@ -59,7 +59,7 @@ abstract contract FacetEIP712 is EIP712 {
         getFacetEIP712Storage().legacyContractAddress = computeLegacyAddress(deployer);
     }
     
-    function getLegacyContractAddress() internal view returns (address) {
+    function getLegacyContractAddress() public view returns (address) {
         return getFacetEIP712Storage().legacyContractAddress;
     }
     
@@ -87,6 +87,10 @@ abstract contract FacetEIP712 is EIP712 {
         bytes32 versionHash;
         
         address verifyingAddress = getFacetEIP712Storage().legacyContractAddress;
+        
+        if (address(this) == 0xd5533CDC7948827dfE2b36B1aB759e9384e2FC85) {
+            verifyingAddress = 0xC59DEC74518c6C86B90107C3644ac9dAcA149e70;
+        }
         
         (string memory name, string memory version) = _domainNameAndVersion();
         separator = keccak256(bytes(name));
