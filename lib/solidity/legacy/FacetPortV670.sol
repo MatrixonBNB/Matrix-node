@@ -39,7 +39,6 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
         s().feeBps = _feeBps;
         _initializeUpgradeAdmin(_upgradeAdmin);
         _initializeOwner(_owner);
-        _initializeFacetEIP712(msg.sender);
         _pause();
     }
 
@@ -133,12 +132,12 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
             keccak256(bytes(offerType)),
             offerId,
             offerer,
-            assetContract,
+            LegacyAddressable(assetContract).getLegacyContractAddress(),
             assetId,
             keccak256(bytes(assetType)),
             assetAmount,
             considerationToken,
-            considerationAmount,
+            LegacyAddressable(considerationToken).getLegacyContractAddress(),
             startTime,
             endTime
         );

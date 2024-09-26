@@ -121,7 +121,6 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
         _initializeOwner(owner);
         _initializePausable(true);
         _initializeUpgradeAdmin(msg.sender);
-        _initializeFacetEIP712(msg.sender);
         s().WETH = _WETH;
         s().usdWeiCentsInOneEth = usdWeiCentsInOneEth;
         s().charCountToUsdWeiCentsPrice = charCountToUsdWeiCentsPrice;
