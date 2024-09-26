@@ -157,9 +157,7 @@ class FacetTransaction < ApplicationRecord
       number: facet_block.eth_block_number,
       base_fee: facet_block.eth_block_base_fee_per_gas,
       hash: facet_block.eth_block_hash,
-      sequence_number: facet_block.sequence_number,
-      fct_minted_per_gas: facet_block.fct_mint_per_gas,
-      total_fct_minted: facet_block.total_fct_minted,
+      sequence_number: facet_block.sequence_number
     )
     
     tx = new
