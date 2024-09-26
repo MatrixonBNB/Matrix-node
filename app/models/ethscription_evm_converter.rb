@@ -27,7 +27,7 @@ module EthscriptionEVMConverter
     return if parsed_content['op'] == 'create'
     calculate_to_address(parsed_content['data']['to'])
   rescue ContractMissing => e
-    shim_val = "0x00000000000000000000000000000000000000c5"
+    shim_val = "0x11110000000000000000000000000000000000c5"
     
     LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
       legacy_value: parsed_content['data']['to'],
@@ -468,7 +468,7 @@ module EthscriptionEVMConverter
     def lookup_new_value(legacy_value)
       new_value = LegacyValueMapping.lookup(legacy_value)
       
-      if new_value == "0x00000000000000000000000000000000000000c5"
+      if new_value == "0x11110000000000000000000000000000000000c5"
         raise ContractMissing, "Contract #{legacy_value} not found"
       end
       
