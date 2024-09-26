@@ -40,7 +40,7 @@ class LegacyMigrationDataGenerator
   end
   
   def import_batch_size
-    [blocks_behind, 50].min
+    [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
   end
   
   def add_legacy_value_mapping_item(legacy_value:, new_value:)
@@ -508,6 +508,21 @@ class LegacyMigrationDataGenerator
 
         if (legacy_value != facet_value && !both_blank) && !special_cases.include?(legacy_receipt.transaction_hash)
           if Ethscription.is_smart_contract_on_l1?(legacy_value) && AddressAliasHelper.apply_l1_to_l2_alias(legacy_value) == facet_value
+            next
+          end
+          
+          if facet_value.match?(/\A0x[0-9a-f]{40}\z/)
+            puts "Checking legacy address for #{facet_value}"
+            
+            legacy_address = TransactionHelper.static_call(
+              contract: PredeployManager.get_contract_from_predeploy_info(name: "FacetPortVee3"),
+              address: facet_value,
+              function: 'getLegacyContractAddress',
+              args: []
+            )
+          end
+          
+          if legacy_address == legacy_value
             next
           end
           

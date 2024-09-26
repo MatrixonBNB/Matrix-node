@@ -40,7 +40,6 @@ contract FacetPortVee3 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
         s().feeBps = _feeBps;
         _initializeUpgradeAdmin(_upgradeAdmin);
         _initializeOwner(_owner);
-        _initializeFacetEIP712(msg.sender);
         _pause();
     }
 
@@ -130,11 +129,11 @@ contract FacetPortVee3 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
             keccak256(bytes(offerType)),
             offerId,
             offerer,
-            assetContract,
+            LegacyAddressable(assetContract).getLegacyContractAddress(),
             assetId,
             keccak256(bytes(assetType)),
             assetAmount,
-            considerationToken,
+            LegacyAddressable(considerationToken).getLegacyContractAddress(),
             considerationAmount,
             startTime,
             endTime
