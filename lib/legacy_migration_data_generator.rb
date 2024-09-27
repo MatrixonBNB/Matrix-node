@@ -515,7 +515,7 @@ class LegacyMigrationDataGenerator
             puts "Checking legacy address for #{facet_value}"
             
             legacy_address = TransactionHelper.static_call(
-              contract: PredeployManager.get_contract_from_predeploy_info(name: "FacetPortVee3"),
+              contract: PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy"),
               address: facet_value,
               function: 'getLegacyContractAddress',
               args: []
