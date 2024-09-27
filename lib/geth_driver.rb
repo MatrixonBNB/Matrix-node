@@ -117,7 +117,7 @@ module GethDriver
       withdrawals: [],
       noTxPool: true,
       transactions: transaction_payloads,
-      gasLimit: "0x" + FacetBlock::GAS_LIMIT.to_s(16),
+      gasLimit: "0x" + SysConfig::L2_BLOCK_GAS_LIMIT.to_s(16),
     }
     
     if new_facet_block.parent_beacon_block_root

@@ -4,6 +4,14 @@ class EthRpcClient
   def initialize(base_url: ENV['L1_RPC_URL'])
     self.base_url = base_url
   end
+  
+  def self.l1
+    @_l1_client ||= new(base_url: ENV.fetch('L1_RPC_URL'))
+  end
+
+  def self.l2
+    @_l2_client ||= new(base_url: ENV.fetch('NON_AUTH_GETH_RPC_URL'))
+  end
 
   def get_block(block_number, include_txs = false)
     if block_number.is_a?(String)
@@ -20,7 +28,7 @@ class EthRpcClient
   end
   
   def get_chain_id
-    query_api(method: 'eth_chainId')['result'].to_i(16)
+    query_api(method: 'eth_chainId').to_i(16)
   end
   
   def debug_trace_block_by_number(block_number)
@@ -37,6 +45,10 @@ class EthRpcClient
     )
   end
 
+  def trace(tx_hash)
+    debug_trace_transaction(tx_hash)
+  end
+  
   def get_transaction(transaction_hash)
     query_api(
       method: 'eth_getTransactionByHash',
@@ -45,6 +57,13 @@ class EthRpcClient
   end
   
   def get_transaction_receipts(block_number)
+    if block_number.is_a?(String)
+      return query_api(
+        method: 'eth_getBlockReceipts',
+        params: [block_number]
+      )
+    end
+    
     query_api(
       method: 'eth_getBlockReceipts',
       params: ["0x" + block_number.to_s(16)]
@@ -66,11 +85,11 @@ class EthRpcClient
     query_api(
       method: 'eth_getCode',
       params: [address, block_number]
-    )['result']
+    )
   end
   
   def get_block_number
-    query_api(method: 'eth_blockNumber')['result'].to_i(16)
+    query_api(method: 'eth_blockNumber').to_i(16)
   end
 
   def query_api(method = nil, params = [], **kwargs)
@@ -106,7 +125,7 @@ class EthRpcClient
         raise "API error: #{parsed_response['error']['message']}"
       end
 
-      parsed_response
+      parsed_response['result']
     rescue StandardError => e
       puts "Retrying #{retries} more times (last error: #{e.message.inspect})"
       

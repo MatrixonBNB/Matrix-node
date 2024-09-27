@@ -18,11 +18,8 @@ RSpec.describe "Reverts" do
       from_address: from_address
     )
     
-    res.receipts_imported.first.contract_address
+    res.contract_address
   }
-  
-  # TODO: test constructor reverting
-  # TODO: test invalid opcode
   
   it do
     airdrop_address = deploy_contract_with_proxy(
@@ -83,6 +80,19 @@ RSpec.describe "Reverts" do
     )
   end
   
+  it 'reverts immediately in constructor' do
+    counter_contract = EVMHelpers.compile_contract('contracts/ImmediateRevert')
+  
+    facet_data = EVMHelpers.get_deploy_data(counter_contract, [])
+              
+    res = create_and_import_block(
+      facet_data: facet_data,
+      to_address: nil,
+      from_address: from_address,
+      expect_failure: true
+    )
+  end
+  
   it 'calls with wrong args' do
     data = TransactionHelper.get_function_calldata(
       contract: counter_contract,
@@ -120,7 +130,7 @@ RSpec.describe "Reverts" do
   end
   
   it 'hits the block gas limit' do
-    limit = FacetBlock::GAS_LIMIT
+    limit = SysConfig::L2_BLOCK_GAS_LIMIT
     over_limit = limit + 1
     
     call_contract_function(
@@ -163,6 +173,15 @@ RSpec.describe "Reverts" do
       from_address: from_address,
       value: from_address_balance + 1000.ether,
       eth_gas_used: 0,
+      expect_failure: true
+    )
+  end
+  
+  it 'tries and invalid opcode' do
+    create_and_import_block(
+      facet_data: "0xaaaa",
+      to_address: nil,
+      from_address: from_address,
       expect_failure: true
     )
   end

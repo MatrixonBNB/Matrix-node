@@ -16,14 +16,14 @@ RSpec.describe "Bridge contracts" do
       args: [
         "Bridge Tester",
         "BT",
-        trusted_smart_contract
+        alias_addr(trusted_smart_contract)
       ]
     )
-
+    
     bridge_in_receipt = trigger_contract_interaction_and_expect_success(
-      from: trusted_smart_contract,
+      from: alias_addr(trusted_smart_contract),
       payload: {
-        to: bridge_deploy_receipt.contract_address,
+        to: bridge_deploy_receipt.contractAddress,
         data: {
           function: "bridgeIn",
           args: [from_address, 500]
@@ -46,7 +46,7 @@ RSpec.describe "Bridge contracts" do
       detect{|i| i['event'] == 'InitiateWithdrawal'}['data']['withdrawalId']
     
     trigger_contract_interaction_and_expect_success(
-      from: trusted_smart_contract,
+      from: alias_addr(trusted_smart_contract),
       payload: {
         to: bridge_deploy_receipt.contract_address,
         data: {

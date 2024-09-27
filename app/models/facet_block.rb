@@ -5,24 +5,7 @@ class FacetBlock < ApplicationRecord
   has_many :facet_transactions, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   has_many :facet_transaction_receipts, primary_key: :block_hash, foreign_key: :block_hash, dependent: :destroy
   
-  GAS_LIMIT = 300e6.to_i
   attr_accessor :in_memory_txs
-  
-  def self.l1_genesis_block
-    ENV.fetch("START_BLOCK").to_i - 1
-  end
-  
-  def self.v2_fork_block
-    ENV.fetch("V2_FORK_BLOCK").to_i
-  end
-  
-  def self.in_v2?(block_number)
-    v2_fork_block.blank? || block_number >= v2_fork_block
-  end
-  
-  def self.in_v1?(block_number)
-    !in_v2?(block_number)
-  end
   
   def assign_l1_attributes(l1_attributes)
     assign_attributes(

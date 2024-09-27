@@ -18,7 +18,7 @@ RSpec.describe "Reverts" do
       from_address: from_address
     )
     
-    res.receipts_imported.first.contract_address
+    res.contract_address
   }
   
   it "automatically uses the base fee per gas of the block" do
@@ -31,7 +31,7 @@ RSpec.describe "Reverts" do
       max_fee_per_gas: 0
     )
     
-    receipt = res.receipts_imported.first
+    receipt = res
     effective_gas_price = receipt.effective_gas_price
     
     block = GethDriver.non_auth_client.call('eth_getBlockByNumber', ["0x" + receipt.block_number.to_s(16), true])

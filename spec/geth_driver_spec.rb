@@ -20,7 +20,7 @@ RSpec.describe GethDriver do
         from_address: from_address,
       )
       
-      expect(res.receipts_imported.map(&:status)).to eq([1])
+      expect(res.status).to eq(1)
       
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
       expect(latest_block).not_to be_nil
@@ -44,7 +44,7 @@ RSpec.describe GethDriver do
       
       # Validate balance change considering mint amount and gas cost
       balance_change = sender_balance_after.to_i(16) - sender_balance_before.to_i(16)
-      expected_balance_change = res.transactions_imported.sum(&:mint) - total_gas_cost
+      expected_balance_change = res.mint - total_gas_cost
       
       expect(balance_change).to eq(expected_balance_change)
 
@@ -85,7 +85,7 @@ RSpec.describe GethDriver do
         from_address: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
       )
       
-      expect(res.receipts_imported.map(&:status)).to eq([1])
+      expect(res.status).to eq(1)
       
       # Verify the new block and the increment transaction
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
@@ -94,15 +94,15 @@ RSpec.describe GethDriver do
 
       increment_tx_response = latest_block['transactions'].second
       
-      tx_of_interest = res.transactions_imported.first
+      tx_of_interest = res
       
       expect(increment_tx_response['input']).to eq(tx_of_interest.input)
 
       increment_tx_receipt = client.call("eth_getTransactionReceipt", [increment_tx_response['hash']])
       expect(increment_tx_receipt).not_to be_nil
-      expect(increment_tx_receipt['from']).to eq(tx_of_interest.from_address)
+      expect(increment_tx_receipt['from']).to eq(tx_of_interest.from)
       
-      expect(increment_tx_receipt['to']).to eq(tx_of_interest.to_address)
+      expect(increment_tx_receipt['to']).to eq(tx_of_interest.to)
 
       function = contract.parent.function_hash['getCount']
       
@@ -126,7 +126,7 @@ RSpec.describe GethDriver do
         gas_limit: 21000,
       )
       
-      expect(res.receipts_imported.map(&:status)).to eq([1])
+      expect(res.status).to eq(1)
       
       # Step 4: Verify the block was created with the correct properties
       latest_block = client.call("eth_getBlockByNumber", ["latest", true])
@@ -136,15 +136,15 @@ RSpec.describe GethDriver do
       # Step 5: Verify the deposit transaction
       deposit_tx_response = latest_block['transactions'].second
       
-      expect(deposit_tx_response['input']).to eq(res.transactions_imported.first.input)
+      expect(deposit_tx_response['input']).to eq(res.input)
       
       deposit_tx_receipt = client.call("eth_getTransactionReceipt", [deposit_tx_response['hash']])
       expect(deposit_tx_receipt).not_to be_nil
-      expect(deposit_tx_receipt['from']).to eq(res.transactions_imported.first.from_address)
-      expect(deposit_tx_receipt['to']).to eq(res.transactions_imported.first.to_address)
+      expect(deposit_tx_receipt['from']).to eq(res.from)
+      expect(deposit_tx_receipt['to']).to eq(res.to)
       
-      sender_balance_before = client.call("eth_getBalance", [res.transactions_imported.first.from_address, start_block['number']])
-      sender_balance_after = client.call("eth_getBalance", [res.transactions_imported.first.from_address, "latest"])
+      sender_balance_before = client.call("eth_getBalance", [res.from, start_block['number']])
+      sender_balance_after = client.call("eth_getBalance", [res.from, "latest"])
 
       # Retrieve gas used and gas price
       gas_used = deposit_tx_receipt['gasUsed'].to_i(16)
@@ -153,7 +153,7 @@ RSpec.describe GethDriver do
 
       # Validate balance change considering mint amount and gas cost
       balance_change = sender_balance_after.to_i(16) - sender_balance_before.to_i(16)
-      expected_balance_change = res.transactions_imported.first.mint - total_gas_cost
+      expected_balance_change = res.mint - total_gas_cost
       # binding.pry
       expect(balance_change).to eq(expected_balance_change)
     end

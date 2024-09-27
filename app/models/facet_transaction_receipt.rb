@@ -91,30 +91,6 @@ class FacetTransactionReceipt < ApplicationRecord
     self.legacy_contract_address_map[their_data] = our_data
   end
 
-  # def set_legacy_contract_address_map
-  #   unless legacy_receipt
-  #     self.legacy_contract_address_map[calculate_legacy_contract_address] = contract_address
-  #     self.legacy_contract_address_map.compact!
-  #     return
-  #   end
-    
-  #   self.legacy_contract_address_map[legacy_receipt.created_contract_address] = contract_address
-    
-  #   our_pair_created = decoded_logs.detect do |log|
-  #     log['event'] == 'PairCreated'
-  #   end
-    
-  #   if our_pair_created
-  #     their_pair_created = legacy_receipt.logs.detect{|i| i['event'] == 'PairCreated'}
-      
-  #     if their_pair_created
-  #       self.legacy_contract_address_map[their_pair_created['data']['pair']] = our_pair_created['data']['pair']
-  #     end
-  #   end
-    
-  #   self.legacy_contract_address_map.compact!
-  # end
-  
   def trace
     # t = process_trace(GethDriver.trace_transaction(transaction_hash))
     # t = test_trace

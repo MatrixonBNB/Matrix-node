@@ -15,7 +15,7 @@ RSpec.describe "L1 Tx Origin Gas Delegation" do
       from_address: deployer_address
     )
     
-    res.receipts_imported.first.contract_address
+    res.contract_address
   }
   
   it 'handles refunds correctly for internal calls' do
@@ -28,70 +28,46 @@ RSpec.describe "L1 Tx Origin Gas Delegation" do
       contract: contract, function: 'consumeGas', args: [5_000, "a" * 1_000]
     )
     
-    initial_from_address_balance = GethDriver.client.call('eth_getBalance', [from_address, 'latest']).to_i(16)
-    initial_from_address2_balance = GethDriver.client.call('eth_getBalance', [from_address2, 'latest']).to_i(16)
+    l1_tx_origin = from_address
+    facet_from = from_address2
     
-    expect(initial_from_address_balance).to eq(0)
-    expect(initial_from_address2_balance).to eq(0)
+    initial_l1_tx_origin_balance = GethDriver.client.call('eth_getBalance', [l1_tx_origin, 'latest']).to_i(16)
+    initial_facet_from_balance = GethDriver.client.call('eth_getBalance', [facet_from, 'latest']).to_i(16)
     
-    # Execute transaction
-    res = call_contract_function(
-      contract: contract,
-      address: counter_address,
-      from: from_address,
-      function: 'increment',
-      gas_limit: 500_000,
-      sub_calls: [
-        {
-          to: counter_address,
-          from: from_address2,
-          input: consume_gas_input,
-          gas_limit: 600_000
-        }
-      ]
+    expect(initial_l1_tx_origin_balance).to eq(0)
+    expect(initial_facet_from_balance).to eq(0)
+    
+    facet_payload = generate_facet_tx_payload(
+      input: "0x" + "1" * 1000,
+      to: "0x" + "1" * 40,
+      gas_limit: 500_000
     )
     
-    # Get final balances
-    final_from_address_balance = GethDriver.client.call('eth_getBalance', [from_address, 'latest']).to_i(16)
-    final_from_address2_balance = GethDriver.client.call('eth_getBalance', [from_address2, 'latest']).to_i(16)
+    events = [
+      generate_event_log(facet_payload, facet_from, 0),
+    ]
 
+    res = import_eth_tx(input: "0x1234", events: events, from_address: l1_tx_origin)
+    
     base_fee = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])['baseFeePerGas'].to_i(16)
     
-    outer_tx = res.transactions_imported.first
-    outer_receipt = res.receipts_imported.first
-    inner_tx = res.transactions_imported.second
-    inner_receipt = res.receipts_imported.second
+    mint_amount = res.mint
     
-    # Outer transaction
-    outer_mint = outer_tx.mint
-    outer_gas_cost = outer_tx.gas_limit * base_fee
-    outer_gas_refund = (outer_tx.gas_limit - outer_receipt.gas_used) * base_fee
-    outer_balance_change = outer_mint - outer_gas_cost + outer_gas_refund
+    gas_cost = res.gas * base_fee
+    gas_refund = (res.gas - res.gas_used) * base_fee
+    
+    expected_facet_from_balance_change = 0
+    expected_l1_tx_origin_balance_change = mint_amount - gas_cost + gas_refund
+    
+    final_l1_tx_origin_balance = GethDriver.client.call('eth_getBalance', [l1_tx_origin, 'latest']).to_i(16)
+    final_facet_from_balance = GethDriver.client.call('eth_getBalance', [facet_from, 'latest']).to_i(16)
+    
+    actual_l1_tx_origin_balance_change = final_l1_tx_origin_balance - initial_l1_tx_origin_balance
+    actual_facet_from_balance_change = final_facet_from_balance - initial_facet_from_balance
 
-    # Inner transaction
-    inner_mint = inner_tx.mint
-    inner_gas_cost = inner_tx.gas_limit * base_fee
-    inner_gas_refund = (inner_tx.gas_limit - inner_receipt.gas_used) * base_fee
-    
-    excess_inner_mint = inner_mint - inner_gas_cost
-    
-    expected_from_address_balance_change = outer_balance_change + inner_gas_refund + excess_inner_mint
-
-    actual_from_address_balance_change = final_from_address_balance - initial_from_address_balance
-
-    # Print detailed debug information
-    puts "Base fee: #{base_fee}"
-    puts "Outer transaction: Gas used: #{outer_receipt.gas_used}, Gas limit: #{outer_tx.gas_limit}, Mint: #{outer_mint}"
-    puts "Inner transaction: Gas used: #{inner_receipt.gas_used}, Gas limit: #{inner_tx.gas_limit}, Mint: #{inner_mint}"
-    puts "Outer balance change: #{outer_balance_change}"
-    puts "Inner gas refund: #{inner_gas_refund}"
-    puts "Expected from_address balance change: #{expected_from_address_balance_change}"
-    puts "Actual from_address balance change: #{actual_from_address_balance_change}"
-    puts "Difference: #{actual_from_address_balance_change - expected_from_address_balance_change}"
-    
-    # Expectations
-    expect(actual_from_address_balance_change).to eq(expected_from_address_balance_change)
-    
-    expect(outer_receipt.effective_gas_price).to eq(base_fee)
+    expect(actual_l1_tx_origin_balance_change).to eq(expected_l1_tx_origin_balance_change)
+    expect(actual_facet_from_balance_change).to eq(expected_facet_from_balance_change)
+      
+    expect(res.effective_gas_price).to eq(base_fee)
   end
 end
