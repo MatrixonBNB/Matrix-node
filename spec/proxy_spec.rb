@@ -33,7 +33,7 @@ RSpec.describe "Uniswap" do
   end
   
   before(:all) do
-    GethDriver.setup_rspec_geth
+    GethTestHelper.setup_rspec_geth
     Singleton.__init__(EthBlockImporter)
   end
   
@@ -56,7 +56,7 @@ RSpec.describe "Uniswap" do
       in_v2: false
     )
     
-    expect(proxy_res.receipts_imported.first.contract_address).to eq(
+    expect(proxy_res.contract_address).to eq(
       calculate_address(first_tx_receipt.from_address, 0)
     )
     next
@@ -69,7 +69,7 @@ RSpec.describe "Uniswap" do
       in_v2: false
     )
     
-    receipt = proxy_res.receipts_imported.first
+    receipt = proxy_res
     status = receipt.status == 1 ? "success" : "failure"
     
     expect(status).to eq(
@@ -129,7 +129,7 @@ RSpec.describe "Uniswap" do
       in_v2: false
     )
     
-    implementation_address = implementation_res.receipts_imported.first.contract_address
+    implementation_address = implementation_res.contract_address
     
     initialize_calldata = get_function_calldata(
       contract: 'legacy/EtherBridgeV064',
@@ -150,7 +150,7 @@ RSpec.describe "Uniswap" do
       in_v2: false
     )
     
-    proxy_address = proxy_res.receipts_imported.first.contract_address
+    proxy_address = proxy_res.contract_address
     
     bridge_in_calldata = get_function_calldata(
       contract: 'legacy/EtherBridgeV064',

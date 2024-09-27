@@ -1,6 +1,9 @@
 class EthTransaction < T::Struct
+  include SysConfig
+  
   const :block_hash, String
   const :block_number, Integer
+  const :block_timestamp, Integer
   const :tx_hash, String
   const :transaction_index, Integer
   const :input, T.nilable(String)
@@ -11,8 +14,6 @@ class EthTransaction < T::Struct
   const :logs, T::Array[T.untyped], default: []
   const :eth_block, T.nilable(EthBlock)
   const :facet_transactions, T::Array[FacetTransaction], default: []
-  
-  delegate :in_v2?, to: :FacetBlock
   
   FacetLogInboxEventSig = "0x00000000000000000000000000000000000000000000000000000000000face7"
   
@@ -34,6 +35,7 @@ class EthTransaction < T::Struct
       EthTransaction.new(
         block_hash: block_hash,
         block_number: block_number,
+        block_timestamp: block_result['timestamp'].to_i(16),
         tx_hash: tx['hash'],
         transaction_index: tx['transactionIndex'].to_i(16),
         input: tx['input'],
@@ -54,7 +56,7 @@ class EthTransaction < T::Struct
   def to_facet_tx
     return unless is_success?
     
-    in_v2?(block_number) ? to_facet_tx_v2 : to_facet_tx_v1
+    eth_block_in_v2?(block_number) ? to_facet_tx_v2 : to_facet_tx_v1
   end
   
   def to_facet_tx_v2
@@ -77,7 +79,7 @@ class EthTransaction < T::Struct
   end
   
   def facet_tx_from_input
-    return unless to_address == FacetTransaction::FACET_INBOX_ADDRESS
+    return unless to_address == FACET_INBOX_ADDRESS
     
     FacetTransaction.from_payload(
       l1_tx_origin: from_address,
@@ -176,5 +178,49 @@ class EthTransaction < T::Struct
       input,
       support_gzip: esip7_enabled
     )
+  end
+  
+  def facet_tx_source_hash
+    payload = [
+      block_hash.hex_to_bytes,
+      tx_hash.hex_to_bytes,
+      0.zpad(32)
+    ].join
+    
+    FacetTransaction.compute_source_hash(
+      payload,
+      FacetTransaction::USER_DEPOSIT_SOURCE_DOMAIN,
+    )
+  end
+  
+  def self.to_rpc_result(eth_transactions)
+    block_result = {
+      'hash' => eth_transactions.first.block_hash,
+      'number' => "0x" + eth_transactions.first.block_number.to_s(16),
+      'baseFeePerGas' => "0x" + 1.gwei.to_s(16),
+      'timestamp' => "0x" + eth_transactions.first.block_timestamp.to_s(16),
+      'parentBeaconBlockRoot' => eth_transactions.first.block_hash,
+      'mixHash' => eth_transactions.first.block_hash,
+      'transactions' => eth_transactions.map do |tx|
+        {
+          'hash' => tx.tx_hash,
+          'transactionIndex' => "0x" + tx.transaction_index.to_s(16),
+          'input' => tx.input,
+          'chainId' => "0x" + tx.chain_id.to_s(16),
+          'from' => tx.from_address,
+          'to' => tx.to_address
+        }
+      end
+    }
+
+    receipt_result = eth_transactions.map do |tx|
+      {
+        'transactionHash' => tx.tx_hash,
+        'status' => "0x" + tx.status.to_s(16),
+        'logs' => tx.logs
+      }
+    end
+    
+    [block_result, receipt_result]
   end
 end

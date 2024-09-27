@@ -1,7 +1,7 @@
 module PredeployManager
   extend self
   include Memery
-  
+  include SysConfig
   PREDEPLOY_INFO_PATH = Rails.root.join('config', 'predeploy_info.json')
   
   def predeploy_to_local_map
@@ -145,7 +145,7 @@ module PredeployManager
     puts "Generated predeploy_info.json"
   end
   
-  def generate_full_genesis_json(l1_network_name, l1_genesis_block = FacetBlock.l1_genesis_block)
+  def generate_full_genesis_json(l1_network_name, l1_genesis_block = SysConfig.l1_genesis_block)
     config = {
       chainId: ChainIdManager.l2_chain_id_from_l1_network_name(l1_network_name),
       homesteadBlock: 0,
@@ -169,6 +169,7 @@ module PredeployManager
       regolithTime: 0,
       canyonTime: 0,
       ecotoneTime: 0,
+      fjordTime: 0,
       deltaTime: 0,
       optimism: {
         eip1559Elasticity: 2,
@@ -191,7 +192,7 @@ module PredeployManager
   end
   
   def get_timestamp_and_mix_hash(l1_block_number)
-    l1_block_result = l1_rpc_client.get_block(l1_block_number)['result']
+    l1_block_result = l1_rpc_client.get_block(l1_block_number)
     timestamp = l1_block_result['timestamp'].to_i(16)
     mix_hash = l1_block_result['mixHash']
     [timestamp, mix_hash, l1_block_result['timestamp']]

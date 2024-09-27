@@ -1,11 +1,11 @@
 class EthBlockImporter
+  include SysConfig
   include Singleton
   include Memery
   
   class BlockNotReadyToImportError < StandardError; end
   
-  attr_accessor :l1_rpc_results, :facet_block_cache, :ethereum_client, :eth_block_cache
-  delegate :l1_genesis_block, :v2_fork_block, :in_v2?, :in_v1?, to: :FacetBlock
+  attr_accessor :l1_rpc_results, :facet_block_cache, :ethereum_client, :eth_block_cache, :geth_driver
   
   def initialize
     @l1_rpc_results = {}
@@ -15,6 +15,8 @@ class EthBlockImporter
     @ethereum_client ||= EthRpcClient.new(
       base_url: ENV.fetch('L1_RPC_URL')
     )
+    
+    @geth_driver = GethDriver
     
     set_eth_block_starting_points
     populate_facet_block_cache
@@ -90,7 +92,7 @@ class EthBlockImporter
     
     if latest_l2_block_number == 0
       facet_block = FacetBlock.from_rpc_result(latest_l2_block)
-      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block)['result'])
+      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block))
       
       facet_block.eth_block_number = eth_block.number
       facet_block.sequence_number = 0
@@ -115,7 +117,7 @@ class EthBlockImporter
     while iterations < max_iterations
       l2_candidate = find_first_l2_block_in_epoch(l2_candidate)
       
-      l1_result = ethereum_client.get_block(l1_candidate)['result']
+      l1_result = ethereum_client.get_block(l1_candidate)
       l1_hash = l1_result['hash']
       
       l1_attributes = GethDriver.client.get_l1_attributes(l2_candidate)
@@ -278,8 +280,8 @@ class EthBlockImporter
     block_numbers.each.with_index do |block_number, index|
       block_response = block_responses[block_number]
       
-      block_result = block_response['block']['result']
-      receipt_result = block_response['receipts']['result']
+      block_result = block_response['block']
+      receipt_result = block_response['receipts']
       
       parent_eth_block = eth_block_cache[block_number - 1]
       
@@ -290,6 +292,7 @@ class EthBlockImporter
           facet_block.eth_block_number >= parent_eth_block.number
         end
         
+        logger.info "Reorg detected at block #{block_number}"
         return
       end
       
@@ -302,7 +305,7 @@ class EthBlockImporter
       facet_txs.each do |facet_tx|
         facet_tx.facet_block = facet_block
         
-        if in_v1?(eth_block.number)
+        if eth_block_in_v1?(eth_block.number)
           facet_tx.assign_gas_limit_from_tx_count_in_block(facet_txs.count)
         end
       end
@@ -383,6 +386,6 @@ class EthBlockImporter
   end
   
   def geth_driver
-    @_geth_driver ||= GethDriver
+    @geth_driver
   end
 end

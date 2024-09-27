@@ -1,4 +1,5 @@
 class FacetTransaction < ApplicationRecord
+  include SysConfig
   class InvalidAddress < StandardError; end
   class TxOutsideGasLimit < StandardError; end
   
@@ -7,9 +8,7 @@ class FacetTransaction < ApplicationRecord
   
   attr_accessor :chain_id, :l1_tx_origin, :l1_calldata_gas_used, :contract_initiated, :ethscription
   
-  FACET_TX_TYPE = 70
-  FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7"
-  
+  FACET_TX_TYPE = 0x46
   DEPOSIT_TX_TYPE = 0x7E
   
   USER_DEPOSIT_SOURCE_DOMAIN = 0
@@ -18,10 +17,8 @@ class FacetTransaction < ApplicationRecord
   SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
   L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
   
-  PER_TX_GAS_LIMIT = 50_000_000
-  
   def within_gas_limit?
-    gas_limit <= PER_TX_GAS_LIMIT
+    gas_limit <= PER_L2_TX_GAS_LIMIT
   end
   
   def self.from_ethscription(ethscription)
@@ -59,7 +56,7 @@ class FacetTransaction < ApplicationRecord
   end
   
   def assign_gas_limit_from_tx_count_in_block(tx_count_in_block)
-    block_gas_limit = FacetBlock::GAS_LIMIT
+    block_gas_limit = SysConfig::L2_BLOCK_GAS_LIMIT
     self.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
   end
   
@@ -157,9 +154,7 @@ class FacetTransaction < ApplicationRecord
       number: facet_block.eth_block_number,
       base_fee: facet_block.eth_block_base_fee_per_gas,
       hash: facet_block.eth_block_hash,
-      sequence_number: facet_block.sequence_number,
-      fct_minted_per_gas: facet_block.fct_mint_per_gas,
-      total_fct_minted: facet_block.total_fct_minted,
+      sequence_number: facet_block.sequence_number
     )
     
     tx = new

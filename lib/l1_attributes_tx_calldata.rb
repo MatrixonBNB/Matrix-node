@@ -9,9 +9,7 @@ module L1AttributesTxCalldata
     base_fee:,
     blob_base_fee: 1,
     hash:,
-    sequence_number:,
-    fct_minted_per_gas:,
-    total_fct_minted:
+    sequence_number:
   )
     base_fee_scalar = 0
     blob_base_fee_scalar = 1
@@ -33,9 +31,7 @@ module L1AttributesTxCalldata
       base_fee.zpad(32),
       blob_base_fee.zpad(32),
       hash,
-      batcher_hash,
-      fct_minted_per_gas.zpad(32),
-      total_fct_minted.zpad(32)
+      batcher_hash
     ].join
     
     packed_data.bytes_to_hex
@@ -57,8 +53,6 @@ module L1AttributesTxCalldata
     blob_base_fee = data[64...96].unpack1('H*').to_i(16)
     hash = data[96...128].unpack1('H*')
     batcher_hash = data[128...160].unpack1('H*')
-    fct_minted_per_gas = data[160...192].unpack1('H*').to_i(16)
-    total_fct_minted = data[192...224].unpack1('H*').to_i(16)
     
     {
       timestamp: timestamp,
@@ -69,9 +63,7 @@ module L1AttributesTxCalldata
       batcher_hash: "0x#{batcher_hash}",
       sequence_number: sequence_number,
       blob_base_fee_scalar: blob_base_fee_scalar,
-      base_fee_scalar: base_fee_scalar,
-      fct_minted_per_gas: fct_minted_per_gas,
-      total_fct_minted: total_fct_minted
+      base_fee_scalar: base_fee_scalar
     }.with_indifferent_access
   end
 end

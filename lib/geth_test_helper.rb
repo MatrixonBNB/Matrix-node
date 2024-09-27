@@ -16,7 +16,7 @@ module GethTestHelper
     teardown_rspec_geth
     
     @temp_datadir = Dir.mktmpdir('geth_datadir_', '/tmp')
-    geth_dir_hash = Digest::SHA256.hexdigest(ENV.fetch('LOCAL_GETH_DIR'))
+    geth_dir_hash = Digest::SHA256.hexdigest(ENV.fetch('LOCAL_GETH_DIR')).first(5)
     log_file_location = Rails.root.join('tmp', "geth_#{geth_dir_hash}.log").to_s
     if File.exist?(log_file_location)
       File.delete(log_file_location)
@@ -95,7 +95,7 @@ module GethTestHelper
   end
   
   def geth_pid_file
-    geth_dir_hash = Digest::SHA256.hexdigest(ENV.fetch('LOCAL_GETH_DIR'))
+    geth_dir_hash = Digest::SHA256.hexdigest(ENV.fetch('LOCAL_GETH_DIR')).first(5)
     "tmp/geth_pid_#{geth_dir_hash}.pid"
   end
 end

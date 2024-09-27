@@ -1,4 +1,5 @@
 class LegacyMigrationDataGenerator
+  include SysConfig
   include Singleton
   include Memery
   
@@ -6,8 +7,6 @@ class LegacyMigrationDataGenerator
   
   attr_accessor :imported_facet_transaction_receipts, :imported_facet_transactions,
     :ethereum_client, :legacy_value_mapping, :current_import_block_number
-    
-  delegate :l1_genesis_block, :v2_fork_block, to: :FacetBlock
 
   def initialize
     reset_state
@@ -111,7 +110,7 @@ class LegacyMigrationDataGenerator
       
       genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + l1_genesis_block.to_s(16), false])
       
-      eth_block = EthBlock.from_rpc_result(genesis_eth_block['result'])
+      eth_block = EthBlock.from_rpc_result(genesis_eth_block)
       eth_block.save!
       
       current_max_block_number = FacetBlock.maximum(:number).to_i
@@ -163,7 +162,7 @@ class LegacyMigrationDataGenerator
     
     # Check for reorg at the start of the batch
     first_block_number = block_numbers.first
-    first_block_data = block_responses[first_block_number]['block']['result']
+    first_block_data = block_responses[first_block_number]['block']
     
     if latest_db_block
       if first_block_number == latest_db_block.number + 1
@@ -224,8 +223,8 @@ class LegacyMigrationDataGenerator
           
           block_response = block_responses[block_number]
       
-          block_result = block_response['block']['result']
-          receipt_result = block_response['receipts']['result']
+          block_result = block_response['block']
+          receipt_result = block_response['receipts']
                     
           eth_block = EthBlock.from_rpc_result(block_result)
           facet_block = FacetBlock.from_eth_block(eth_block)
