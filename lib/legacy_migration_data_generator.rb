@@ -507,11 +507,11 @@ class LegacyMigrationDataGenerator
         ]
 
         if (legacy_value != facet_value && !both_blank) && !special_cases.include?(legacy_receipt.transaction_hash)
-          if Ethscription.is_smart_contract_on_l1?(legacy_value) && AddressAliasHelper.apply_l1_to_l2_alias(legacy_value) == facet_value
-            next
-          end
-          
-          if facet_value.match?(/\A0x[0-9a-f]{40}\z/)
+          if facet_value.to_s.match?(/\A0x[0-9a-f]{40}\z/)
+            if Ethscription.is_smart_contract_on_l1?(legacy_value) && AddressAliasHelper.apply_l1_to_l2_alias(legacy_value) == facet_value
+              next
+            end
+            
             puts "Checking legacy address for #{facet_value}"
             
             legacy_address = TransactionHelper.static_call(
@@ -520,10 +520,10 @@ class LegacyMigrationDataGenerator
               function: 'getLegacyContractAddress',
               args: []
             )
-          end
-          
-          if legacy_address == legacy_value
-            next
+            
+            if legacy_address == legacy_value
+              next
+            end
           end
           
           binding.irb

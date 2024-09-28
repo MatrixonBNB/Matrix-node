@@ -454,7 +454,14 @@ module EthscriptionEVMConverter
           raise InvalidArgValue, "Invalid address: #{arg_value.inspect}!"
         end
         
-        alias_address_if_necessary(safe_calculate_to_address(arg_value))
+        new_value = safe_calculate_to_address(arg_value)
+        is_facet_contract = new_value != arg_value
+        
+        unless is_facet_contract
+          new_value = alias_address_if_necessary(new_value)
+        end
+        
+        new_value
       elsif arg_value.is_a?(Array)
         arg_value.map do |val|
           normalize_arg_value(val, type.nested_sub)
@@ -560,6 +567,7 @@ module EthscriptionEVMConverter
         "0x061eaf68b2069ed7708af1893f4499960a0156c5",
         "0xb01278c0fc86d1cd4de513ca03bf7dacc2dbd1a4",
         "0x342979c2edad4fe8dc3fff12d429b0b608c1699c",
+        "0x000000000006f291b587f39b6960dd32e31400bf",
         "0xbc77ce4b8465dc6ed1fe4930c5c63ff8e8d45fc9"
       ]
       
@@ -569,7 +577,7 @@ module EthscriptionEVMConverter
       
       block = LegacyMigrationDataGenerator.instance.current_import_block_number
       
-      if block < 19000649
+      if block < 19265219
         return false
       end
       
