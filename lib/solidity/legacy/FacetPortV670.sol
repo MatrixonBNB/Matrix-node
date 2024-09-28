@@ -136,8 +136,8 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
             assetId,
             keccak256(bytes(assetType)),
             assetAmount,
-            considerationToken,
             LegacyAddressable(considerationToken).getLegacyContractAddress(),
+            considerationAmount,
             startTime,
             endTime
         );
