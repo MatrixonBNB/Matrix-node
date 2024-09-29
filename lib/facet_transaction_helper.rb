@@ -37,9 +37,7 @@ module FacetTransactionHelper
     allow(mock_ethereum_client).to receive(:get_block).and_return(block_result)
     allow(mock_ethereum_client).to receive(:get_transaction_receipts).and_return(receipt_result)
 
-    allow_any_instance_of(SysConfig).to receive(:eth_block_in_v2?).and_return(true)
-    allow_any_instance_of(SysConfig).to receive(:facet_block_in_v1?).and_return(false)
-    allow_any_instance_of(FctMintCalculator).to receive(:halving_periods_passed).and_return(0)
+    allow_any_instance_of(SysConfig).to receive(:block_in_v2?).and_return(true)
     
     importer = EthBlockImporter.instance
     facet_blocks, eth_blocks = importer.import_next_block

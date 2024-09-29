@@ -30,16 +30,15 @@ class LegacyMigrationDataGenerator
     Ethscription.validate_import?
   end
   
-  def in_v2?(block_number)
-    v2_fork_block.blank? || block_number >= v2_fork_block
-  end
+  # def blocks_behind
+  #   (eth_v2_fork_block - next_block_to_import) + 1
+  # end
   
-  def blocks_behind
-    (v2_fork_block - next_block_to_import) + 1
-  end
-  
+  # TODO: reimplement blocks_behind
   def import_batch_size
-    [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
+    # [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
+    ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i
+    2
   end
   
   def add_legacy_value_mapping_item(legacy_value:, new_value:)
@@ -68,8 +67,6 @@ class LegacyMigrationDataGenerator
     loop do
       begin
         block_numbers = next_blocks_to_import(import_batch_size)
-        
-        raise if in_v2?(block_numbers.first)
         
         if block_numbers.blank?
           raise BlockNotReadyToImportError.new("Block not ready")
@@ -108,7 +105,7 @@ class LegacyMigrationDataGenerator
         raise "Facet genesis block is not the same as the latest block on geth"
       end
       
-      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + l1_genesis_block.to_s(16), false])
+      genesis_eth_block = ethereum_client.call("eth_getBlockByNumber", ["0x" + l1_genesis_block_number.to_s(16), false])
       
       eth_block = EthBlock.from_rpc_result(genesis_eth_block)
       eth_block.save!
@@ -227,6 +224,11 @@ class LegacyMigrationDataGenerator
           receipt_result = block_response['receipts']
                     
           eth_block = EthBlock.from_rpc_result(block_result)
+          
+          if block_in_v2?(eth_block)
+            raise "Block in v2: #{eth_block.number}"
+          end
+                    
           facet_block = FacetBlock.from_eth_block(eth_block)
 
           eth_blocks << eth_block

@@ -145,7 +145,7 @@ module PredeployManager
     puts "Generated predeploy_info.json"
   end
   
-  def generate_full_genesis_json(l1_network_name, l1_genesis_block = SysConfig.l1_genesis_block)
+  def generate_full_genesis_json(l1_network_name, l1_genesis_block_number = SysConfig.l1_genesis_block_number)
     config = {
       chainId: ChainIdManager.l2_chain_id_from_l1_network_name(l1_network_name),
       homesteadBlock: 0,
@@ -178,7 +178,7 @@ module PredeployManager
       }
     }
     
-    timestamp, mix_hash = get_timestamp_and_mix_hash(l1_genesis_block)
+    timestamp, mix_hash = get_timestamp_and_mix_hash(l1_genesis_block_number)
     
     {
       config: config,

@@ -92,7 +92,7 @@ class EthBlockImporter
     
     if latest_l2_block_number == 0
       facet_block = FacetBlock.from_rpc_result(latest_l2_block)
-      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block))
+      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block_number))
       
       facet_block.eth_block_number = eth_block.number
       facet_block.sequence_number = 0
@@ -305,7 +305,7 @@ class EthBlockImporter
       facet_txs.each do |facet_tx|
         facet_tx.facet_block = facet_block
         
-        if eth_block_in_v1?(eth_block.number)
+        if block_in_v1?(eth_block)
           facet_tx.assign_gas_limit_from_tx_count_in_block(facet_txs.count)
         end
       end

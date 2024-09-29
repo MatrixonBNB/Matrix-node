@@ -2,39 +2,44 @@ module SysConfig
   extend self
   
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7".freeze
-  L2_BLOCK_GAS_LIMIT = 300e6.to_i
+  L2_BLOCK_GAS_LIMIT = 240_000_000
   PER_L2_TX_GAS_LIMIT = 50_000_000
   INITIAL_FCT_MINT_PER_L1_GAS = 4096.gwei
+  L2_BLOCK_TIME = 12
   
-  def l1_genesis_block
-    ENV.fetch("START_BLOCK").to_i - 1
+  def block_gas_limit(block)
+    if block_in_v1?(block)
+      L2_BLOCK_GAS_LIMIT * 2
+    else
+      L2_BLOCK_GAS_LIMIT
+    end
   end
   
-  def v2_fork_block
-    ENV.fetch("V2_FORK_BLOCK").to_i
+  def l1_genesis_block_number
+    ENV.fetch("L1_GENESIS_BLOCK").to_i
   end
   
   def v2_fork_timestamp
-    # TODO: probably should use timestamp to avoid ambiguity with missed L1 slots
+    ENV.fetch("V2_FORK_TIMESTAMP").to_i
   end
   
-  # TODO: Fix this so it works with missed L1 slots
-  def facet_v2_fork_block_number
-    first_l1_block_number = l1_genesis_block
-    first_v2_l1_block_number = v2_fork_block
+  def genesis_timestamp
+    @_genesis_timestamp ||= EthRpcClient.l1.get_block(l1_genesis_block_number)["timestamp"].to_i(16)
+  end
+  
+  def l2_v2_fork_block_number
+    [(v2_fork_timestamp - genesis_timestamp) / L2_BLOCK_TIME, 0].max
+  end
+  
+  def block_in_v1?(block)
+    unless block.respond_to?(:timestamp)
+      raise "Invalid block: #{block.inspect}"
+    end
     
-    first_v2_l1_block_number - first_l1_block_number
+    block.timestamp < v2_fork_timestamp
   end
   
-  def facet_block_in_v1?(facet_block_number)
-    facet_block_number < facet_v2_fork_block_number
-  end
-  
-  def eth_block_in_v1?(eth_block_number)
-    !eth_block_in_v2?(eth_block_number)
-  end
-  
-  def eth_block_in_v2?(eth_block_number)
-    eth_block_number >= v2_fork_block
+  def block_in_v2?(block)
+    !block_in_v1?(block)
   end
 end

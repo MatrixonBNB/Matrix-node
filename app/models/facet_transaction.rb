@@ -56,7 +56,7 @@ class FacetTransaction < ApplicationRecord
   end
   
   def assign_gas_limit_from_tx_count_in_block(tx_count_in_block)
-    block_gas_limit = SysConfig::L2_BLOCK_GAS_LIMIT
+    block_gas_limit = SysConfig.block_gas_limit(facet_block)
     self.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
   end
   

@@ -130,7 +130,7 @@ RSpec.describe "Reverts" do
   end
   
   it 'hits the block gas limit' do
-    limit = SysConfig::L2_BLOCK_GAS_LIMIT
+    limit = SysConfig.block_gas_limit(1)
     over_limit = limit + 1
     
     call_contract_function(
