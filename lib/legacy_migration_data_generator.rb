@@ -38,7 +38,6 @@ class LegacyMigrationDataGenerator
   def import_batch_size
     # [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
     ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i
-    2
   end
   
   def add_legacy_value_mapping_item(legacy_value:, new_value:)
