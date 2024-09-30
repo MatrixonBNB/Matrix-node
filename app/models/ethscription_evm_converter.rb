@@ -580,7 +580,7 @@ module EthscriptionEVMConverter
       
       block = LegacyMigrationDataGenerator.instance.current_import_block_number
       
-      if block < 19379249
+      if block < 19379869
         return false
       end
       

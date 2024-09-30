@@ -507,33 +507,55 @@ class LegacyMigrationDataGenerator
         ]
 
         if (legacy_value != facet_value && !both_blank) && !special_cases.include?(legacy_receipt.transaction_hash)
-          if facet_value.to_s.match?(/\A0x[0-9a-f]{40}\z/)
-            if Ethscription.is_smart_contract_on_l1?(legacy_value) && AddressAliasHelper.apply_l1_to_l2_alias(legacy_value) == facet_value
-              next
+          if facet_value.is_a?(Array) && legacy_value.is_a?(Array)
+            if facet_value.length != legacy_value.length
+              raise "Array length mismatch for #{event_name}: Legacy #{legacy_attribute} (#{legacy_value.length}) does not match Facet #{facet_attribute} (#{facet_value.length})"
             end
-            
-            puts "Checking legacy address for #{facet_value}"
-            
-            legacy_address = TransactionHelper.static_call(
-              contract: PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy"),
-              address: facet_value,
-              function: 'getLegacyContractAddress',
-              args: []
-            )
-            
-            if legacy_address == legacy_value
-              next
+
+            mismatch = facet_value.zip(legacy_value).any? do |facet_addr, legacy_addr|
+              !compare_addresses(legacy_addr, facet_addr)
             end
+
+            if mismatch
+              binding.irb
+              raise "#{event_name} attribute mismatch in address array: Legacy #{legacy_attribute} #{legacy_value} does not match Facet #{facet_attribute} #{facet_value}"
+            end
+          elsif compare_addresses(legacy_value, facet_value)
+            # Addresses match, do nothing
+          else
+            binding.irb
+            raise "#{event_name} attribute mismatch: Legacy #{legacy_attribute} #{legacy_value} does not match Facet #{facet_attribute} #{facet_value}"
           end
-          
-          binding.irb
-          raise "#{event_name} attribute mismatch: Legacy #{legacy_attribute} #{legacy_value} does not match Facet #{facet_attribute} #{facet_value}"
         end
       end
     elsif (legacy_event || facet_event) && !global_special_cases.include?(legacy_receipt.transaction_hash)
       binding.irb
       raise "#{event_name} event presence mismatch: Legacy event present? #{!!legacy_event}, Facet event present? #{!!facet_event}"
     end
+  end
+
+  def compare_addresses(legacy_addr, facet_addr)
+    # Check if both addresses match the Ethereum address format
+    unless legacy_addr.to_s.match?(/\A0x[0-9a-f]{40}\z/) && facet_addr.to_s.match?(/\A0x[0-9a-f]{40}\z/)
+      return false
+    end
+
+    return true if legacy_addr == facet_addr
+
+    if Ethscription.is_smart_contract_on_l1?(legacy_addr) && AddressAliasHelper.apply_l1_to_l2_alias(legacy_addr) == facet_addr
+      return true
+    end
+
+    legacy_address = TransactionHelper.static_call(
+      contract: PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy"),
+      address: facet_addr,
+      function: 'getLegacyContractAddress',
+      args: []
+    )
+
+    return true if legacy_address == legacy_addr
+
+    Ethscription.safe_calculate_to_address(legacy_addr) == facet_addr
   end
 
   def compare_events_multi(legacy_receipt, facet_receipt, events, except: {})
@@ -651,5 +673,29 @@ class LegacyMigrationDataGenerator
   
   def geth_driver
     @_geth_driver ||= GethDriver
+  end
+  
+  def self.generate_alloc_json
+    data = GethDriver.dump_state
+    
+    alloc = {}
+    data.each_line do |line|
+      entry = JSON.parse(line)
+      address = entry['address']
+      
+      unless address
+        puts "No address: #{line}"
+        next
+      end
+      
+      alloc[address] = {
+        'balance' => entry['balance'],
+        'nonce' => entry['nonce'],
+        'code' => entry['code'],
+        'storage' => entry['storage']
+      }.compact
+    end
+    
+    alloc
   end
 end

@@ -41,6 +41,20 @@ module GethDriver
     puts command
   end
   
+  def dump_state
+    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
+
+    command = [
+      "#{geth_dir}/build/bin/geth",
+      'dump',
+      "--datadir #{geth_dir}/datadir"
+    ]
+    
+    full_command = command.join(' ')
+    
+    `#{full_command}`
+  end
+  
   def client
     @_client ||= GethClient.new(ENV.fetch('GETH_RPC_URL'))
   end
