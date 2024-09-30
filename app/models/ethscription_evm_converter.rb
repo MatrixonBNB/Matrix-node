@@ -571,7 +571,9 @@ module EthscriptionEVMConverter
         "0xbc77ce4b8465dc6ed1fe4930c5c63ff8e8d45fc9",
         "0x1f7ffb55dcbbe953b9dc5b34333849d5b259393f",
         "0xc6d6ebf238b2def7a456dbec6c1532d5fc337469",
-        "0x426614a1de756017c39ad86540f0423b006c31ff"
+        "0x426614a1de756017c39ad86540f0423b006c31ff",
+        "0x57b8792c775d34aa96092400983c3e112fcbc296",
+        "0x00000000000001a49e2dac26e7a55efb3f8fc0b6"
       ]
       
       if known_l1_contracts.include?(address)
@@ -580,7 +582,7 @@ module EthscriptionEVMConverter
       
       block = LegacyMigrationDataGenerator.instance.current_import_block_number
       
-      if block < 19379869
+      if block < 19561909
         return false
       end
       
