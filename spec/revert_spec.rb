@@ -130,7 +130,8 @@ RSpec.describe "Reverts" do
   end
   
   it 'hits the block gas limit' do
-    limit = SysConfig.block_gas_limit(1)
+    block = Struct.new(:timestamp, :number).new(1, 1)
+    limit = SysConfig.block_gas_limit(block)
     over_limit = limit + 1
     
     call_contract_function(
