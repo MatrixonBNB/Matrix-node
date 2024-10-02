@@ -86,7 +86,7 @@ module PredeployManager
     hex.match?(/^0x[0-9a-fA-F]+$/) && hex.length.even?
   end
   
-  def generate_alloc_for_genesis
+  def generate_alloc_for_genesis(use_dump: false)
     initializable_slot = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132"
     
     max_uint64 = 2 ** 64 - 1
@@ -117,7 +117,12 @@ module PredeployManager
       raise KeyError, "Duplicate keys found: #{duplicates.join(', ')}"
     end
     
-    optimism_allocs.merge(our_allocs)
+    dump_file = Rails.root.join("20120159_dump.json")
+    dump = use_dump ? JSON.parse(File.read(dump_file)) : {}
+    
+    merged = dump.merge(optimism_allocs).merge(our_allocs)
+    
+    merged.sort_by { |key, _| key.downcase }.to_h
   end
   
   def generate_predeploy_info_json
@@ -184,10 +189,10 @@ module PredeployManager
       config: config,
       timestamp: "0x#{timestamp.to_s(16)}",
       extraData: "Think outside the block".ljust(32).bytes_to_hex,
-      gasLimit: "0x#{300e6.to_i.to_s(16)}",
+      gasLimit: "0x#{SysConfig::L2_BLOCK_GAS_LIMIT.to_s(16)}",
       difficulty: "0x0",
       mixHash: mix_hash,
-      alloc: generate_alloc_for_genesis
+      alloc: generate_alloc_for_genesis(use_dump: l1_network_name == 'sepolia')
     }
   end
   

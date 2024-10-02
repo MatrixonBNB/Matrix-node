@@ -689,11 +689,11 @@ class LegacyMigrationDataGenerator
       end
       
       alloc[address] = {
-        'balance' => entry['balance'],
-        'nonce' => entry['nonce'],
-        'code' => entry['code'],
-        'storage' => entry['storage']
-      }.compact
+        'balance' => "0x0",
+        'nonce' => entry['nonce'] ? "0x#{entry['nonce'].to_i.to_s(16)}" : "0x0",
+        'code' => entry['code'].presence || "0x",
+        'storage' => entry['storage'].presence || {}
+      }
     end
     
     alloc
