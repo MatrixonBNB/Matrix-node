@@ -37,3 +37,7 @@ base_fees
 # Ignore master key for decrypting credentials and more.
 /config/master.key
 node_modules
+
+/lib/solidity/out/
+/lib/solidity/cache/
+/lib/solidity/.env

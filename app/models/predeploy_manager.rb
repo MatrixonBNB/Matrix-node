@@ -238,4 +238,70 @@ module PredeployManager
       base_url: ENV.fetch('L1_RPC_URL')
     )
   end
+  
+  SOL_DIR = Rails.root.join('lib', 'solidity')
+  LEGACY_DIR = SOL_DIR.join('src', 'legacy')
+
+  def verify_contracts(rpc_url, blockscout_url)
+    # Get the contracts from PredeployManager
+    contracts = PredeployManager.predeploy_to_local_map.to_a.reverse.to_h
+  
+    contracts.each do |address, contract_name|
+      sol_file = LEGACY_DIR.join("#{contract_name}.sol")
+      
+      if sol_file.exist?
+        command = [
+          "cd #{SOL_DIR} &&",  # Change to the Solidity directory
+          "forge verify-contract",
+          "--verifier blockscout",
+          "--compiler-version 0.8.24",
+          "--via-ir",
+          "--optimizer-runs 200",
+          "--verifier-url #{blockscout_url}",
+          "--rpc-url #{rpc_url}",
+          address,
+          "src/legacy/#{contract_name}.sol:#{contract_name}",
+        ].join(" ")
+        puts command
+        puts "Verifying #{contract_name} at #{address}..."
+        system(command)
+        puts "Verification complete for #{contract_name}"
+        puts "----------------------------------------"
+      else
+        puts "Skipping #{contract_name}: Solidity file not found at #{sol_file}"
+      end
+    end
+  
+    puts "All contracts processed."
+  end
+  
+  def get_old_address_to_new_mapping
+    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
+    facet_chain_dir = File.join(geth_dir, 'facet-chain')
+    sepolia_genesis_path = File.join(facet_chain_dir, 'facet-sepolia.json')
+  
+    old_to_new_mapping = {}
+  
+    # Read and parse the Sepolia genesis file
+    genesis_data = JSON.parse(File.read(sepolia_genesis_path))
+  
+    # Check if 'alloc' key exists
+    if genesis_data.key?('alloc')
+      genesis_data['alloc'].each do |new_address, contract_data|
+        # Check if the contract has storage data
+        if contract_data.key?('storage')
+          # Look for the specific storage key
+          old_address = contract_data['storage']['0xc853a311d1a4f36ec5860cd7849f0a8937a18e7b2c8d83c55f3308f9f81e51cb']
+          if old_address
+            # Remove '0x' prefix if present
+            old_address = old_address.sub(/^0x/, '')
+            # Add to mapping
+            old_to_new_mapping["0x" + old_address] = new_address
+          end
+        end
+      end
+    end
+  
+    old_to_new_mapping
+  end
 end
