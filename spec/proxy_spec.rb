@@ -79,7 +79,7 @@ RSpec.describe "Uniswap" do
   
   it 'does another one' do
     next
-    facet_data = get_deploy_data('legacy/AirdropERC20Vb02', [])
+    facet_data = get_deploy_data('predeploys/AirdropERC20Vb02', [])
           
     implementation_res = create_and_import_block(
       facet_data: facet_data,
@@ -91,7 +91,7 @@ RSpec.describe "Uniswap" do
     implementation_address = implementation_res.receipts_imported.first.contract_address
     
     initialize_calldata = get_function_calldata(
-      contract: 'legacy/AirdropERC20Vb02',
+      contract: 'predeploys/AirdropERC20Vb02',
       function: 'initialize',
       args: [
         "ethx",          # name
@@ -105,7 +105,7 @@ RSpec.describe "Uniswap" do
     
     proxy_res = create_and_import_block(
       facet_data: get_deploy_data(
-        'legacy/ERC1967Proxy', [implementation_address, initialize_calldata]
+        'predeploys/ERC1967Proxy', [implementation_address, initialize_calldata]
       ),
       to_address: nil,
       from_address: from_address,
@@ -117,7 +117,7 @@ RSpec.describe "Uniswap" do
     next
     mint_amount = 1e18.to_i
     
-    facet_data = get_deploy_data('legacy/EtherBridgeV064', [])
+    facet_data = get_deploy_data('predeploys/EtherBridgeV064', [])
           
     from_address = "0xC2172a6315c1D7f6855768F843c420EbB36eDa96".downcase
     trusted_smart_contract = "0xbE73b799BE0b492c36b19bf7a69D4a6b41D90214".downcase
@@ -132,7 +132,7 @@ RSpec.describe "Uniswap" do
     implementation_address = implementation_res.contract_address
     
     initialize_calldata = get_function_calldata(
-      contract: 'legacy/EtherBridgeV064',
+      contract: 'predeploys/EtherBridgeV064',
       function: 'initialize',
       args: [
         "Facet Ether",
@@ -143,7 +143,7 @@ RSpec.describe "Uniswap" do
     
     proxy_res = create_and_import_block(
       facet_data: get_deploy_data(
-        'legacy/ERC1967Proxy', [implementation_address, initialize_calldata]
+        'predeploys/ERC1967Proxy', [implementation_address, initialize_calldata]
       ),
       to_address: nil,
       from_address: from_address,
@@ -153,7 +153,7 @@ RSpec.describe "Uniswap" do
     proxy_address = proxy_res.contract_address
     
     bridge_in_calldata = get_function_calldata(
-      contract: 'legacy/EtherBridgeV064',
+      contract: 'predeploys/EtherBridgeV064',
       function: 'bridgeIn',
       args: [
         from_address,
@@ -162,7 +162,7 @@ RSpec.describe "Uniswap" do
     )
     
     call_contract_function(
-      contract: 'legacy/EtherBridgeV064',
+      contract: 'predeploys/EtherBridgeV064',
       address: proxy_address,
       from: trusted_smart_contract,
       function: 'bridgeIn',
@@ -170,7 +170,7 @@ RSpec.describe "Uniswap" do
     )
     
     result = static_call(
-      contract: 'legacy/EtherBridgeV064',
+      contract: 'predeploys/EtherBridgeV064',
       address: proxy_address,
       function: 'balanceOf',
       args: [from_address]

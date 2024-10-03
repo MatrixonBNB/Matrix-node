@@ -13,8 +13,7 @@ class SolidityCompiler
     
     def directory_checksum
       directories = [
-        Rails.root.join('lib', 'solidity'),
-        Rails.root.join('node_modules')
+        Rails.root.join('contracts')
       ]
       
       @checksum ||= calculate_checksum(directories)
@@ -30,13 +29,14 @@ class SolidityCompiler
     end
 
     def compile_all_legacy_files
-      directory = Rails.root.join('lib', 'solidity', 'legacy')
+      directory = Rails.root.join('contracts', 'src', 'predeploys')
       files = Dir.glob("#{directory}/**/*.sol").select do |f|
         File.file?(f) && f.split("/").last.match(/V[a-f0-9]{3}\.sol$/i)
       end
       
-      foundry_root = Rails.root.join('lib', 'solidity')
-      build_command = "forge build --root #{foundry_root} --no-metadata"
+      foundry_root = Rails.root.join('contracts')
+      predeploy_root = foundry_root.join('src', 'predeploys')
+      build_command = "forge build --root #{foundry_root} --no-metadata --contracts #{predeploy_root}"
       puts "Running command: #{build_command}"
       build_output, build_status = Open3.capture2e(build_command)
       
@@ -66,12 +66,12 @@ class SolidityCompiler
       # Ensure file_path is a string
       file_path = file_path.to_s
 
-      foundry_root = Rails.root.join('lib', 'solidity')
+      foundry_root = Rails.root.join('contracts')
       file_path = foundry_root.join('src', file_path) unless file_path.start_with?(foundry_root.to_s)
       
       contract_name = File.basename(file_path, '.sol')
       
-      json_file_path = foundry_root.join('out', "#{File.basename(file_path)}", "#{contract_name}.json")
+      json_file_path = foundry_root.join('forge-artifacts', "#{File.basename(file_path)}", "#{contract_name}.json")
       contract_data = JSON.parse(File.read(json_file_path))
         
       {

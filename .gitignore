@@ -38,6 +38,5 @@ base_fees
 /config/master.key
 node_modules
 
-/lib/solidity/out/
-/lib/solidity/cache/
-/lib/solidity/.env
+/contracts/forge-artifacts/
+/contracts/src/cache/

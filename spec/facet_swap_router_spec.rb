@@ -23,7 +23,7 @@ RSpec.describe "FacetSwapRouterV099 contract" do
     token_a_address = tokenA_deploy_receipt.contract_address
     
     factory_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/FacetSwapFactoryVe7f',
+      implementation: 'predeploys/FacetSwapFactoryVe7f',
       from: user_address,
       args: [user_address]
     )
@@ -39,7 +39,7 @@ RSpec.describe "FacetSwapRouterV099 contract" do
     token_b_address = tokenB_deploy_receipt.contract_address
 
     router_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/FacetSwapRouterV099',
+      implementation: 'predeploys/FacetSwapRouterV099',
       from: user_address,
       args: [factory_address, weth_address]
     )
@@ -67,7 +67,7 @@ RSpec.describe "FacetSwapRouterV099 contract" do
 # binding.pry
     pair_address = create_pair_receipt.decoded_logs.detect { |i| i['event'] == 'PairCreated' }['data']['pair']
     
-    EVMTestHelper.contract_addresses[pair_address] = "legacy/FacetSwapPairV2b2"
+    EVMTestHelper.contract_addresses[pair_address] = "predeploys/FacetSwapPairV2b2"
 
     make_static_call(
       contract: pair_address,

@@ -43,7 +43,7 @@ module EVMTestHelper
     contract:,
     args: [],
     value: 0,
-    gas_limit: 1_000_000,
+    gas_limit: 5_000_000,
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
@@ -68,7 +68,7 @@ module EVMTestHelper
     implementation:,
     args: [],
     value: 0,
-    gas_limit: 1_000_000,
+    gas_limit: 5_000_000,
     max_fee_per_gas: 10.gwei,
     expect_failure: false
   )

@@ -5,7 +5,7 @@ module PredeployManager
   PREDEPLOY_INFO_PATH = Rails.root.join('config', 'predeploy_info.json')
   
   def predeploy_to_local_map
-    legacy_dir = Rails.root.join("lib/solidity/legacy")
+    legacy_dir = Rails.root.join("contracts/src/predeploys")
     map = {}
     
     Dir.glob("#{legacy_dir}/*.sol").each do |file_path|
@@ -24,7 +24,7 @@ module PredeployManager
         deployed_by_contract_prefixes = %w(ERC20Bridge FacetBuddy FacetSwapPair)
         
         if deployed_by_contract_prefixes.any? { |prefix| filename.match(/^#{prefix}V[a-f0-9]{3}$/i) }
-          contract = EVMHelpers.compile_contract("legacy/#{filename}")
+          contract = EVMHelpers.compile_contract("predeploys/#{filename}")
         
           map["0x" + contract.parent.init_code_hash.last(40)] = filename
         end
@@ -67,7 +67,7 @@ module PredeployManager
   
   def local_from_predeploy(address)
     name = predeploy_to_local_map.fetch(address&.downcase)
-    "legacy/#{name}"
+    "predeploys/#{name}"
   end
   memoize :local_from_predeploy
 
@@ -129,7 +129,7 @@ module PredeployManager
     predeploy_info = {}
     
     predeploy_to_local_map.each do |address, contract_name|
-      contract = EVMHelpers.compile_contract("legacy/#{contract_name}")
+      contract = EVMHelpers.compile_contract("predeploys/#{contract_name}")
       predeploy_info[contract_name] ||= {
         name: contract.name,
         address: [],
@@ -139,7 +139,7 @@ module PredeployManager
       predeploy_info[contract_name][:address] << address
     end
     
-    proxy_contract = EVMHelpers.compile_contract("legacy/ERC1967Proxy")
+    proxy_contract = EVMHelpers.compile_contract("libraries/ERC1967Proxy")
     predeploy_info['ERC1967Proxy'] = {
       name: proxy_contract.name,
       abi: proxy_contract.abi,
@@ -241,8 +241,8 @@ module PredeployManager
     )
   end
   
-  SOL_DIR = Rails.root.join('lib', 'solidity')
-  LEGACY_DIR = SOL_DIR.join('src', 'legacy')
+  SOL_DIR = Rails.root.join('contracts')
+  LEGACY_DIR = SOL_DIR.join('src', 'predeploys')
 
   def verify_contracts(rpc_url, blockscout_url)
     # Get the contracts from PredeployManager
@@ -262,7 +262,7 @@ module PredeployManager
           "--verifier-url #{blockscout_url}",
           "--rpc-url #{rpc_url}",
           address,
-          "src/legacy/#{contract_name}.sol:#{contract_name}",
+          "src/predeploys/#{contract_name}.sol:#{contract_name}",
         ].join(" ")
         puts command
         puts "Verifying #{contract_name} at #{address}..."
