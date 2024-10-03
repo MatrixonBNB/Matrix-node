@@ -185,6 +185,8 @@ module PredeployManager
     
     timestamp, mix_hash = get_timestamp_and_mix_hash(l1_genesis_block_number)
     
+    use_dump = l1_network_name == 'sepolia' && !Rails.env.test?
+    
     {
       config: config,
       timestamp: "0x#{timestamp.to_s(16)}",
@@ -192,7 +194,7 @@ module PredeployManager
       gasLimit: "0x#{SysConfig::L2_BLOCK_GAS_LIMIT.to_s(16)}",
       difficulty: "0x0",
       mixHash: mix_hash,
-      alloc: generate_alloc_for_genesis(use_dump: l1_network_name == 'sepolia')
+      alloc: generate_alloc_for_genesis(use_dump: use_dump)
     }
   end
   

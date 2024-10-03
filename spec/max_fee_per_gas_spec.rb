@@ -7,7 +7,7 @@ RSpec.describe "Reverts" do
   
   let(:from_address) { "0x000000000000000000000000000000000000000a" }
   
-  let(:counter_contract) { EVMHelpers.compile_contract('contracts/Counter') }
+  let(:counter_contract) { EVMHelpers.compile_contract('contracts/Counter2') }
   
   let!(:counter_address) {
     facet_data = EVMHelpers.get_deploy_data(counter_contract, [1])

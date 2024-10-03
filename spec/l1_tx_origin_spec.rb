@@ -6,7 +6,7 @@ RSpec.describe "L1 Tx Origin Gas Delegation" do
   let!(:from_address2) { "0x2222" + SecureRandom.hex(18) }
   
   let!(:counter_address) {
-    contract = EVMHelpers.compile_contract('contracts/Counter')
+    contract = EVMHelpers.compile_contract('contracts/Counter2')
     facet_data = EVMHelpers.get_deploy_data(contract, [1])
             
     res = create_and_import_block(
@@ -19,7 +19,7 @@ RSpec.describe "L1 Tx Origin Gas Delegation" do
   }
   
   it 'handles refunds correctly for internal calls' do
-    contract = EVMHelpers.compile_contract('contracts/Counter')
+    contract = EVMHelpers.compile_contract('contracts/Counter2')
     
     increment_input = TransactionHelper.get_function_calldata(
       contract: contract, function: 'increment', args: []
