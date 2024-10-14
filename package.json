@@ -4,11 +4,5 @@
   "description": "A Rails project with Solidity contracts",
   "main": "index.js",
   "author": "Your Name",
-  "license": "MIT",
-  "dependencies": {
-    "@openzeppelin/contracts": "5.0.2",
-    "@openzeppelin/contracts-upgradeable": "5.0.2",
-    "forge": "^2.3.0",
-    "solady": "0.0.243"
-  }
+  "license": "MIT"
 }

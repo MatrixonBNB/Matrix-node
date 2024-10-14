@@ -35,15 +35,14 @@ class SolidityCompiler
       end
       
       foundry_root = Rails.root.join('contracts')
-      predeploy_root = foundry_root.join('src', 'predeploys')
-      build_command = "forge build --root #{foundry_root} --no-metadata --contracts #{predeploy_root}"
+      build_command = "cd #{foundry_root} && forge build"
       puts "Running command: #{build_command}"
-      build_output, build_status = Open3.capture2e(build_command)
       
-      unless build_status.success?
-        raise "Error running forge build: #{build_output}"
+      success = system(build_command)
+        
+      unless success
+        raise "Error running forge build. Exit status: #{$?.exitstatus}"
       end
-
       checksum = directory_checksum
       
       results = files.map do |file|
