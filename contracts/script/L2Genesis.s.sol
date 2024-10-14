@@ -13,8 +13,6 @@ contract L2Genesis is Script {
     uint256 public constant PRECOMPILE_COUNT = 256;
     address internal deployer;
     
-    uint256 public constant L2_CHAIN_ID = 0xface7;
-    
     struct PredeployContract {
         address addr;
         string name;
@@ -33,7 +31,6 @@ contract L2Genesis is Script {
 
     function run() public {
         vm.startPrank(deployer);
-        vm.chainId(L2_CHAIN_ID);
         
         etchContracts();
         vm.stopPrank();
