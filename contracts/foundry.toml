@@ -1,0 +1,24 @@
+[profile.default]
+src = "src"
+out = 'forge-artifacts'
+libs = ["lib"]
+via_ir = true
+optimizer = true
+optimizer_runs = 200
+solc_version = "0.8.24"
+ast = true
+evm_version = "cancun"
+
+ffi = true
+fs_permissions = [
+  { access='read-write', path='./predeploy-contracts.json' }
+]
+
+ignored_error_codes = ["transient-storage", "code-size", "init-code-size", 5159]
+
+remappings = [
+  "solady/=lib/solady/",
+  "src/=src/",
+  '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
+  'forge-std/=lib/forge-std/src',
+]

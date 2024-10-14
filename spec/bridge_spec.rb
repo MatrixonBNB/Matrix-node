@@ -11,7 +11,7 @@ RSpec.describe "Bridge contracts" do
   
   it 'bridges' do
     bridge_deploy_receipt = deploy_contract_with_proxy(
-      implementation: 'legacy/EtherBridgeV064',
+      implementation: 'predeploys/EtherBridgeV064',
       from: from_address,
       args: [
         "Bridge Tester",

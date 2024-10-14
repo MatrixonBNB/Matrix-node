@@ -1,25 +1,19 @@
 class SolidityCompiler
-  def initialize(filename_or_solidity_code)
-    @solidity_file = filename_or_solidity_code
-  end
-
-  def self.reset_checksum
-    @checksum = nil
-  end
-  
   class << self
     include Memery
 
     def compile(filename_or_solidity_code)
       checksum = directory_checksum
-
       memoized_compile(filename_or_solidity_code, checksum)
+    end
+    
+    def reset_checksum
+      @checksum = nil
     end
     
     def directory_checksum
       directories = [
-        Rails.root.join('lib', 'solidity'),
-        Rails.root.join('node_modules')
+        Rails.root.join('contracts')
       ]
       
       @checksum ||= calculate_checksum(directories)
@@ -35,112 +29,61 @@ class SolidityCompiler
     end
 
     def compile_all_legacy_files
-      directory = Rails.root.join('lib', 'solidity', 'legacy')
+      directory = Rails.root.join('contracts', 'src', 'predeploys')
       files = Dir.glob("#{directory}/**/*.sol").select do |f|
         File.file?(f) && f.split("/").last.match(/V[a-f0-9]{3}\.sol$/i)
       end
-  
+      
+      foundry_root = Rails.root.join('contracts')
+      build_command = "cd #{foundry_root} && forge build"
+      puts "Running command: #{build_command}"
+      
+      success = system(build_command)
+        
+      unless success
+        raise "Error running forge build. Exit status: #{$?.exitstatus}"
+      end
       checksum = directory_checksum
       
-      results = Parallel.map(files, in_threads: Parallel.processor_count * 2) do |file|
+      results = files.map do |file|
         memoized_compile(file, checksum)
       end
-  
-      # Combine results into a single hash
-      combined_results = results.reduce({}) do |acc, result|
-        acc.merge(result)
-      end
-  
-      combined_results
+
+      results.reduce({}, :merge)
     end
-    
+
     def memoized_compile(filename, checksum)
       Rails.cache.fetch(['compile', checksum, filename.to_s]) do
         compile_solidity(filename)
       end
     end
     memoize :memoized_compile
-  end
-  
-  def self.current_solc_version
-    version_output = `solc --version`
-    version_output[/\d+\.\d+\.\d+/]
-  end
-  
-  def self.compile_solidity(file_path)
-    if Rails.env.production?
-      raise "Solidity compilation is disabled in production"
-    end
-    
-    pragma_version = nil
-    File.foreach(file_path) do |line|
-      if line =~ /pragma solidity (.+);/
-        pragma_version = $1.strip
-        break
-      end
-    end
 
-    raise "Pragma version not found in #{IO.read(file_path)}" unless pragma_version
+    def compile_solidity(file_path)
+      raise "Solidity compilation is disabled in production" if Rails.env.production?
 
-    # Extract the version number (e.g., from "^0.8.0" to "0.8.0")
-    version_match = pragma_version.match(/(\d+\.\d+\.\d+)/)
-    raise "Invalid pragma version format in #{file_path}" unless version_match
+      # Ensure file_path is a string
+      file_path = file_path.to_s
 
-    version = version_match[1]
-
-    # Set the Solidity version using solc-select
-    unless current_solc_version == version
-      system("solc-select use #{version} --always-install")
-    end
-    
-    legacy_solidity = version.split('.').last(2).join('.').to_f < 8.17
-    
-    solc_args = [
-      "solc",
-      "--combined-json", "abi,bin,bin-runtime",
-      "--optimize",
-      # "--optimize-runs", "#{2 ** 32 - 1}",
-      # TODO: Switch back to the max optimize runs
-      "--optimize-runs", "200",
-      "--base-path", Rails.root.join("lib", "solidity").to_s
-    ]
-
-    # Append additional arguments if not legacy
-    unless legacy_solidity
-      solc_args += [
-        "--via-ir",
-        "--include-path", "node_modules/",
-      ]
-    end
-    
-    solc_args += [file_path.to_s]
-    
-    puts "Running solc with arguments: #{solc_args.join(' ')}"
-
-    filename = file_path.to_s.split("/").last
-    
-    # Compile with optimizer settings
-    stdout, stderr, status = Benchmark.msr("Compiled #{filename}") do
-      Open3.capture3(*solc_args)
-    end
-    
-    raise "Error running solc: #{stderr}" unless status.success?
-  
-    # Parse the JSON output
-    output = JSON.parse(stdout)
-  
-    # Extract the contract names, bytecode, and ABI
-    contract_data = {}
-    output['contracts'].each do |contract_name, contract_info|
-      name = contract_name.split(':').last
-      contract_data[name] = {
-        'bytecode' => contract_info['bin'],
-        'abi' => contract_info['abi'],
-        'bin_runtime' => contract_info['bin-runtime']
+      foundry_root = Rails.root.join('contracts')
+      file_path = foundry_root.join('src', file_path) unless file_path.start_with?(foundry_root.to_s)
+      
+      contract_name = File.basename(file_path, '.sol')
+      
+      json_file_path = foundry_root.join('forge-artifacts', "#{File.basename(file_path)}", "#{contract_name}.json")
+      contract_data = JSON.parse(File.read(json_file_path))
+        
+      {
+        contract_name => {
+          'abi' => contract_data['abi'],
+          'bytecode' => contract_data['bytecode']['object'].sub(/\A0x/, ''),
+          'bin_runtime' => contract_data['deployedBytecode']['object'].sub(/\A0x/, '')
+        }
       }
     end
-  
-    # Return the hash mapping contract names to their bytecode and ABI
-    contract_data
+  end
+
+  def initialize(filename_or_solidity_code)
+    @solidity_file = filename_or_solidity_code
   end
 end

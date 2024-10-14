@@ -68,7 +68,7 @@ module GethDriver
   end
   
   def trace_transaction(tx_hash)
-    # contract = EVMHelpers.compile_contract("legacy/NFTCollectionVa11")
+    # contract = EVMHelpers.compile_contract("predeploys/NFTCollectionVa11")
     # function = contract.parent.function_hash['contractURI']
     # data = function.get_call_data
     

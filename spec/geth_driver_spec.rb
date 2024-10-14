@@ -6,7 +6,7 @@ RSpec.describe GethDriver do
   describe 'block and deposit transaction' do
     it 'deploys a contract with a deposit tx' do
       initial_count = 5
-      contract = EVMHelpers.compile_contract('contracts/Counter')
+      contract = EVMHelpers.compile_contract('contracts/Counter2')
       facet_data = EVMHelpers.get_deploy_data(contract, [initial_count])
       
       from_address = "0x" + "0" * 39 + 'a'
@@ -63,7 +63,7 @@ RSpec.describe GethDriver do
       decoded_data = Eth::Abi.decode(["string"], log_event['data'].hex_to_bytes)
       expect(decoded_data[0]).to eq("Hello, World!")
    
-      contract = EVMHelpers.get_contract('contracts/Counter', contract_address)
+      contract = EVMHelpers.get_contract('contracts/Counter2', contract_address)
       function = contract.parent.function_hash['getCount']
       
       data = function.get_call_data

@@ -137,7 +137,7 @@ class FacetTransactionReceipt < ApplicationRecord
         impl.parent.decode_log(log)
       rescue Eth::Contract::UnknownEvent => e
         # If unknown event, try all contracts in the legacy directory
-        legacy_dir = Rails.root.join('lib', 'solidity', 'legacy')
+        legacy_dir = Rails.root.join('contracts', 'src', 'predeploys')
         legacy_files = Dir.glob(legacy_dir.join('*.sol'))
   
         legacy_files.sort_by! { |file| File.basename(file, '.sol') == 'ERC1967Proxy' ? 0 : 1 }

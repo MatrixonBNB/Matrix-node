@@ -5,7 +5,7 @@ module PredeployManager
   PREDEPLOY_INFO_PATH = Rails.root.join('config', 'predeploy_info.json')
   
   def predeploy_to_local_map
-    legacy_dir = Rails.root.join("lib/solidity/legacy")
+    legacy_dir = Rails.root.join("contracts/src/predeploys")
     map = {}
     
     Dir.glob("#{legacy_dir}/*.sol").each do |file_path|
@@ -20,14 +20,6 @@ module PredeployManager
         end
         
         map[address] = filename
-        
-        deployed_by_contract_prefixes = %w(ERC20Bridge FacetBuddy FacetSwapPair)
-        
-        if deployed_by_contract_prefixes.any? { |prefix| filename.match(/^#{prefix}V[a-f0-9]{3}$/i) }
-          contract = EVMHelpers.compile_contract("legacy/#{filename}")
-        
-          map["0x" + contract.parent.init_code_hash.last(40)] = filename
-        end
       end
     end 
     
@@ -66,8 +58,8 @@ module PredeployManager
   memoize :get_contract_from_predeploy_info
   
   def local_from_predeploy(address)
-    name = predeploy_to_local_map.fetch(address&.downcase)
-    "legacy/#{name}"
+    name = predeploy_to_local_map.fetch(address)
+    "predeploys/#{name}"
   end
   memoize :local_from_predeploy
 
@@ -87,27 +79,8 @@ module PredeployManager
   end
   
   def generate_alloc_for_genesis(use_dump: false)
-    initializable_slot = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132"
-    
-    max_uint64 = 2 ** 64 - 1
-
-    result = max_uint64 << 1
-
-    hex_result = result.zpad(32).bytes_to_hex
-    
-    our_allocs = predeploy_to_local_map.map do |address, alloc|
-      [
-        address,
-        {
-          "code" => "0x" + get_code(address),
-          "balance" => "0x0",
-          "nonce" => "0x1",
-          "storage" => {
-            initializable_slot => hex_result
-          }
-        }
-      ]
-    end.to_h
+    genesis_test = Rails.root.join('contracts', 'facet-local-genesis-allocs.json')
+    our_allocs = JSON.parse(IO.read(genesis_test))
     
     optimism_file = Rails.root.join('config', 'facet-optimism-genesis-allocs.json')
     optimism_allocs = JSON.parse(File.read(optimism_file))
@@ -118,7 +91,8 @@ module PredeployManager
     end
     
     dump_file = Rails.root.join("20120159_dump.json")
-    dump = use_dump ? JSON.parse(File.read(dump_file)) : {}
+    # dump = use_dump ? JSON.parse(File.read(dump_file)) : {}
+    dump = {}
     
     merged = dump.merge(optimism_allocs).merge(our_allocs)
     
@@ -126,10 +100,17 @@ module PredeployManager
   end
   
   def generate_predeploy_info_json
+    foundry_file = Rails.root.join('contracts', 'predeploy-contracts.json')
+    foundry_parsed = JSON.parse(File.read(foundry_file))  
+    
+    foundry_address_to_name = foundry_parsed.each_with_object({}) do |contract, hash|
+      hash[contract['addr'].downcase] = contract['name']
+    end
+    
     predeploy_info = {}
     
-    predeploy_to_local_map.each do |address, contract_name|
-      contract = EVMHelpers.compile_contract("legacy/#{contract_name}")
+    foundry_address_to_name.each do |address, contract_name|
+      contract = EVMHelpers.compile_contract("predeploys/#{contract_name}")
       predeploy_info[contract_name] ||= {
         name: contract.name,
         address: [],
@@ -139,7 +120,7 @@ module PredeployManager
       predeploy_info[contract_name][:address] << address
     end
     
-    proxy_contract = EVMHelpers.compile_contract("legacy/ERC1967Proxy")
+    proxy_contract = EVMHelpers.compile_contract("libraries/ERC1967Proxy")
     predeploy_info['ERC1967Proxy'] = {
       name: proxy_contract.name,
       abi: proxy_contract.abi,
@@ -185,6 +166,8 @@ module PredeployManager
     
     timestamp, mix_hash = get_timestamp_and_mix_hash(l1_genesis_block_number)
     
+    use_dump = l1_network_name == 'sepolia' && !Rails.env.test?
+    
     {
       config: config,
       timestamp: "0x#{timestamp.to_s(16)}",
@@ -192,7 +175,7 @@ module PredeployManager
       gasLimit: "0x#{SysConfig::L2_BLOCK_GAS_LIMIT.to_s(16)}",
       difficulty: "0x0",
       mixHash: mix_hash,
-      alloc: generate_alloc_for_genesis(use_dump: l1_network_name == 'sepolia')
+      alloc: generate_alloc_for_genesis(use_dump: use_dump)
     }
   end
   
@@ -212,6 +195,9 @@ module PredeployManager
     MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
     SolidityCompiler.compile_all_legacy_files
+    
+    foundry_root = Rails.root.join('contracts')
+    system("cd #{foundry_root} && forge script script/L2Genesis.s.sol")
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
     
@@ -239,11 +225,10 @@ module PredeployManager
     )
   end
   
-  SOL_DIR = Rails.root.join('lib', 'solidity')
-  LEGACY_DIR = SOL_DIR.join('src', 'legacy')
+  SOL_DIR = Rails.root.join('contracts')
+  LEGACY_DIR = SOL_DIR.join('src', 'predeploys')
 
   def verify_contracts(rpc_url, blockscout_url)
-    # Get the contracts from PredeployManager
     contracts = PredeployManager.predeploy_to_local_map.to_a.reverse.to_h
   
     contracts.each do |address, contract_name|
@@ -258,9 +243,10 @@ module PredeployManager
           "--via-ir",
           "--optimizer-runs 200",
           "--verifier-url #{blockscout_url}",
+          "--watch",
           "--rpc-url #{rpc_url}",
           address,
-          "src/legacy/#{contract_name}.sol:#{contract_name}",
+          "src/predeploys/#{contract_name}.sol:#{contract_name}",
         ].join(" ")
         puts command
         puts "Verifying #{contract_name} at #{address}..."

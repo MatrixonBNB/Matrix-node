@@ -15,6 +15,10 @@ class LegacyContractArtifact < ApplicationRecord
     const :pragma_version, String
     const :created_at, String
     const :updated_at, String
+    
+    def primary_contract_name
+      LegacyContractArtifact.extract_primary_contract_name(source_code)
+    end
   end
   
   class AmbiguousSuffixError < StandardError; end
@@ -181,6 +185,23 @@ class LegacyContractArtifact < ApplicationRecord
         puts "Diff between #{artifact1.name} and #{artifact2.name} for contract #{contract_name}:"
         diff_source_code(artifact1, artifact2)
       end
+    end
+  end
+  
+  def self.most_recent_artifacts
+    cached_all
+      .group_by(&:primary_contract_name)
+      .transform_values do |artifacts|
+        artifacts.max_by { |artifact| [artifact.block_number, artifact.transaction_index, artifact.internal_transaction_index] }
+      end
+  end
+  
+  def self.print_most_recent_artifacts_with_addresses
+    most_recent_artifacts.each do |name, artifact|
+      suffix = artifact.init_code_hash.last(3)
+      address = address_from_suffix(suffix)
+      
+      puts "#{name}V#{suffix}"
     end
   end
   
