@@ -39,4 +39,4 @@ base_fees
 node_modules
 
 /contracts/forge-artifacts/
-/contracts/src/cache/
+/contracts/cache/
