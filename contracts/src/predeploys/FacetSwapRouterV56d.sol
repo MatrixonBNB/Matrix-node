@@ -123,14 +123,23 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         require(amountB >= amountBMin, "FacetSwapV1Router: INSUFFICIENT_B_AMOUNT");
     }
 
+    modifier ensureWETHBalance() {
+        uint256 initialWETHBalance = ERC20(s().WETH).balanceOf(address(this));
+        _;
+        uint256 finalWETHBalance = ERC20(s().WETH).balanceOf(address(this));
+        require(finalWETHBalance >= initialWETHBalance, "Router WETH balance decreased");
+    }
+
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,
         address[] memory path,
         address to,
         uint256 deadline
-    ) public virtual whenNotPaused returns (uint256[] memory amounts) {
+    ) public virtual whenNotPaused ensureWETHBalance returns (uint256[] memory amounts) {
         require(path[0] == s().WETH || path[path.length - 1] == s().WETH, "Must have WETH as either the first or last token in the path");
+        require(path[0] != path[path.length - 1], "Cannot self trade");
+
         uint256 amountInWithFee = path[0] == s().WETH ? amountIn - calculateFeeAmount(amountIn) : amountIn;
         amounts = _swapExactTokensForTokens(amountInWithFee, amountOutMin, path, address(this), deadline);
         uint256 amountToChargeFeeOn = path[0] == s().WETH ? amountIn : amounts[amounts.length - 1];
@@ -168,8 +177,10 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         address[] memory path,
         address to,
         uint256 deadline
-    ) public virtual whenNotPaused returns (uint256[] memory amounts) {
+    ) public virtual whenNotPaused ensureWETHBalance returns (uint256[] memory amounts) {
         require(path[0] == s().WETH || path[path.length - 1] == s().WETH, "Must have WETH as either the first or last token in the path");
+        require(path[0] != path[path.length - 1], "Cannot self trade");
+
         uint256 amountOutWithFee = path[path.length - 1] == s().WETH ? amountOut + calculateFeeAmount(amountOut) : amountOut;
         amounts = _swapTokensForExactTokens(amountOutWithFee, amountInMax, path, address(this), deadline);
         uint256 amountToChargeFeeOn = path[0] == s().WETH ? amounts[0] : amountOut;

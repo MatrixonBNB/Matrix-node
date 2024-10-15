@@ -8,7 +8,22 @@ import "src/interfaces/IFacetSwapV1Callee.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
 
+library UQ112x112 {
+    uint224 constant Q112 = 2**112;
+
+    // encode a uint112 as a UQ112x112
+    function encode(uint112 y) internal pure returns (uint224 z) {
+        z = uint224(y) * Q112; // never overflows
+    }
+
+    // divide a UQ112x112 by a uint112, returning a UQ112x112
+    function uqdiv(uint224 x, uint112 y) internal pure returns (uint224 z) {
+        z = x / uint224(y);
+    }
+}
+
 contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
+    using UQ112x112 for uint224;
     using LibString for *;
     
     struct FacetSwapPairStorage {
@@ -29,6 +44,14 @@ contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
         assembly {
            cs.slot := position
         }
+    }
+    
+    function getToken0() public view returns (address) {
+        return s().token0;
+    }
+    
+    function getToken1() public view returns (address) {
+        return s().token1;
     }
     
     uint256 public constant MINIMUM_LIQUIDITY = 10 ** 3;
@@ -70,9 +93,10 @@ contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
         _blockTimestampLast = s().blockTimestampLast;
     }
 
-    function _safeTransfer(address token, address to, uint256 value) private {
-        bool result = ERC20(token).transfer(to, value);
-        require(result, "FacetSwapV1: TRANSFER_FAILED");
+    function _safeTransfer(address token, address to, uint value) private {
+        bytes4 selector = bytes4(keccak256(bytes('transfer(address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(selector, to, value));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), 'UniswapV2: TRANSFER_FAILED');
     }
 
     function _update(uint256 balance0, uint256 balance1, uint112 _reserve0, uint112 _reserve1) private {
@@ -80,22 +104,16 @@ contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
         uint32 timeElapsed = blockTimestamp - s().blockTimestampLast;
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
-            s().price0CumulativeLast += uint256(encode(_reserve1) / _reserve0) * timeElapsed;
-            s().price1CumulativeLast += uint256(encode(_reserve0) / _reserve1) * timeElapsed;
+            unchecked {
+                s().price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
+                s().price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+            }
         }
         emit PreSwapReserves(s().reserve0, s().reserve1);
         s().reserve0 = uint112(balance0);
         s().reserve1 = uint112(balance1);
         s().blockTimestampLast = blockTimestamp;
         emit Sync(s().reserve0, s().reserve1);
-    }
-
-    function encode(uint112 y) internal pure returns (uint224) {
-        return uint224(y) * 2**112;
-    }
-
-    function uqdiv(uint224 x, uint112 y) internal pure returns (uint224) {
-        return x / uint224(y);
     }
 
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool) {
