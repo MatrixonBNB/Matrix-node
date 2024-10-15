@@ -16,6 +16,14 @@ contract PublicMintERC20Vc88 is FacetERC20, Initializable {
            cs.slot := position
         }
     }
+    
+    function getMaxSupply() public view returns (uint256) {
+        return s().maxSupply;
+    }
+
+    function getPerMintLimit() public view returns (uint256) {
+        return s().perMintLimit;
+    }
   
     constructor() {
       _disableInitializers();

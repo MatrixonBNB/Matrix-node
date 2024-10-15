@@ -14,6 +14,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         string name;
         string symbol;
         uint8 decimals;
+        mapping(address => bool) balanceInitialized;
     }
     
     function _FacetERC20Storage() internal pure returns (FacetERC20Storage storage cs) {
@@ -41,14 +42,6 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         return _FacetERC20Storage().decimals;
     }
     
-    function transfer(address to, uint amount) public override returns (bool) {
-        uint256 currentBalance = balanceOf(msg.sender);
-        require(currentBalance >= amount, 
-        string.concat("ERC20: transfer amount exceeds balance. Balance: ", currentBalance.toString(), " Amount: ", amount.toString())
-        );
-        return super.transfer(to, amount);
-    }
-    
     function transferFrom(address from, address to, uint amount) public override returns (bool) {
         if (msg.sender.isBuddyOfUser(from)) {
             super._approve(from, msg.sender, type(uint256).max);
@@ -65,11 +58,29 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         return super.allowance(owner, spender);
     }
     
-    function _burn(address from, uint amount) internal override {
-        uint256 currentBalance = balanceOf(from);
-        require(currentBalance >= amount,
-        string.concat("ERC20: burn amount exceeds balance. Balance: ", currentBalance.toString(), " Amount: ", amount.toString())
-        );
-        return super._burn(from, amount);
+    function _beforeTokenTransfer(address from, address to, uint256) internal virtual override {
+        initBalanceIfNeeded(from);
+        initBalanceIfNeeded(to);
+    }
+    
+    function isInMigration() internal view returns(bool) {
+        address dummy = 0x11110000000000000000000000000000000000C5;
+        return dummy.code.length > 0;
+    }
+    
+    function initBalanceIfNeeded(address account) public {
+        FacetERC20Storage storage fs = _FacetERC20Storage();
+        uint256 balance = balanceOf(account);
+        
+        if (account == address(0)) return;
+        if (isInMigration()) return;
+        
+        if (!fs.balanceInitialized[account]) {
+            if (balance > 0) {
+                emit Transfer(address(0), account, balance);
+            }
+            
+            fs.balanceInitialized[account] = true;
+        }
     }
 }
