@@ -3,6 +3,8 @@ module PredeployManager
   include Memery
   include SysConfig
   PREDEPLOY_INFO_PATH = Rails.root.join('config', 'predeploy_info.json')
+  SOL_DIR = Rails.root.join('contracts')
+  LEGACY_DIR = SOL_DIR.join('src', 'predeploys')
   
   def predeploy_to_local_map
     legacy_dir = Rails.root.join("contracts/src/predeploys")
@@ -62,21 +64,6 @@ module PredeployManager
     "predeploys/#{name}"
   end
   memoize :local_from_predeploy
-
-  def get_code(address)
-    local = local_from_predeploy(address)
-    contract = EVMHelpers.compile_contract(local)
-    raise unless contract.parent.bin_runtime
-    unless is_valid_hex?("0x" + contract.parent.bin_runtime)
-      binding.irb
-      raise
-    end
-    contract.parent.bin_runtime
-  end
-  
-  def is_valid_hex?(hex)
-    hex.match?(/^0x[0-9a-fA-F]+$/) && hex.length.even?
-  end
   
   def generate_alloc_for_genesis(use_dump: false)
     genesis_test = Rails.root.join('contracts', 'facet-local-genesis-allocs.json')
@@ -90,9 +77,7 @@ module PredeployManager
       raise KeyError, "Duplicate keys found: #{duplicates.join(', ')}"
     end
     
-    dump_file = Rails.root.join("20120159_dump.json")
-    # dump = use_dump ? JSON.parse(File.read(dump_file)) : {}
-    dump = {}
+    dump = use_dump ? get_alloc_from_geth : {}
     
     merged = dump.merge(optimism_allocs).merge(our_allocs)
     
@@ -225,10 +210,36 @@ module PredeployManager
     )
   end
   
-  SOL_DIR = Rails.root.join('contracts')
-  LEGACY_DIR = SOL_DIR.join('src', 'predeploys')
-
-  def verify_contracts(rpc_url, blockscout_url)
+  def get_alloc_from_geth
+    data = GethDriver.dump_state
+    
+    alloc = {}
+    data.each_line do |line|
+      entry = JSON.parse(line)
+      address = entry['address']
+      
+      next unless address
+      next if address == "0x11110000000000000000000000000000000000c5"
+      
+      code = entry['code'].presence || "0x"
+      
+      next if code == "0x"
+      
+      nonce = [entry['nonce'], 1].max
+      nonce = "0x" + nonce.to_s(16)
+      
+      alloc[address] = {
+        'balance' => "0x0",
+        'nonce' => nonce,
+        'code' => code,
+        'storage' => entry['storage'].presence || {}
+      }
+    end
+    
+    alloc
+  end
+  
+  def verify_contracts(rpc_url = "http://localhost:8545", blockscout_url = "http://localhost/api/")
     contracts = PredeployManager.predeploy_to_local_map.to_a.reverse.to_h
   
     contracts.each do |address, contract_name|
@@ -259,35 +270,5 @@ module PredeployManager
     end
   
     puts "All contracts processed."
-  end
-  
-  def get_old_address_to_new_mapping
-    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
-    facet_chain_dir = File.join(geth_dir, 'facet-chain')
-    sepolia_genesis_path = File.join(facet_chain_dir, 'facet-sepolia.json')
-  
-    old_to_new_mapping = {}
-  
-    # Read and parse the Sepolia genesis file
-    genesis_data = JSON.parse(File.read(sepolia_genesis_path))
-  
-    # Check if 'alloc' key exists
-    if genesis_data.key?('alloc')
-      genesis_data['alloc'].each do |new_address, contract_data|
-        # Check if the contract has storage data
-        if contract_data.key?('storage')
-          # Look for the specific storage key
-          old_address = contract_data['storage']['0xc853a311d1a4f36ec5860cd7849f0a8937a18e7b2c8d83c55f3308f9f81e51cb']
-          if old_address
-            # Remove '0x' prefix if present
-            old_address = old_address.sub(/^0x/, '')
-            # Add to mapping
-            old_to_new_mapping["0x" + old_address] = new_address
-          end
-        end
-      end
-    end
-  
-    old_to_new_mapping
   end
 end

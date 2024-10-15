@@ -674,37 +674,4 @@ class LegacyMigrationDataGenerator
   def geth_driver
     @_geth_driver ||= GethDriver
   end
-  
-  def self.generate_alloc_json
-    data = GethDriver.dump_state
-    
-    alloc = {}
-    data.each_line do |line|
-      entry = JSON.parse(line)
-      address = entry['address']
-      code = entry['code'].presence || "0x"
-      
-      unless address
-        puts "No address: #{line}"
-        next
-      end
-      
-      if code == "0x"
-        next
-      end
-      
-      if address == "0x11110000000000000000000000000000000000c5"
-        next
-      end
-      
-      alloc[address] = {
-        'balance' => "0x0",
-        'nonce' => entry['nonce'] ? "0x#{entry['nonce'].to_i.to_s(16)}" : "0x0",
-        'code' => code,
-        'storage' => entry['storage'].presence || {}
-      }
-    end
-    
-    alloc
-  end
 end

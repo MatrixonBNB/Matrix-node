@@ -18,38 +18,6 @@ abstract contract LegacyAddressable {
         }
     }
     
-    function getDeployerNonce() internal view returns (uint256 nonce) {
-        address deployer = msg.sender;
-        address computedAddress;
-        uint256 maxAttempts = 100_000;
-        
-        // Iterate until we find the nonce that produces this contract's address
-        while (true) {
-            computedAddress = compAddr(deployer, nonce);
-            
-            if (computedAddress == address(this)) {
-                return nonce;
-            }
-            
-            // Prevent infinite loop in case of an error
-            require(nonce <= maxAttempts, "Nonce not found");
-            
-            nonce++;
-        }
-    }
-    
-    function compAddr(address deployer, uint256 nonce) pure internal returns (address) {
-        return address(uint160(uint256(keccak256(LibRLP.p(deployer).p(nonce).encode()))));
-    }
-    
-    function compAddrLegacy(address deployer, uint256 nonce) pure internal returns (address) {
-        return address(uint160(uint256(keccak256(LibRLP.p(deployer).p(nonce).p('facet').encode()))));
-    }
-    
-    function computeLegacyAddress() internal view returns (address) {
-        return compAddrLegacy(msg.sender, getDeployerNonce());
-    }
-    
     function _initializeLegacyAddress() internal {
         require(getLegacyContractAddress() == address(0), "Legacy address already set");
         
@@ -57,7 +25,7 @@ abstract contract LegacyAddressable {
             return;
         }
         
-        getLegacyAddressStorage().legacyContractAddress = computeLegacyAddress();
+        getLegacyAddressStorage().legacyContractAddress = address(this);
     }
     
     function getLegacyContractAddress() public view returns (address) {
