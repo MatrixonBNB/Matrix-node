@@ -77,9 +77,14 @@ module PredeployManager
       raise KeyError, "Duplicate keys found: #{duplicates.join(', ')}"
     end
     
-    dump = use_dump ? get_alloc_from_geth : {}
+    merged = optimism_allocs.merge(our_allocs)
     
-    merged = dump.merge(optimism_allocs).merge(our_allocs)
+    if use_dump
+      dump = get_alloc_from_geth
+      modified_merged = merged.except('0x11110000000000000000000000000000000000c5')
+      
+      return dump.merge(modified_merged).sort_by { |key, _| key.downcase }.to_h
+    end
     
     merged.sort_by { |key, _| key.downcase }.to_h
   end
@@ -151,7 +156,7 @@ module PredeployManager
     
     timestamp, mix_hash = get_timestamp_and_mix_hash(l1_genesis_block_number)
     
-    use_dump = l1_network_name == 'sepolia' && !Rails.env.test?
+    use_dump = l1_network_name == 'sepolia'
     
     {
       config: config,

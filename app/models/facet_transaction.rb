@@ -131,14 +131,8 @@ class FacetTransaction < ApplicationRecord
       contract_initiated: tx.contract_initiated
     )
     
-    payload = [
-      block_hash.hex_to_bytes,
-      tx_hash.hex_to_bytes,
-      0.zpad(32)
-    ].join
-    
     tx.source_hash = FacetTransaction.compute_source_hash(
-      payload,
+      tx_hash.hex_to_bytes,
       USER_DEPOSIT_SOURCE_DOMAIN,
     )
     

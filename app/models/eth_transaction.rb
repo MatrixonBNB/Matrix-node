@@ -185,14 +185,8 @@ class EthTransaction < T::Struct
   end
   
   def facet_tx_source_hash
-    payload = [
-      block_hash.hex_to_bytes,
-      tx_hash.hex_to_bytes,
-      0.zpad(32)
-    ].join
-    
     FacetTransaction.compute_source_hash(
-      payload,
+      tx_hash.hex_to_bytes,
       FacetTransaction::USER_DEPOSIT_SOURCE_DOMAIN,
     )
   end

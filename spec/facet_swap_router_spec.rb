@@ -8,8 +8,20 @@ RSpec.describe "FacetSwapRouterV099 contract" do
   let(:token_b) { "0x2000000000000000000000000000000000000000" }
   let(:weth_address) { "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
 
-  def sqrt(integer)
-    Math.sqrt(integer.to_d).floor
+  def sqrt(y)
+    if y > 3
+      z = y
+      x = y / 2 + 1
+      while x < z
+        z = x
+        x = (y / x + x) / 2
+      end
+      z
+    elsif y != 0
+      1
+    else
+      0
+    end
   end
 
   it 'performs a token swap' do

@@ -88,25 +88,10 @@ CREATE TABLE public.eth_blocks (
     id bigint NOT NULL,
     number bigint NOT NULL,
     block_hash character varying NOT NULL,
-    logs_bloom text,
-    total_difficulty numeric(78,0),
-    receipts_root character varying,
-    extra_data character varying,
-    withdrawals_root character varying,
     base_fee_per_gas bigint,
-    nonce character varying,
-    miner character varying,
-    excess_blob_gas bigint,
-    difficulty bigint,
-    gas_limit bigint,
-    gas_used bigint,
     parent_beacon_block_root character varying,
-    size integer,
-    transactions_root character varying,
-    state_root character varying,
     mix_hash character varying,
     parent_hash character varying NOT NULL,
-    blob_gas_used bigint,
     "timestamp" bigint NOT NULL,
     imported_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
@@ -135,55 +120,6 @@ CREATE SEQUENCE public.eth_blocks_id_seq
 --
 
 ALTER SEQUENCE public.eth_blocks_id_seq OWNED BY public.eth_blocks.id;
-
-
---
--- Name: eth_calls; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.eth_calls (
-    id bigint NOT NULL,
-    call_index integer NOT NULL,
-    parent_call_index integer,
-    block_number bigint NOT NULL,
-    block_hash character varying NOT NULL,
-    transaction_hash character varying NOT NULL,
-    from_address character varying NOT NULL,
-    to_address character varying,
-    gas bigint,
-    gas_used bigint,
-    input text,
-    output text,
-    value numeric(78,0),
-    call_type character varying,
-    error character varying,
-    revert_reason character varying,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT chk_rails_c45d2557d8 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
-    CONSTRAINT chk_rails_dd2f8d7808 CHECK (((from_address)::text ~ '^0x[a-f0-9]{40}$'::text)),
-    CONSTRAINT chk_rails_e24d956c84 CHECK (((transaction_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
-    CONSTRAINT chk_rails_f57d9e37cc CHECK (((to_address)::text ~ '^0x[a-f0-9]{40}$'::text))
-);
-
-
---
--- Name: eth_calls_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.eth_calls_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: eth_calls_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.eth_calls_id_seq OWNED BY public.eth_calls.id;
 
 
 --
@@ -426,13 +362,6 @@ ALTER TABLE ONLY public.eth_blocks ALTER COLUMN id SET DEFAULT nextval('public.e
 
 
 --
--- Name: eth_calls id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.eth_calls ALTER COLUMN id SET DEFAULT nextval('public.eth_calls_id_seq'::regclass);
-
-
---
 -- Name: facet_blocks id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -481,14 +410,6 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 ALTER TABLE ONLY public.eth_blocks
     ADD CONSTRAINT eth_blocks_pkey PRIMARY KEY (id);
-
-
---
--- Name: eth_calls eth_calls_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.eth_calls
-    ADD CONSTRAINT eth_calls_pkey PRIMARY KEY (id);
 
 
 --
@@ -565,41 +486,6 @@ CREATE UNIQUE INDEX index_eth_blocks_on_block_hash ON public.eth_blocks USING bt
 --
 
 CREATE UNIQUE INDEX index_eth_blocks_on_number ON public.eth_blocks USING btree (number);
-
-
---
--- Name: index_eth_calls_on_block_hash; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_eth_calls_on_block_hash ON public.eth_calls USING btree (block_hash);
-
-
---
--- Name: index_eth_calls_on_block_hash_and_call_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_eth_calls_on_block_hash_and_call_index ON public.eth_calls USING btree (block_hash, call_index);
-
-
---
--- Name: index_eth_calls_on_block_hash_and_parent_call_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_eth_calls_on_block_hash_and_parent_call_index ON public.eth_calls USING btree (block_hash, parent_call_index);
-
-
---
--- Name: index_eth_calls_on_block_number; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_eth_calls_on_block_number ON public.eth_calls USING btree (block_number);
-
-
---
--- Name: index_eth_calls_on_transaction_hash; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_eth_calls_on_transaction_hash ON public.eth_calls USING btree (transaction_hash);
 
 
 --
@@ -746,14 +632,6 @@ ALTER TABLE ONLY public.facet_transaction_receipts
 
 
 --
--- Name: eth_calls fk_rails_c8d48557a6; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.eth_calls
-    ADD CONSTRAINT fk_rails_c8d48557a6 FOREIGN KEY (block_hash) REFERENCES public.eth_blocks(block_hash) ON DELETE CASCADE;
-
-
---
 -- Name: facet_transaction_receipts fk_rails_ed7d5973ff; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -769,9 +647,7 @@ SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
 ('20240924215928'),
-('20240905151756'),
 ('20240813133726'),
-('20240628125033'),
 ('20240627143934'),
 ('20240627143407'),
 ('20240627143108'),
