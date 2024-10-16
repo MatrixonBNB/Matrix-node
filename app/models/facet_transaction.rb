@@ -183,12 +183,6 @@ class FacetTransaction < ApplicationRecord
   end
   
   def to_facet_payload
-    if max_fee_per_gas == 0 || max_fee_per_gas > facet_block.calculated_base_fee_per_gas
-      calculated_max_fee_per_gas = facet_block.calculated_base_fee_per_gas
-    else
-      calculated_max_fee_per_gas = max_fee_per_gas
-    end
-    
     tx_data = []
     tx_data.push(Eth::Util.hex_to_bin(source_hash))
     tx_data.push(Eth::Util.hex_to_bin(l1_tx_origin.to_s))
@@ -196,7 +190,7 @@ class FacetTransaction < ApplicationRecord
     tx_data.push(Eth::Util.hex_to_bin(to_address.to_s))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(mint))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(value))
-    tx_data.push(Eth::Util.serialize_int_to_big_endian(calculated_max_fee_per_gas))
+    tx_data.push(Eth::Util.serialize_int_to_big_endian(max_fee_per_gas))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(gas_limit))
     tx_data.push('')
     tx_data.push(Eth::Util.hex_to_bin(input))

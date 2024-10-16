@@ -21,14 +21,14 @@ RSpec.describe "Reverts" do
     res.contract_address
   }
   
-  it "automatically uses the base fee per gas of the block" do
+  it "Works with too high max fee per gas" do
     res = call_contract_function(
       contract: counter_contract,
       address: counter_address,
       from: from_address,
       function: 'increment',
       args: [],
-      max_fee_per_gas: 0
+      max_fee_per_gas: 2 ** 256 - 1
     )
     
     receipt = res
