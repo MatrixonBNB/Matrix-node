@@ -31,6 +31,7 @@ class CreateFacetTransactionReceipts < ActiveRecord::Migration[7.1]
       t.index :transaction_hash, unique: true
       t.index :block_hash
       t.index :block_number
+      t.index :transaction_index
       t.index [:block_number, :transaction_index]
     end
 
