@@ -49,8 +49,7 @@ class FacetTransaction < ApplicationRecord
       USER_DEPOSIT_SOURCE_DOMAIN
     )
     
-    # It gets set automatically later
-    tx.max_fee_per_gas = 0
+    tx.max_fee_per_gas = 2 ** 256 - 1
     
     tx
   end

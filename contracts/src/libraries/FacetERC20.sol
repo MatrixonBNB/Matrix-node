@@ -5,17 +5,19 @@ import "solady/src/tokens/ERC20.sol";
 import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
+import "solady/src/utils/EnumerableSetLib.sol";
 import "./MigrationLib.sol";
 
 abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     using LibString for *;
     using FacetBuddyLib for address;
+    using EnumerableSetLib for *;
     
     struct FacetERC20Storage {
         string name;
         string symbol;
         uint8 decimals;
-        mapping(address => bool) balanceInitialized;
+        EnumerableSetLib.AddressSet balanceHoldersToInit;
     }
     
     function _FacetERC20Storage() internal pure returns (FacetERC20Storage storage cs) {
@@ -59,29 +61,32 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         return super.allowance(owner, spender);
     }
     
-    function _beforeTokenTransfer(address from, address to, uint256) internal virtual override {
-        initBalanceIfNeeded(from);
-        initBalanceIfNeeded(to);
-    }
-    
-    function initBalanceIfNeeded(address account) public {
-        if (MigrationLib.isInMigration()) return;
-
-        FacetERC20Storage storage fs = _FacetERC20Storage();
-        uint256 balance = balanceOf(account);
-        
-        if (!fs.balanceInitialized[account]) {
-            if (balance > 0) {
-                emit Transfer(address(0), account, balance);
-            }
-            
-            fs.balanceInitialized[account] = true;
+    function _beforeTokenTransfer(address, address to, uint256) internal virtual override {
+        if (MigrationLib.isInMigration()) {
+            _FacetERC20Storage().balanceHoldersToInit.add(to);
+        } else {
+            require(allBalancesInitialized(), "Balances not initialized");
         }
     }
     
-    function initManyBalancesIfNeeded(address[] memory accounts) public {
-        for (uint256 i = 0; i < accounts.length; i++) {
-            initBalanceIfNeeded(accounts[i]);
+    function allBalancesInitialized() public view returns (bool) {
+        return _FacetERC20Storage().balanceHoldersToInit.length() == 0;
+    }
+    
+    function initAllBalances() public {
+        require(MigrationLib.isNotInMigration(), "Migration in progress");
+        
+        FacetERC20Storage storage fs = _FacetERC20Storage();
+        
+        for (uint256 i = 0; i < fs.balanceHoldersToInit.length(); i++) {
+            address holder = fs.balanceHoldersToInit.at(i);
+            uint256 balance = balanceOf(holder);
+            
+            if (balance > 0) {
+                emit Transfer(address(0), holder, balance);
+            }
+            
+            fs.balanceHoldersToInit.remove(holder);
         }
     }
 }

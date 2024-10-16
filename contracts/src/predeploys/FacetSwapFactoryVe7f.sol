@@ -6,14 +6,17 @@ import "solady/src/utils/Initializable.sol";
 import "src/predeploys/FacetSwapPairV2b2.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";
+import "solady/src/utils/EnumerableSetLib.sol";
 
 contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
+    using EnumerableSetLib for EnumerableSetLib.AddressSet;
+
     struct FacetSwapFactoryStorage {
         address feeTo;
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
-        bool pairsInitializedFromMigration;
+        EnumerableSetLib.AddressSet pairsToMigrate;
     }
 
     function s() internal pure returns (FacetSwapFactoryStorage storage fs) {
@@ -69,6 +72,12 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         s().getPair[token0][token1] = pair;
         s().getPair[token1][token0] = pair;
         s().allPairs.push(pair);
+        
+        if (MigrationLib.isInMigration()) {
+            s().pairsToMigrate.add(pair);
+        } else {
+            require(allPairsInitialized(), "Migrated pairs not initialized");
+        }
 
         emit PairCreated(token0, token1, pair, s().allPairs.length);
     }
@@ -83,18 +92,29 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         s().feeToSetter = _feeToSetter;
     }
     
-    function initPairsFromMigration() public {
+    function allPairsInitialized() public view returns (bool) {
+        return s().pairsToMigrate.length() == 0;
+    }
+    
+    function initAllPairsFromMigration() external {
         require(MigrationLib.isNotInMigration(), "Still migrating");
-        require(!s().pairsInitializedFromMigration, "Already initialized");
         
-        for (uint256 i = 0; i < s().allPairs.length; i++) {
-            address pair = s().allPairs[i];
-            address token0 = FacetSwapPairV2b2(pair).getToken0();
-            address token1 = FacetSwapPairV2b2(pair).getToken1();
+        FacetSwapFactoryStorage storage fs = s();
+        
+        for (uint256 i = 0; i < fs.pairsToMigrate.length(); i++) {
+            address pair = fs.pairsToMigrate.at(i);
+            FacetERC20 token0 = FacetERC20(FacetSwapPairV2b2(pair).getToken0());
+            FacetERC20 token1 = FacetERC20(FacetSwapPairV2b2(pair).getToken1());
             
-            emit PairCreated(token0, token1, pair, i + 1);
+            token0.initAllBalances();
+            token1.initAllBalances();
+            
+            emit PairCreated(address(token0), address(token1), pair, i + 1);
+            
+            FacetERC20(pair).initAllBalances();
+            FacetSwapPairV2b2(pair).sync();
+            
+            fs.pairsToMigrate.remove(pair);
         }
-        
-        s().pairsInitializedFromMigration = true;
     }
 }
