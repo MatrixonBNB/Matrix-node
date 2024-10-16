@@ -4,12 +4,14 @@ pragma solidity 0.8.24;
 import "solady/src/tokens/ERC721.sol";
 import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
+import "./MigrationLib.sol";
 
 abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
     using FacetBuddyLib for address;
     struct FacetERC721Storage {
         string name;
         string symbol;
+        mapping(uint256 => bool) ownerInitialized;
     }
     
     function _FacetERC721Storage() internal pure returns (FacetERC721Storage storage cs) {
@@ -56,5 +58,30 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
         address owner = ownerOf(id);
         
         return spender.isBuddyOfUser(owner);
+    }
+    
+    function _beforeTokenTransfer(address from, address, uint256 id) internal virtual override {
+        initOwnerIfNeeded(from, id);
+    }
+    
+    function initOwnerIfNeeded(address currentOwner, uint256 id) public {
+        if (MigrationLib.isInMigration()) return;
+        
+        FacetERC721Storage storage fs = _FacetERC721Storage();
+        
+        if (!fs.ownerInitialized[id]) {
+            if (currentOwner != address(0)) {
+                emit Transfer(address(0), currentOwner, id);
+            }
+            
+            fs.ownerInitialized[id] = true;
+        }
+    }
+    
+    function initManyOwnersIfNeeded(uint256[] memory ids) public {
+        for (uint256 i = 0; i < ids.length; i++) {
+            address owner = ownerOf(ids[i]);
+            initOwnerIfNeeded(owner, ids[i]);
+        }
     }
 }

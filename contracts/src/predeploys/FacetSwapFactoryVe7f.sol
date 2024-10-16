@@ -5,6 +5,7 @@ import "src/libraries/Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
 import "src/predeploys/FacetSwapPairV2b2.sol";
 import "src/libraries/ERC1967Proxy.sol";
+import "src/libraries/MigrationLib.sol";
 
 contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     struct FacetSwapFactoryStorage {
@@ -12,6 +13,7 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
+        bool pairsInitializedFromMigration;
     }
 
     function s() internal pure returns (FacetSwapFactoryStorage storage fs) {
@@ -79,5 +81,20 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     function setFeeToSetter(address _feeToSetter) public {
         require(msg.sender == s().feeToSetter, "FacetSwapV1: FORBIDDEN");
         s().feeToSetter = _feeToSetter;
+    }
+    
+    function initPairsFromMigration() public {
+        require(MigrationLib.isNotInMigration(), "Still migrating");
+        require(!s().pairsInitializedFromMigration, "Already initialized");
+        
+        for (uint256 i = 0; i < s().allPairs.length; i++) {
+            address pair = s().allPairs[i];
+            address token0 = FacetSwapPairV2b2(pair).getToken0();
+            address token1 = FacetSwapPairV2b2(pair).getToken1();
+            
+            emit PairCreated(token0, token1, pair, i + 1);
+        }
+        
+        s().pairsInitializedFromMigration = true;
     }
 }

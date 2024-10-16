@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import "src/predeploys/FacetBuddyFactoryVef8.sol";
 
 library FacetBuddyLib {
-    address constant canonicalBuddyFactory = 0x5Ae4Dd90B59d2607cf35DC061E47b63189487871;
+    address constant canonicalBuddyFactory = 0xbEFa89a61c00730FF003854376148200b8F00E0a;
     
     function isBuddyOfUser(address potentialBuddy, address user) internal view returns (bool) {
         uint256 codeSize;

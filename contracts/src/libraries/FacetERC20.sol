@@ -5,6 +5,7 @@ import "solady/src/tokens/ERC20.sol";
 import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
+import "./MigrationLib.sol";
 
 abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     using LibString for *;
@@ -63,17 +64,11 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         initBalanceIfNeeded(to);
     }
     
-    function isInMigration() internal view returns(bool) {
-        address dummy = 0x11110000000000000000000000000000000000C5;
-        return dummy.code.length > 0;
-    }
-    
     function initBalanceIfNeeded(address account) public {
+        if (MigrationLib.isInMigration()) return;
+
         FacetERC20Storage storage fs = _FacetERC20Storage();
         uint256 balance = balanceOf(account);
-        
-        if (account == address(0)) return;
-        if (isInMigration()) return;
         
         if (!fs.balanceInitialized[account]) {
             if (balance > 0) {
@@ -81,6 +76,12 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
             }
             
             fs.balanceInitialized[account] = true;
+        }
+    }
+    
+    function initManyBalancesIfNeeded(address[] memory accounts) public {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            initBalanceIfNeeded(accounts[i]);
         }
     }
 }

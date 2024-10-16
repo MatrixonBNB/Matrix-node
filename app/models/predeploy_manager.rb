@@ -240,9 +240,13 @@ module PredeployManager
   end
   
   def verify_contracts(rpc_url = "http://localhost:8545", blockscout_url = "http://localhost/api/")
-    contracts = PredeployManager.predeploy_to_local_map.to_a.reverse.to_h
-  
-    contracts.each do |address, contract_name|
+    foundry_file = Rails.root.join('contracts', 'predeploy-contracts.json')
+    foundry_parsed = JSON.parse(File.read(foundry_file))  
+    
+    foundry_parsed.each do |contract|
+      address = contract['addr']
+      contract_name = contract['name']
+      
       sol_file = LEGACY_DIR.join("#{contract_name}.sol")
       
       if sol_file.exist?

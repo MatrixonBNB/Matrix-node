@@ -230,10 +230,27 @@ contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
     }
 
     function sqrt(uint input) public view returns (uint) {
-        address pre = 0x00050db43a2b7dACe8D24c481E0Fe45459a09000;
-        (bool success, bytes memory output) = pre.staticcall(abi.encode(input));
-        require(success, "Failed to call sqrt precompile contract");
-        return abi.decode(output, (uint));
+        if (MigrationLib.isInMigration()) {
+            address pre = 0x00050db43a2b7dACe8D24c481E0Fe45459a09000;
+            (bool success, bytes memory output) = pre.staticcall(abi.encode(input));
+            require(success, "Failed to call sqrt precompile contract");
+            return abi.decode(output, (uint));
+        } else {
+            return fixedPointSqrt(input);
+        }
+    }
+    
+    function fixedPointSqrt(uint y) internal pure returns (uint z) {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
     }
 
     function min(uint x, uint y) internal pure returns (uint z) {

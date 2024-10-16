@@ -302,6 +302,10 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         require(protocolFeeBPS <= 10000, "Fee cannot be greater than 100%");
         s().protocolFeeBPS = protocolFeeBPS;
     }
+    
+    function getProtocolFeeBPS() public view returns (uint256) {
+        return s().protocolFeeBPS;
+    }
 
     function withdrawFees(address to) public onlyOwner {
         uint256 balance = ERC20(s().WETH).balanceOf(address(this));

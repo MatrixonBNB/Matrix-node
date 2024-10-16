@@ -8,7 +8,22 @@ import "src/interfaces/IFacetSwapV1Callee.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
 
+library UQ112x112 {
+    uint224 constant Q112 = 2**112;
+
+    // encode a uint112 as a UQ112x112
+    function encode(uint112 y) internal pure returns (uint224 z) {
+        z = uint224(y) * Q112; // never overflows
+    }
+
+    // divide a UQ112x112 by a uint112, returning a UQ112x112
+    function uqdiv(uint224 x, uint112 y) internal pure returns (uint224 z) {
+        z = x / uint224(y);
+    }
+}
+
 contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
+    using UQ112x112 for uint224;
     using LibString for *;
     
     struct FacetSwapPairStorage {
@@ -29,6 +44,14 @@ contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
         assembly {
            cs.slot := position
         }
+    }
+    
+    function getToken0() public view returns (address) {
+        return s().token0;
+    }
+    
+    function getToken1() public view returns (address) {
+        return s().token1;
     }
     
     uint256 public constant MINIMUM_LIQUIDITY = 10 ** 3;
@@ -80,22 +103,16 @@ contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
         uint32 timeElapsed = blockTimestamp - s().blockTimestampLast;
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
-            s().price0CumulativeLast += uint256(encode(_reserve1) / _reserve0) * timeElapsed;
-            s().price1CumulativeLast += uint256(encode(_reserve0) / _reserve1) * timeElapsed;
+            unchecked {
+                s().price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
+                s().price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+            }
         }
         emit PreSwapReserves(s().reserve0, s().reserve1);
         s().reserve0 = uint112(balance0);
         s().reserve1 = uint112(balance1);
         s().blockTimestampLast = blockTimestamp;
         emit Sync(s().reserve0, s().reserve1);
-    }
-
-    function encode(uint112 y) internal pure returns (uint224) {
-        return uint224(y) * 2**112;
-    }
-
-    function uqdiv(uint224 x, uint112 y) internal pure returns (uint224) {
-        return x / uint224(y);
     }
 
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool) {
@@ -211,10 +228,27 @@ contract FacetSwapPairV2b2 is FacetERC20, Initializable, Upgradeable {
     }
 
     function sqrt(uint input) public view returns (uint) {
-        address pre = 0x00050db43a2b7dACe8D24c481E0Fe45459a09000;
-        (bool success, bytes memory output) = pre.staticcall(abi.encode(input));
-        require(success, "Failed to call sqrt precompile contract");
-        return abi.decode(output, (uint));
+        if (MigrationLib.isInMigration()) {
+            address pre = 0x00050db43a2b7dACe8D24c481E0Fe45459a09000;
+            (bool success, bytes memory output) = pre.staticcall(abi.encode(input));
+            require(success, "Failed to call sqrt precompile contract");
+            return abi.decode(output, (uint));
+        } else {
+            return fixedPointSqrt(input);
+        }
+    }
+    
+    function fixedPointSqrt(uint y) internal pure returns (uint z) {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
     }
 
     function min(uint x, uint y) internal pure returns (uint z) {
