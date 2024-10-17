@@ -2,6 +2,8 @@
 pragma solidity 0.8.24;
 
 library MigrationLib {
+    address public constant DUMMY_ADDRESS = 0x11110000000000000000000000000000000000C5;
+    
     function isInMigration() internal view returns (bool) {
         return dummyHasCode();
     }
@@ -11,7 +13,6 @@ library MigrationLib {
     }
     
     function dummyHasCode() private view returns (bool) {
-        address dummy = 0x11110000000000000000000000000000000000C5;
-        return dummy.code.length != 0;
+        return DUMMY_ADDRESS.code.length != 0;
     }
 }

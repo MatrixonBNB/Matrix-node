@@ -4,14 +4,14 @@ pragma solidity 0.8.24;
 import "src/libraries/Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
-import "solady/src/utils/EnumerableSetLib.sol";
+import "src/libraries/LimitedLibMappedAddressSet.sol";
 import "./FacetSwapPairVdfd.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";
 
 contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     using LibString for *;
-    using EnumerableSetLib for EnumerableSetLib.AddressSet;
+    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
     
     struct FacetSwapFactoryStorage {
         address feeTo;
@@ -19,7 +19,7 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
         uint256 lpFeeBPS;
-        EnumerableSetLib.AddressSet pairsToMigrate;
+        LimitedLibMappedAddressSet.MappedSet pairsToMigrate;
     }
     
     function s() internal pure returns (FacetSwapFactoryStorage storage fs) {
@@ -138,7 +138,9 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
             FacetERC20(pair).initAllBalances();
             FacetSwapPairVdfd(pair).sync();
             
-            fs.pairsToMigrate.remove(pair);
+            fs.pairsToMigrate.removeFromMapping(pair);
         }
+        
+        fs.pairsToMigrate.clearArray();
     }
 }

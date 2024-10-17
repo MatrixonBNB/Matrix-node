@@ -5,19 +5,19 @@ import "solady/src/tokens/ERC20.sol";
 import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
-import "solady/src/utils/EnumerableSetLib.sol";
+import "src/libraries/LimitedLibMappedAddressSet.sol";
 import "./MigrationLib.sol";
 
 abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     using LibString for *;
     using FacetBuddyLib for address;
-    using EnumerableSetLib for *;
+    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
     
     struct FacetERC20Storage {
         string name;
         string symbol;
         uint8 decimals;
-        EnumerableSetLib.AddressSet balanceHoldersToInit;
+        LimitedLibMappedAddressSet.MappedSet balanceHoldersToInit;
     }
     
     function _FacetERC20Storage() internal pure returns (FacetERC20Storage storage cs) {
@@ -73,6 +73,14 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         return _FacetERC20Storage().balanceHoldersToInit.length() == 0;
     }
     
+    function getBalanceHoldersToInit() public view returns (address[] memory) {
+        return _FacetERC20Storage().balanceHoldersToInit.values();
+    }
+    
+    function balanceHoldersToInitCount() public view returns (uint256) {
+        return _FacetERC20Storage().balanceHoldersToInit.length();
+    }
+    
     function initAllBalances() public {
         require(MigrationLib.isNotInMigration(), "Migration in progress");
         
@@ -86,7 +94,9 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
                 emit Transfer(address(0), holder, balance);
             }
             
-            fs.balanceHoldersToInit.remove(holder);
+            fs.balanceHoldersToInit.removeFromMapping(holder);
         }
+        
+        fs.balanceHoldersToInit.clearArray();
     }
 }

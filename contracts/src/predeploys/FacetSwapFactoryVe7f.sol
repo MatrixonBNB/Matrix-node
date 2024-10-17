@@ -6,17 +6,17 @@ import "solady/src/utils/Initializable.sol";
 import "src/predeploys/FacetSwapPairV2b2.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";
-import "solady/src/utils/EnumerableSetLib.sol";
+import "src/libraries/LimitedLibMappedAddressSet.sol";
 
 contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
-    using EnumerableSetLib for EnumerableSetLib.AddressSet;
+    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
 
     struct FacetSwapFactoryStorage {
         address feeTo;
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
-        EnumerableSetLib.AddressSet pairsToMigrate;
+        LimitedLibMappedAddressSet.MappedSet pairsToMigrate;
     }
 
     function s() internal pure returns (FacetSwapFactoryStorage storage fs) {
@@ -114,7 +114,9 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
             FacetERC20(pair).initAllBalances();
             FacetSwapPairV2b2(pair).sync();
             
-            fs.pairsToMigrate.remove(pair);
+            fs.pairsToMigrate.removeFromMapping(pair);
         }
+        
+        fs.pairsToMigrate.clearArray();
     }
 }
