@@ -18,8 +18,8 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
-        uint256 lpFeeBPS;
         LimitedLibMappedAddressSet.MappedSet pairsToMigrate;
+        uint256 lpFeeBPS;
     }
     
     function s() internal pure returns (FacetSwapFactoryStorage storage fs) {
@@ -46,6 +46,10 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     
     function getPair(address tokenA, address tokenB) public view returns (address pair) {
         return s().getPair[tokenA][tokenB];
+    }
+    
+    function getAllPairs() public view returns (address[] memory) {
+        return s().allPairs;
     }
     
     function feeTo() public view returns (address) {
