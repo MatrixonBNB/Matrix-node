@@ -11,7 +11,7 @@ module GethDriver
     
     command = [
       "make geth &&",
-      "rm -rf ./datadir &&",
+      "rm -rf ./datadir/* &&",
       "./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} &&",
       "./build/bin/geth --datadir ./datadir",
       "--http",

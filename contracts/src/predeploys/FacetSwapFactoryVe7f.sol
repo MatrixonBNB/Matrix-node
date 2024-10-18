@@ -52,6 +52,10 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     function feeTo() public view returns (address) {
         return s().feeTo;
     }
+    
+    function feeToSetter() public view returns (address) {
+        return s().feeToSetter;
+    }
 
     function createPair(address tokenA, address tokenB) public returns (address pair) {
         require(tokenA != tokenB, "FacetSwapV1: IDENTICAL_ADDRESSES");
@@ -103,8 +107,8 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         
         for (uint256 i = 0; i < fs.pairsToMigrate.length(); i++) {
             address pair = fs.pairsToMigrate.at(i);
-            FacetERC20 token0 = FacetERC20(FacetSwapPairV2b2(pair).getToken0());
-            FacetERC20 token1 = FacetERC20(FacetSwapPairV2b2(pair).getToken1());
+            FacetERC20 token0 = FacetERC20(FacetSwapPairV2b2(pair).token0());
+            FacetERC20 token1 = FacetERC20(FacetSwapPairV2b2(pair).token1());
             
             token0.initAllBalances();
             token1.initAllBalances();

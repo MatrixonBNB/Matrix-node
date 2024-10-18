@@ -7,20 +7,7 @@ import "src/predeploys/FacetSwapFactoryVac5.sol";
 import "src/interfaces/IFacetSwapV1Callee.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
-
-library UQ112x112 {
-    uint224 constant Q112 = 2**112;
-
-    // encode a uint112 as a UQ112x112
-    function encode(uint112 y) internal pure returns (uint224 z) {
-        z = uint224(y) * Q112; // never overflows
-    }
-
-    // divide a UQ112x112 by a uint112, returning a UQ112x112
-    function uqdiv(uint224 x, uint112 y) internal pure returns (uint224 z) {
-        z = x / uint224(y);
-    }
-}
+import "src/libraries/UQ112x112.sol";
 
 contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
     using UQ112x112 for uint224;
@@ -46,12 +33,28 @@ contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {
         }
     }
     
-    function getToken0() public view returns (address) {
+    function factory() public view returns (address) {
+        return s().factory;
+    }
+    
+    function token0() public view returns (address) {
         return s().token0;
     }
     
-    function getToken1() public view returns (address) {
+    function token1() public view returns (address) {
         return s().token1;
+    }
+
+    function price0CumulativeLast() public view returns (uint256) {
+        return s().price0CumulativeLast;
+    }
+
+    function price1CumulativeLast() public view returns (uint256) {
+        return s().price1CumulativeLast;
+    }
+
+    function kLast() public view returns (uint256) {
+        return s().kLast;
     }
     
     uint256 public constant MINIMUM_LIQUIDITY = 10 ** 3;
