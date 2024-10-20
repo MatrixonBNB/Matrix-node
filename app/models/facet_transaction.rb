@@ -13,6 +13,7 @@ class FacetTransaction < ApplicationRecord
   
   USER_DEPOSIT_SOURCE_DOMAIN = 0
   L1_INFO_DEPOSIT_SOURCE_DOMAIN = 1
+  UPGRADE_DEPOSITED_SOURCE_DOMAIN = 2
   
   SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
   L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
@@ -168,6 +169,37 @@ class FacetTransaction < ApplicationRecord
     
     tx.source_hash = FacetTransaction.compute_source_hash(
       payload,
+      L1_INFO_DEPOSIT_SOURCE_DOMAIN
+    )
+    
+    tx
+  end
+  
+  def self.v1_to_v2_migration_tx_from_block(facet_block)
+    unless facet_block.number == 1 && SysConfig.block_in_v2?(facet_block)
+      raise "Invalid block number #{facet_block.number}!"
+    end
+    
+    function_selector = Eth::Util.keccak256('executeMigration()').first(4).bytes_to_hex
+    migration_manager_address = "0x" + Eth::Util.keccak256("migration manager").bytes_to_hex.last(40)
+    msg_sender = "0x" + Eth::Util.keccak256("v1 to v2 migrator").bytes_to_hex.last(40)
+    
+    upgrade_intent = "emit events required to complete v1 to v2 migration"
+
+    tx = new
+    tx.chain_id = ChainIdManager.current_l2_chain_id
+    tx.to_address = migration_manager_address
+    tx.value = 0
+    tx.mint = 0
+    tx.max_fee_per_gas = 0
+    tx.gas_limit = 9223372036854775807
+    tx.input = function_selector
+    tx.from_address = msg_sender
+    
+    tx.facet_block = facet_block
+    
+    tx.source_hash = FacetTransaction.compute_source_hash(
+      Eth::Util.keccak256(upgrade_intent),
       L1_INFO_DEPOSIT_SOURCE_DOMAIN
     )
     

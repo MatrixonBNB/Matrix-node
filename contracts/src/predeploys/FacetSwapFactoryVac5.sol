@@ -4,21 +4,19 @@ pragma solidity 0.8.24;
 import "src/libraries/Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
-import "src/libraries/LimitedLibMappedAddressSet.sol";
 import "./FacetSwapPairVdfd.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";
+import "src/predeploys/MigrationManager.sol";
 
 contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     using LibString for *;
-    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
     
     struct FacetSwapFactoryStorage {
         address feeTo;
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
-        LimitedLibMappedAddressSet.MappedSet pairsToMigrate;
         uint256 lpFeeBPS;
     }
     
@@ -38,10 +36,18 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     function initialize(address _feeToSetter) public initializer {
         s().feeToSetter = _feeToSetter;
         _initializeUpgradeAdmin(msg.sender);
+        
+        if (MigrationLib.isInMigration()) {
+            MigrationManager(MigrationLib.MIGRATION_MANAGER).registerFactory(address(this));
+        }
     }
 
     function allPairsLength() public view returns (uint256) {
         return s().allPairs.length;
+    }
+    
+    function allPairs(uint256 index) public view returns (address) {
+        return s().allPairs[index];
     }
     
     function getPair(address tokenA, address tokenB) public view returns (address pair) {
@@ -79,12 +85,6 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         s().getPair[token0][token1] = pair;
         s().getPair[token1][token0] = pair;
         s().allPairs.push(pair);
-
-        if (MigrationLib.isInMigration()) {
-            s().pairsToMigrate.add(pair);
-        } else {
-            require(allPairsInitialized(), "Migrated pairs not initialized");
-        }
 
         emit PairCreated(token0, token1, pair, s().allPairs.length);
     }
@@ -124,31 +124,8 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         Upgradeable(pair).upgrade(newHash, newSource);
     }
     
-    function allPairsInitialized() public view returns (bool) {
-        return s().pairsToMigrate.length() == 0;
-    }
-    
-    function initAllPairsFromMigration() external {
-        require(MigrationLib.isNotInMigration(), "Still migrating");
-        
-        FacetSwapFactoryStorage storage fs = s();
-        
-        for (uint256 i = 0; i < fs.pairsToMigrate.length(); i++) {
-            address pair = fs.pairsToMigrate.at(i);
-            FacetERC20 token0 = FacetERC20(FacetSwapPairVdfd(pair).token0());
-            FacetERC20 token1 = FacetERC20(FacetSwapPairVdfd(pair).token1());
-            
-            token0.initAllBalances();
-            token1.initAllBalances();
-            
-            emit PairCreated(address(token0), address(token1), pair, i + 1);
-            
-            FacetERC20(pair).initAllBalances();
-            FacetSwapPairVdfd(pair).sync();
-            
-            fs.pairsToMigrate.removeFromMapping(pair);
-        }
-        
-        fs.pairsToMigrate.clearArray();
+    function emitPairCreated(address token0, address token1, address pair, uint256 pairLength) public {
+        require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only migration manager can call");
+        emit PairCreated(token0, token1, pair, pairLength);
     }
 }

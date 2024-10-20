@@ -27,6 +27,9 @@ module PredeployManager
     
     map["0x11110000000000000000000000000000000000c5"] = "NonExistentContractShim"
     
+    migration_manager_address = "0x" + Eth::Util.keccak256("migration manager").bytes_to_hex.last(40)
+    map[migration_manager_address] = "MigrationManager"
+    
     map
   end
   memoize :predeploy_to_local_map
@@ -250,6 +253,7 @@ module PredeployManager
     
     foundry_parsed.each do |contract|
       address = contract['addr']
+      next if address == "0x11110000000000000000000000000000000000c5"
       contract_name = contract['name']
       
       sol_file = LEGACY_DIR.join("#{contract_name}.sol")
@@ -263,7 +267,7 @@ module PredeployManager
           "--via-ir",
           "--optimizer-runs 200",
           "--verifier-url #{blockscout_url}",
-          "--watch",
+          # "--watch",
           "--rpc-url #{rpc_url}",
           address,
           "src/predeploys/#{contract_name}.sol:#{contract_name}",

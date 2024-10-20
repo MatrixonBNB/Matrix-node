@@ -6,17 +6,13 @@ import "solady/src/utils/Initializable.sol";
 import "src/predeploys/FacetSwapPairV2b2.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";
-import "src/libraries/LimitedLibMappedAddressSet.sol";
 
 contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
-    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
-
     struct FacetSwapFactoryStorage {
         address feeTo;
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
-        LimitedLibMappedAddressSet.MappedSet pairsToMigrate;
     }
 
     function s() internal pure returns (FacetSwapFactoryStorage storage fs) {
@@ -35,10 +31,18 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     function initialize(address _feeToSetter) public initializer {
         s().feeToSetter = _feeToSetter;
         _initializeUpgradeAdmin(msg.sender);
+        
+        if (MigrationLib.isInMigration()) {
+            MigrationManager(MigrationLib.MIGRATION_MANAGER).registerFactory(address(this));
+        }
     }
 
     function allPairsLength() public view returns (uint256) {
         return s().allPairs.length;
+    }
+    
+    function allPairs(uint256 index) public view returns (address) {
+        return s().allPairs[index];
     }
 
     function getAllPairs() public view returns (address[] memory) {
@@ -76,12 +80,6 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         s().getPair[token0][token1] = pair;
         s().getPair[token1][token0] = pair;
         s().allPairs.push(pair);
-        
-        if (MigrationLib.isInMigration()) {
-            s().pairsToMigrate.add(pair);
-        } else {
-            require(allPairsInitialized(), "Migrated pairs not initialized");
-        }
 
         emit PairCreated(token0, token1, pair, s().allPairs.length);
     }
@@ -96,31 +94,8 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         s().feeToSetter = _feeToSetter;
     }
     
-    function allPairsInitialized() public view returns (bool) {
-        return s().pairsToMigrate.length() == 0;
-    }
-    
-    function initAllPairsFromMigration() external {
-        require(MigrationLib.isNotInMigration(), "Still migrating");
-        
-        FacetSwapFactoryStorage storage fs = s();
-        
-        for (uint256 i = 0; i < fs.pairsToMigrate.length(); i++) {
-            address pair = fs.pairsToMigrate.at(i);
-            FacetERC20 token0 = FacetERC20(FacetSwapPairV2b2(pair).token0());
-            FacetERC20 token1 = FacetERC20(FacetSwapPairV2b2(pair).token1());
-            
-            token0.initAllBalances();
-            token1.initAllBalances();
-            
-            emit PairCreated(address(token0), address(token1), pair, i + 1);
-            
-            FacetERC20(pair).initAllBalances();
-            FacetSwapPairV2b2(pair).sync();
-            
-            fs.pairsToMigrate.removeFromMapping(pair);
-        }
-        
-        fs.pairsToMigrate.clearArray();
+    function emitPairCreated(address token0, address token1, address pair, uint256 pairLength) public {
+        require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only migration manager can call");
+        emit PairCreated(token0, token1, pair, pairLength);
     }
 }

@@ -123,7 +123,13 @@ module GethDriver
     
     FctMintCalculator.assign_mint_amounts(transactions, new_facet_block)
     
-    transactions_with_attributes = [new_facet_block.attributes_tx] + transactions
+    system_txs = [new_facet_block.attributes_tx]
+    
+    if SysConfig.block_in_v2?(new_facet_block) && new_facet_block.number == 1
+      system_txs << FacetTransaction.v1_to_v2_migration_tx_from_block(new_facet_block)
+    end
+    
+    transactions_with_attributes = system_txs + transactions
     transaction_payloads = transactions_with_attributes.map(&:to_facet_payload)
     
     payload_attributes = {

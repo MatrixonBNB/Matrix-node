@@ -5,19 +5,19 @@ import "solady/src/tokens/ERC20.sol";
 import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
-import "src/libraries/LimitedLibMappedAddressSet.sol";
+import "solady/src/utils/SafeCastLib.sol";
 import "./MigrationLib.sol";
+import "src/predeploys/MigrationManager.sol";
 
 abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     using LibString for *;
+    using SafeCastLib for *;
     using FacetBuddyLib for address;
-    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
     
     struct FacetERC20Storage {
         string name;
         string symbol;
         uint8 decimals;
-        LimitedLibMappedAddressSet.MappedSet balanceHoldersToInit;
     }
     
     function _FacetERC20Storage() internal pure returns (FacetERC20Storage storage cs) {
@@ -61,42 +61,21 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         return super.allowance(owner, spender);
     }
     
-    function _beforeTokenTransfer(address, address to, uint256) internal virtual override {
+    function emitTransferEvent(address to, uint96 value) external {
+        require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only migration manager can call");
+        emit Transfer(address(0), to, value);
+    }
+    
+    function _afterTokenTransfer(address from, address to, uint256) internal virtual override {
         if (MigrationLib.isInMigration()) {
-            _FacetERC20Storage().balanceHoldersToInit.add(to);
-        } else {
-            require(allBalancesInitialized(), "Balances not initialized");
-        }
-    }
-    
-    function allBalancesInitialized() public view returns (bool) {
-        return _FacetERC20Storage().balanceHoldersToInit.length() == 0;
-    }
-    
-    function getBalanceHoldersToInit() public view returns (address[] memory) {
-        return _FacetERC20Storage().balanceHoldersToInit.values();
-    }
-    
-    function balanceHoldersToInitCount() public view returns (uint256) {
-        return _FacetERC20Storage().balanceHoldersToInit.length();
-    }
-    
-    function initAllBalances() public {
-        require(MigrationLib.isNotInMigration(), "Migration in progress");
-        
-        FacetERC20Storage storage fs = _FacetERC20Storage();
-        
-        for (uint256 i = 0; i < fs.balanceHoldersToInit.length(); i++) {
-            address holder = fs.balanceHoldersToInit.at(i);
-            uint256 balance = balanceOf(holder);
-            
-            if (balance > 0) {
-                emit Transfer(address(0), holder, balance);
+            if (from != address(0)) {  // Skip for minting operations
+                uint96 fromBalance = balanceOf(from).toUint96();
+                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(from, fromBalance);
             }
-            
-            fs.balanceHoldersToInit.removeFromMapping(holder);
+            if (to != address(0)) {  // Skip for burning operations
+                uint96 toBalance = balanceOf(to).toUint96();
+                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(to, toBalance);
+            }
         }
-        
-        fs.balanceHoldersToInit.clearArray();
     }
 }
