@@ -5,13 +5,11 @@ import "solady/src/tokens/ERC20.sol";
 import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
-import "solady/src/utils/SafeCastLib.sol";
 import "./MigrationLib.sol";
 import "src/predeploys/MigrationManager.sol";
 
 abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     using LibString for *;
-    using SafeCastLib for *;
     using FacetBuddyLib for address;
     
     struct FacetERC20Storage {
@@ -61,7 +59,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         return super.allowance(owner, spender);
     }
     
-    function emitTransferEvent(address to, uint96 value) external {
+    function emitTransferEvent(address to, uint256 value) external {
         require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only migration manager can call");
         emit Transfer(address(0), to, value);
     }
@@ -69,12 +67,10 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     function _afterTokenTransfer(address from, address to, uint256) internal virtual override {
         if (MigrationLib.isInMigration()) {
             if (from != address(0)) {  // Skip for minting operations
-                uint96 fromBalance = balanceOf(from).toUint96();
-                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(from, fromBalance);
+                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(from, balanceOf(from));
             }
             if (to != address(0)) {  // Skip for burning operations
-                uint96 toBalance = balanceOf(to).toUint96();
-                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(to, toBalance);
+                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(to, balanceOf(to));
             }
         }
     }

@@ -32,16 +32,16 @@ contract MigrationManager {
         factories.add(factory);
     }
     
-    function recordTransfer(address to, uint96 currentBalance) external whileInV1 {
+    function recordTransfer(address to, uint256 currentBalance) external whileInV1 {
         address token = msg.sender;
         
         allERC20Tokens.add(token);
         
-        if (currentBalance > 0) {
+        // if (currentBalance > 0) {
             erc20TokenToHolders[token].add(to);
-        } else {
-            erc20TokenToHolders[token].remove(to);
-        }
+        // } else {
+        //     erc20TokenToHolders[token].remove(to);
+        // }
     }
     
     function executeMigration() external whileInV2 {
@@ -95,7 +95,7 @@ contract MigrationManager {
             uint256 balance = FacetERC20(token).balanceOf(holder);
             
             if (balance > 0) {
-                FacetERC20(token).emitTransferEvent(holder, uint96(balance));
+                FacetERC20(token).emitTransferEvent(holder, balance);
             }
             
             holders.remove(holder);
