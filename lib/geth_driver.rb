@@ -125,7 +125,7 @@ module GethDriver
     
     system_txs = [new_facet_block.attributes_tx]
     
-    if SysConfig.block_in_v2?(new_facet_block) && new_facet_block.number == 1
+    if SysConfig.is_first_v2_block?(new_facet_block)
       system_txs << FacetTransaction.v1_to_v2_migration_tx_from_block(new_facet_block)
     end
     

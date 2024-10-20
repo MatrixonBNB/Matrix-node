@@ -176,7 +176,7 @@ class FacetTransaction < ApplicationRecord
   end
   
   def self.v1_to_v2_migration_tx_from_block(facet_block)
-    unless facet_block.number == 1 && SysConfig.block_in_v2?(facet_block)
+    unless SysConfig.is_first_v2_block?(facet_block)
       raise "Invalid block number #{facet_block.number}!"
     end
     
