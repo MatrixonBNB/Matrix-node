@@ -31,14 +31,14 @@ class EthRpcClient
     query_api(method: 'eth_chainId').to_i(16)
   end
   
-  def debug_trace_block_by_number(block_number)
+  def trace_block(block_number)
     query_api(
       method: 'debug_traceBlockByNumber',
       params: ['0x' + block_number.to_s(16), { tracer: "callTracer", timeout: "10s" }]
     )
   end
 
-  def debug_trace_transaction(transaction_hash)
+  def trace_transaction(transaction_hash)
     query_api(
       method: 'debug_traceTransaction',
       params: [transaction_hash, { tracer: "callTracer", timeout: "10s" }]
@@ -46,7 +46,7 @@ class EthRpcClient
   end
 
   def trace(tx_hash)
-    debug_trace_transaction(tx_hash)
+    trace_transaction(tx_hash)
   end
   
   def get_transaction(transaction_hash)
@@ -68,6 +68,10 @@ class EthRpcClient
       method: 'eth_getBlockReceipts',
       params: ["0x" + block_number.to_s(16)]
     )
+  end
+  
+  def get_block_receipts(block_number)
+    get_transaction_receipts(block_number)
   end
   
   def get_transaction_receipt(transaction_hash)

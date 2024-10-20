@@ -182,7 +182,7 @@ class FacetTransaction < ApplicationRecord
     
     function_selector = Eth::Util.keccak256('executeMigration()').first(4).bytes_to_hex
     migration_manager_address = "0x" + Eth::Util.keccak256("migration manager").bytes_to_hex.last(40)
-    msg_sender = "0x" + Eth::Util.keccak256("v1 to v2 migrator").bytes_to_hex.last(40)
+    msg_sender = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
     
     upgrade_intent = "emit events required to complete v1 to v2 migration"
 
@@ -192,7 +192,7 @@ class FacetTransaction < ApplicationRecord
     tx.value = 0
     tx.mint = 0
     tx.max_fee_per_gas = 0
-    tx.gas_limit = 9223372036854775807
+    tx.gas_limit = 100e9.to_i
     tx.input = function_selector
     tx.from_address = msg_sender
     

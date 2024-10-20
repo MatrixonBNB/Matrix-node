@@ -2,19 +2,16 @@
 pragma solidity 0.8.24;
 
 import "solady/src/tokens/ERC721.sol";
-import "./FacetBuddyLib.sol";
+import "src/libraries/FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
-import "solady/src/utils/EnumerableSetLib.sol";
-import "./MigrationLib.sol";
+import "src/libraries/MigrationLib.sol";
 
 abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
     using FacetBuddyLib for address;
-    using EnumerableSetLib for EnumerableSetLib.Uint256Set;
 
     struct FacetERC721Storage {
         string name;
         string symbol;
-        EnumerableSetLib.Uint256Set tokensToInit;
     }
     
     function _FacetERC721Storage() internal pure returns (FacetERC721Storage storage cs) {
@@ -63,32 +60,18 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
         return spender.isBuddyOfUser(owner);
     }
     
-    function _beforeTokenTransfer(address, address, uint256 id) internal virtual override {
+    function _afterTokenTransfer(address from, address to, uint256 id) internal virtual override {
         if (MigrationLib.isInMigration()) {
-            _FacetERC721Storage().tokensToInit.add(id);
-        } else {
-            require(allTokensInitialized(), "Tokens not initialized");
+            MigrationLib.manager().recordERC721TokenId(id);
         }
     }
     
-    function allTokensInitialized() public view returns (bool) {
-        return _FacetERC721Storage().tokensToInit.length() == 0;
+    function safeOwnerOf(uint256 id) external view returns (address) {
+        return _ownerOf(id);
     }
     
-    function initAllTokens() public {
-        require(MigrationLib.isNotInMigration(), "Migration in progress");
-                
-        FacetERC721Storage storage fs = _FacetERC721Storage();
-        
-        for (uint256 i = 0; i < fs.tokensToInit.length(); i++) {
-            uint256 tokenId = fs.tokensToInit.at(i);
-            address owner = _ownerOf(tokenId);
-            
-            if (owner != address(0)) {
-                emit Transfer(address(0), owner, tokenId);
-            }
-            
-            fs.tokensToInit.remove(tokenId);
-        }
+    function emitTransferEvent(address owner, uint256 id) external {
+        require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only migration manager can call");
+        emit Transfer(address(0), owner, id);
     }
 }

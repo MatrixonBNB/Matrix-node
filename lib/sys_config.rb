@@ -8,8 +8,11 @@ module SysConfig
   L2_BLOCK_TIME = 12
   
   def block_gas_limit(block)
-    if block_in_v1?(block) || is_first_v2_block?(block)
-      2e9.to_i
+    if block_in_v1?(block)
+      L2_BLOCK_GAS_LIMIT * 2
+    elsif is_first_v2_block?(block)
+      # TODO
+      L2_BLOCK_GAS_LIMIT
     else
       L2_BLOCK_GAS_LIMIT
     end

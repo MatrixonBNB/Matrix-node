@@ -26,7 +26,7 @@ contract TestMigrationManager is Script, Test {
     uint256 constant NUM_TOKENS = 2;
     uint256 constant NUM_HOLDERS = 10;
         
-    address constant MIGRATION_MANAGER = address(uint160(uint256(keccak256("migration manager"))));
+    address constant MIGRATION_MANAGER = MigrationLib.SYSTEM_ADDRESS;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
@@ -62,7 +62,7 @@ contract TestMigrationManager is Script, Test {
 
         // Prepare to capture events
         vm.recordLogs();
-        vm.dumpState("start_laksdjkldfs.json");
+        // vm.dumpState("start_laksdjkldfs.json");
         // Measure gas usage of executeMigration
         uint256 gasBeforeMigration = gasleft();
         migrationManager.executeMigration();
@@ -70,7 +70,7 @@ contract TestMigrationManager is Script, Test {
         uint256 gasUsed = gasBeforeMigration - gasAfterMigration;
 
         console.log("Gas used for executeMigration:", gasUsed);
-        vm.dumpState("end_laksdjkldfs.json");
+        // vm.dumpState("end_laksdjkldfs.json");
         // // Verify emitted events
         verifyMigrationEvents();
         

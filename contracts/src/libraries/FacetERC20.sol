@@ -66,12 +66,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     
     function _afterTokenTransfer(address from, address to, uint256) internal virtual override {
         if (MigrationLib.isInMigration()) {
-            if (from != address(0)) {  // Skip for minting operations
-                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(from, balanceOf(from));
-            }
-            if (to != address(0)) {  // Skip for burning operations
-                MigrationManager(MigrationLib.MIGRATION_MANAGER).recordTransfer(to, balanceOf(to));
-            }
+            MigrationLib.manager().recordERC20Holder(to);
         }
     }
 }
