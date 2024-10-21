@@ -5,7 +5,7 @@ import "src/predeploys/MigrationManager.sol";
 
 library MigrationLib {
     address public constant DUMMY_ADDRESS = 0x11110000000000000000000000000000000000C5;
-    address public constant MIGRATION_MANAGER = address(uint160(uint256(keccak256("migration manager"))));
+    address public constant MIGRATION_MANAGER = 0x22220000000000000000000000000000000000D6;
     address public constant SYSTEM_ADDRESS = 0xDeaDDEaDDeAdDeAdDEAdDEaddeAddEAdDEAd0001;
     
     function manager() internal pure returns (MigrationManager) {

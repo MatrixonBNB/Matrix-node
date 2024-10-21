@@ -17,6 +17,7 @@ class FacetTransaction < ApplicationRecord
   
   SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
   L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
+  MIGRATION_MANAGER_ADDRESS = "0x22220000000000000000000000000000000000d6"
   
   def within_gas_limit?
     gas_limit <= PER_L2_TX_GAS_LIMIT
@@ -181,20 +182,17 @@ class FacetTransaction < ApplicationRecord
     end
     
     function_selector = Eth::Util.keccak256('executeMigration()').first(4).bytes_to_hex
-    migration_manager_address = "0x" + Eth::Util.keccak256("migration manager").bytes_to_hex.last(40)
-    msg_sender = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
-    
     upgrade_intent = "emit events required to complete v1 to v2 migration batch ##{batch_number}"
 
     tx = new
     tx.chain_id = ChainIdManager.current_l2_chain_id
-    tx.to_address = migration_manager_address
+    tx.to_address = MIGRATION_MANAGER_ADDRESS
     tx.value = 0
     tx.mint = 0
     tx.max_fee_per_gas = 0
     tx.gas_limit = 100e9.to_i
     tx.input = function_selector
-    tx.from_address = msg_sender
+    tx.from_address = SYSTEM_ADDRESS
     
     tx.facet_block = facet_block
     
