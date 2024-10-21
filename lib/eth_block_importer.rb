@@ -91,6 +91,8 @@ class EthBlockImporter
     latest_l2_block_number = latest_l2_block['number'].to_i(16)
     
     if latest_l2_block_number == 0
+      l1_block = EthRpcClient.l1.get_block(SysConfig.l1_genesis_block_number)
+      eth_block = EthBlock.from_rpc_result(l1_block)
       facet_block = FacetBlock.from_rpc_result(latest_l2_block)
       l1_attributes = GethDriver.client.get_l1_attributes(latest_l2_block_number)
       

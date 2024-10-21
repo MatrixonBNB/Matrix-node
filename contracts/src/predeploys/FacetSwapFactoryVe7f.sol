@@ -31,10 +31,6 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
     function initialize(address _feeToSetter) public initializer {
         s().feeToSetter = _feeToSetter;
         _initializeUpgradeAdmin(msg.sender);
-        
-        if (MigrationLib.isInMigration()) {
-            MigrationManager(MigrationLib.MIGRATION_MANAGER).registerFactory(address(this));
-        }
     }
 
     function allPairsLength() public view returns (uint256) {
@@ -80,6 +76,10 @@ contract FacetSwapFactoryVe7f is Initializable, Upgradeable {
         s().getPair[token0][token1] = pair;
         s().getPair[token1][token0] = pair;
         s().allPairs.push(pair);
+
+        if (MigrationLib.isInMigration()) {
+            MigrationLib.manager().recordPairCreation(pair);
+        }
 
         emit PairCreated(token0, token1, pair, s().allPairs.length);
     }

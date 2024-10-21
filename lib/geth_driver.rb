@@ -126,7 +126,20 @@ module GethDriver
     system_txs = [new_facet_block.attributes_tx]
     
     if SysConfig.is_first_v2_block?(new_facet_block)
-      system_txs << FacetTransaction.v1_to_v2_migration_tx_from_block(new_facet_block)
+      migration_manager_address = "0x" + Eth::Util.keccak256("migration manager").bytes_to_hex.last(40)
+      function_selector = Eth::Util.keccak256('transactionsRequired()').first(4).bytes_to_hex
+
+      result = EthRpcClient.l2.eth_call(
+        to: migration_manager_address,
+        data: function_selector
+      )
+      
+      abi_decoded = Eth::Abi.decode(['uint256'], result)
+      num_transactions = abi_decoded.first
+      
+      num_transactions.times do
+        system_txs << FacetTransaction.v1_to_v2_migration_tx_from_block(new_facet_block)
+      end
     end
     
     transactions_with_attributes = system_txs + transactions

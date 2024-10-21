@@ -23,10 +23,10 @@ contract TestMigrationManager is Script, Test {
     TestToken[] public tokens;
     address[] public holders;
     
-    uint256 constant NUM_TOKENS = 2;
-    uint256 constant NUM_HOLDERS = 10;
-        
-    address constant MIGRATION_MANAGER = MigrationLib.SYSTEM_ADDRESS;
+    uint256 constant NUM_TOKENS = 100;
+    uint256 constant NUM_HOLDERS = 1000;
+    
+    address constant MIGRATION_MANAGER = MigrationLib.MIGRATION_MANAGER;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
@@ -57,15 +57,23 @@ contract TestMigrationManager is Script, Test {
         for (uint256 i = 0; i < NUM_TOKENS; i++) {
             mintAndTransfer(tokens[i]);
         }
-
+        
         vm.etch(MigrationLib.DUMMY_ADDRESS, new bytes(0)); // End migration
 
         // Prepare to capture events
         vm.recordLogs();
         // vm.dumpState("start_laksdjkldfs.json");
         // Measure gas usage of executeMigration
+        uint256 totalTransactionsRequired = migrationManager.transactionsRequired();
+        console.log("Total transactions required:", totalTransactionsRequired);
+        
         uint256 gasBeforeMigration = gasleft();
-        migrationManager.executeMigration();
+        vm.startPrank(MigrationLib.SYSTEM_ADDRESS);
+        for (uint256 i = 0; i < totalTransactionsRequired; i++) {
+            uint256 remainingEvents = migrationManager.executeMigration();
+            console.log("Remaining events:", remainingEvents);
+        }
+        vm.stopPrank();
         uint256 gasAfterMigration = gasleft();
         uint256 gasUsed = gasBeforeMigration - gasAfterMigration;
 

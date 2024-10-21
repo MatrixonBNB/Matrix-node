@@ -177,6 +177,13 @@ class EthRpcClient
     query_api(method: method, params: params)
   end
   
+  def eth_call(to:, data:, block_number: "latest")
+    query_api(
+      method: 'eth_call',
+      params: [{ to: to, data: data }, block_number]
+    )
+  end
+  
   def headers
     { 
       'Accept' => 'application/json',
