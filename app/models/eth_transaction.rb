@@ -190,35 +190,4 @@ class EthTransaction < T::Struct
       FacetTransaction::USER_DEPOSIT_SOURCE_DOMAIN,
     )
   end
-  
-  def self.to_rpc_result(eth_transactions)
-    block_result = {
-      'hash' => eth_transactions.first.block_hash,
-      'number' => "0x" + eth_transactions.first.block_number.to_s(16),
-      'baseFeePerGas' => "0x" + 1.gwei.to_s(16),
-      'timestamp' => "0x" + eth_transactions.first.block_timestamp.to_s(16),
-      'parentBeaconBlockRoot' => eth_transactions.first.block_hash,
-      'mixHash' => eth_transactions.first.block_hash,
-      'transactions' => eth_transactions.map do |tx|
-        {
-          'hash' => tx.tx_hash,
-          'transactionIndex' => "0x" + tx.transaction_index.to_s(16),
-          'input' => tx.input,
-          'chainId' => "0x" + tx.chain_id.to_s(16),
-          'from' => tx.from_address,
-          'to' => tx.to_address
-        }
-      end
-    }
-
-    receipt_result = eth_transactions.map do |tx|
-      {
-        'transactionHash' => tx.tx_hash,
-        'status' => "0x" + tx.status.to_s(16),
-        'logs' => tx.logs
-      }
-    end
-    
-    [block_result, receipt_result]
-  end
 end
