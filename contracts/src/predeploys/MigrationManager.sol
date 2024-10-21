@@ -127,58 +127,64 @@ contract MigrationManager {
     }
     
     function processERC20Tokens() internal whileInV2 {
-        uint256 tokensLength = allERC20Tokens.length();
-        for (uint256 i = tokensLength; i > 0; --i) {
-            address token = allERC20Tokens.at(i - 1);
-            
-            migrateERC20(token);
-            if (batchFinished()) return;
+        unchecked {
+            uint256 tokensLength = allERC20Tokens.length();
+            for (uint256 i = tokensLength; i > 0; --i) {
+                address token = allERC20Tokens.at(i - 1);
+                
+                migrateERC20(token);
+                if (batchFinished()) return;
+            }
         }
     }
     
     function processERC721Tokens() internal whileInV2 {
-        uint256 tokensLength = allERC721Tokens.length();
-        for (uint256 i = tokensLength; i > 0; --i) {
-            address token = allERC721Tokens.at(i - 1);
-            
-            migrateERC721(token);
-            if (batchFinished()) return;
+        unchecked {
+            uint256 tokensLength = allERC721Tokens.length();
+            for (uint256 i = tokensLength; i > 0; --i) {
+                address token = allERC721Tokens.at(i - 1);
+                
+                migrateERC721(token);
+                if (batchFinished()) return;
+            }
         }
     }
     
     function processFactories() internal whileInV2 {
-        uint256 factoriesLength = factories.length();
-        
-        for (uint256 i = factoriesLength; i > 0; --i) {
-            FacetSwapFactory factory = FacetSwapFactory(factories.at(i - 1));
-            EnumerableSetLib.AddressSet storage pairs = factoryToPairs[address(factory)];
+        unchecked {
+            uint256 factoriesLength = factories.length();
             
-            uint256 pairsLength = pairs.length();
-            for (uint256 j = pairsLength; j > 0; --j) {
-                FacetSwapPair pair = FacetSwapPair(pairs.at(j - 1));
-                address token0 = pair.token0();
-                address token1 = pair.token1();
+            for (uint256 i = factoriesLength; i > 0; --i) {
+                FacetSwapFactory factory = FacetSwapFactory(factories.at(i - 1));
+                EnumerableSetLib.AddressSet storage pairs = factoryToPairs[address(factory)];
                 
-                migrateERC20(token0);
-                if (batchFinished()) return;
-                
-                migrateERC20(token1);
-                if (batchFinished()) return;
-                
-                factory.emitPairCreated(address(pair), token0, token1, j);
-                
-                migrateERC20(address(pair), true);
-                pair.sync();
-                
-                currentBatchEmittedEvents += 2;
-                pairs.remove(address(pair));
-                
-                if (pairs.length() == 0) {
-                    delete factoryToPairs[address(factory)];
-                    factories.remove(address(factory));
+                uint256 pairsLength = pairs.length();
+                for (uint256 j = pairsLength; j > 0; --j) {
+                    FacetSwapPair pair = FacetSwapPair(pairs.at(j - 1));
+                    address token0 = pair.token0();
+                    address token1 = pair.token1();
+                    
+                    migrateERC20(token0);
+                    if (batchFinished()) return;
+                    
+                    migrateERC20(token1);
+                    if (batchFinished()) return;
+                    
+                    factory.emitPairCreated(address(pair), token0, token1, j);
+                    
+                    migrateERC20(address(pair), true);
+                    pair.sync();
+                    
+                    currentBatchEmittedEvents += 2;
+                    pairs.remove(address(pair));
+                    
+                    if (pairs.length() == 0) {
+                        delete factoryToPairs[address(factory)];
+                        factories.remove(address(factory));
+                    }
+                    
+                    if (batchFinished()) return;
                 }
-                
-                if (batchFinished()) return;
             }
         }
     }

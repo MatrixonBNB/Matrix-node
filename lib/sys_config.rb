@@ -12,7 +12,7 @@ module SysConfig
       L2_BLOCK_GAS_LIMIT * 2
     elsif is_first_v2_block?(block)
       # TODO
-      L2_BLOCK_GAS_LIMIT
+      L2_BLOCK_GAS_LIMIT * 10
     else
       L2_BLOCK_GAS_LIMIT
     end

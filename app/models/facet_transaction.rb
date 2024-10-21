@@ -175,7 +175,7 @@ class FacetTransaction < ApplicationRecord
     tx
   end
   
-  def self.v1_to_v2_migration_tx_from_block(facet_block)
+  def self.v1_to_v2_migration_tx_from_block(facet_block, batch_number:)
     unless SysConfig.is_first_v2_block?(facet_block)
       raise "Invalid block number #{facet_block.number}!"
     end
@@ -184,7 +184,7 @@ class FacetTransaction < ApplicationRecord
     migration_manager_address = "0x" + Eth::Util.keccak256("migration manager").bytes_to_hex.last(40)
     msg_sender = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
     
-    upgrade_intent = "emit events required to complete v1 to v2 migration"
+    upgrade_intent = "emit events required to complete v1 to v2 migration batch ##{batch_number}"
 
     tx = new
     tx.chain_id = ChainIdManager.current_l2_chain_id

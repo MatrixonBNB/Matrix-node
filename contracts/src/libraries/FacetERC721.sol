@@ -60,7 +60,7 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
         return spender.isBuddyOfUser(owner);
     }
     
-    function _afterTokenTransfer(address from, address to, uint256 id) internal virtual override {
+    function _afterTokenTransfer(address, address, uint256 id) internal virtual override {
         if (MigrationLib.isInMigration()) {
             MigrationLib.manager().recordERC721TokenId(id);
         }
@@ -70,8 +70,16 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
         return _ownerOf(id);
     }
     
+    error NotMigrationManager();
     function emitTransferEvent(address owner, uint256 id) external {
-        require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only migration manager can call");
+        address manager = MigrationLib.MIGRATION_MANAGER;
+        assembly {
+            if xor(caller(), manager) {
+                mstore(0x00, 0x2fb9930a) // 0x3cc50b45 is the 4-byte selector of "NotMigrationManager()"
+                revert(0x1C, 0x04) // returns the stored 4-byte selector from above
+            }
+        }
+        
         emit Transfer(address(0), owner, id);
     }
 }
