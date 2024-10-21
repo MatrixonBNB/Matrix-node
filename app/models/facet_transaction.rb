@@ -190,7 +190,7 @@ class FacetTransaction < ApplicationRecord
     tx.value = 0
     tx.mint = 0
     tx.max_fee_per_gas = 0
-    tx.gas_limit = 100e9.to_i
+    tx.gas_limit = 200_000_000
     tx.input = function_selector
     tx.from_address = SYSTEM_ADDRESS
     
