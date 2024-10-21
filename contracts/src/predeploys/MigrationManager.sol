@@ -88,13 +88,13 @@ contract MigrationManager {
             uint256 allPairsLength = factory.allPairsLength();
             for (uint256 j = 0; j < allPairsLength; j++) {
                 FacetSwapPair pair = FacetSwapPair(factory.allPairs(j));
-                FacetERC20 token0 = FacetERC20(pair.token0());
-                FacetERC20 token1 = FacetERC20(pair.token1());
+                address token0 = pair.token0();
+                address token1 = pair.token1();
                 
-                migrateERC20(address(token0));
-                migrateERC20(address(token1));
+                migrateERC20(token0);
+                migrateERC20(token1);
                 
-                factory.emitPairCreated(address(pair), address(token0), address(token1), j + 1);
+                factory.emitPairCreated(address(pair), token0, token1, j + 1);
                 
                 migrateERC20(address(pair));
                 pair.sync();
