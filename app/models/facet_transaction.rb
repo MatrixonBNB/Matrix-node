@@ -89,12 +89,16 @@ class FacetTransaction < ApplicationRecord
       raise Eth::Tx::TransactionTypeError, "Invalid transaction type #{type}!"
     end
 
-    bin = Eth::Util.hex_to_bin hex[2..]
-    tx = Eth::Rlp.decode bin
+    bin = Eth::Util.hex_to_bin(hex[2..])
+    tx = Eth::Rlp.decode(bin)
 
     # So people can add "extra data" to burn more gas
     unless [6, 7].include?(tx.size)
       raise Eth::Tx::ParameterError, "Transaction missing fields!"
+    end
+    
+    unless tx.all? { |field| field.is_a?(String) }
+      raise Eth::Tx::ParameterError, "Transaction fields are not strings!"
     end
 
     chain_id = Eth::Util.deserialize_big_endian_to_int(tx[0])
