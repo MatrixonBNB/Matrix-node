@@ -25,14 +25,36 @@ contract MigrationManager {
     using EnumerableSetLib for EnumerableSetLib.Uint256Set;
     
     bool public migrationExecuted;
-    EnumerableSetLib.AddressSet public factories;
-    mapping(address => EnumerableSetLib.AddressSet) public factoryToPairs;
     
-    EnumerableSetLib.AddressSet public allERC20Tokens;
-    mapping(address => EnumerableSetLib.AddressSet) public erc20TokenToHolders;
+    EnumerableSetLib.AddressSet factories;
+    function getFactories() public view returns (address[] memory) {
+        return factories.values();
+    }
     
-    EnumerableSetLib.AddressSet public allERC721Tokens;
-    mapping(address => EnumerableSetLib.Uint256Set) public erc721TokenToTokenIds;
+    mapping(address => EnumerableSetLib.AddressSet) factoryToPairs;
+    function getFactoryToPairs(address factory) public view returns (address[] memory) {
+        return factoryToPairs[factory].values();
+    }
+    
+    EnumerableSetLib.AddressSet allERC20Tokens;
+    function getAllERC20Tokens() public view returns (address[] memory) {
+        return allERC20Tokens.values();
+    }
+    
+    mapping(address => EnumerableSetLib.AddressSet) erc20TokenToHolders;
+    function getERC20TokenToHolders(address token) public view returns (address[] memory) {
+        return erc20TokenToHolders[token].values();
+    }
+    
+    EnumerableSetLib.AddressSet allERC721Tokens;
+    function getAllERC721Tokens() public view returns (address[] memory) {
+        return allERC721Tokens.values();
+    }
+    
+    mapping(address => EnumerableSetLib.Uint256Set) erc721TokenToTokenIds;
+    function getERC721TokenToTokenIds(address token) public view returns (uint256[] memory) {
+        return erc721TokenToTokenIds[token].values();
+    }
     
     uint256 public currentBatchEmittedEvents;
     uint256 public totalEmittedEvents;
