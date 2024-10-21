@@ -42,8 +42,8 @@ class EthBlockImporter
       hex_block_number = "0x#{current_block_number.to_s(16)}"
       block_data = geth_driver.client.call("eth_getBlockByNumber", [hex_block_number, false])
       current_block = FacetBlock.from_rpc_result(block_data)
-      l1_attributes = GethDriver.client.get_l1_attributes(current_block.number)
       
+      l1_attributes = GethDriver.client.get_l1_attributes(current_block.number)
       current_block.assign_l1_attributes(l1_attributes)
       
       facet_block_cache[current_block.number] = current_block
@@ -91,14 +91,12 @@ class EthBlockImporter
     latest_l2_block_number = latest_l2_block['number'].to_i(16)
     
     if latest_l2_block_number == 0
+      l1_block = EthRpcClient.l1.get_block(SysConfig.l1_genesis_block_number)
+      eth_block = EthBlock.from_rpc_result(l1_block)
       facet_block = FacetBlock.from_rpc_result(latest_l2_block)
-      eth_block = EthBlock.from_rpc_result(ethereum_client.get_block(l1_genesis_block_number))
+      l1_attributes = GethDriver.client.get_l1_attributes(latest_l2_block_number)
       
-      facet_block.eth_block_number = eth_block.number
-      facet_block.sequence_number = 0
-      facet_block.eth_block_hash = eth_block.block_hash
-      facet_block.eth_block_base_fee_per_gas = eth_block.base_fee_per_gas
-      facet_block.eth_block_timestamp = eth_block.timestamp
+      facet_block.assign_l1_attributes(l1_attributes)
       
       facet_block_cache[0] = facet_block
       eth_block_cache[eth_block.number] = eth_block

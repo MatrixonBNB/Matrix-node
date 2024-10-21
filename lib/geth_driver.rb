@@ -123,7 +123,26 @@ module GethDriver
     
     FctMintCalculator.assign_mint_amounts(transactions, new_facet_block)
     
-    transactions_with_attributes = [new_facet_block.attributes_tx] + transactions
+    system_txs = [new_facet_block.attributes_tx]
+    
+    if SysConfig.is_first_v2_block?(new_facet_block)
+      migration_manager_address = "0x22220000000000000000000000000000000000d6"
+      function_selector = Eth::Util.keccak256('transactionsRequired()').first(4).bytes_to_hex
+
+      result = EthRpcClient.l2.eth_call(
+        to: migration_manager_address,
+        data: function_selector
+      )
+      
+      abi_decoded = Eth::Abi.decode(['uint256'], result)
+      num_transactions = abi_decoded.first
+      
+      num_transactions.times do |i|
+        system_txs << FacetTransaction.v1_to_v2_migration_tx_from_block(new_facet_block, batch_number: i + 1)
+      end
+    end
+    
+    transactions_with_attributes = system_txs + transactions
     transaction_payloads = transactions_with_attributes.map(&:to_facet_payload)
     
     payload_attributes = {

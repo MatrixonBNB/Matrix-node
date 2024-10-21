@@ -26,6 +26,7 @@ module PredeployManager
     end 
     
     map["0x11110000000000000000000000000000000000c5"] = "NonExistentContractShim"
+    map["0x22220000000000000000000000000000000000d6"] = "MigrationManager"
     
     map
   end
@@ -81,9 +82,19 @@ module PredeployManager
     
     if use_dump
       dump = get_alloc_from_geth
-      modified_merged = merged.except('0x11110000000000000000000000000000000000c5')
+      dump_migration_data = dump.dig('0x22220000000000000000000000000000000000d6', 'storage') || {}
+      dump_migration_code = dump.dig('0x22220000000000000000000000000000000000d6', 'code') || "0x"
       
-      return dump.merge(modified_merged).sort_by { |key, _| key.downcase }.to_h
+      final = dump.merge(merged).sort_by { |key, _| key.downcase }.to_h
+      
+      final.delete('0x11110000000000000000000000000000000000c5')
+      
+      if dump_migration_code != "0x" && dump_migration_code != final['0x22220000000000000000000000000000000000d6']['code']
+        raise "Migration data or code mismatch!"
+      end
+      
+      final['0x22220000000000000000000000000000000000d6']['storage'] = dump_migration_data
+      return final
     end
     
     merged.sort_by { |key, _| key.downcase }.to_h
@@ -250,6 +261,7 @@ module PredeployManager
     
     foundry_parsed.each do |contract|
       address = contract['addr']
+      next if address == "0x11110000000000000000000000000000000000c5"
       contract_name = contract['name']
       
       sol_file = LEGACY_DIR.join("#{contract_name}.sol")
@@ -263,7 +275,7 @@ module PredeployManager
           "--via-ir",
           "--optimizer-runs 200",
           "--verifier-url #{blockscout_url}",
-          "--watch",
+          # "--watch",
           "--rpc-url #{rpc_url}",
           address,
           "src/predeploys/#{contract_name}.sol:#{contract_name}",

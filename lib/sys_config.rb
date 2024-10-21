@@ -10,6 +10,9 @@ module SysConfig
   def block_gas_limit(block)
     if block_in_v1?(block)
       L2_BLOCK_GAS_LIMIT * 2
+    elsif is_first_v2_block?(block)
+      # TODO
+      L2_BLOCK_GAS_LIMIT * 10
     else
       L2_BLOCK_GAS_LIMIT
     end
@@ -41,5 +44,9 @@ module SysConfig
   
   def block_in_v2?(block)
     !block_in_v1?(block)
+  end
+  
+  def is_first_v2_block?(block)
+    block_in_v2?(block) && block.number == 1
   end
 end

@@ -5,19 +5,17 @@ import "solady/src/tokens/ERC20.sol";
 import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
-import "src/libraries/LimitedLibMappedAddressSet.sol";
 import "./MigrationLib.sol";
+import "src/predeploys/MigrationManager.sol";
 
 abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     using LibString for *;
     using FacetBuddyLib for address;
-    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
     
     struct FacetERC20Storage {
         string name;
         string symbol;
         uint8 decimals;
-        LimitedLibMappedAddressSet.MappedSet balanceHoldersToInit;
     }
     
     function _FacetERC20Storage() internal pure returns (FacetERC20Storage storage cs) {
@@ -61,42 +59,22 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         return super.allowance(owner, spender);
     }
     
-    function _beforeTokenTransfer(address, address to, uint256) internal virtual override {
-        if (MigrationLib.isInMigration()) {
-            _FacetERC20Storage().balanceHoldersToInit.add(to);
-        } else {
-            require(allBalancesInitialized(), "Balances not initialized");
-        }
-    }
-    
-    function allBalancesInitialized() public view returns (bool) {
-        return _FacetERC20Storage().balanceHoldersToInit.length() == 0;
-    }
-    
-    function getBalanceHoldersToInit() public view returns (address[] memory) {
-        return _FacetERC20Storage().balanceHoldersToInit.values();
-    }
-    
-    function balanceHoldersToInitCount() public view returns (uint256) {
-        return _FacetERC20Storage().balanceHoldersToInit.length();
-    }
-    
-    function initAllBalances() public {
-        require(MigrationLib.isNotInMigration(), "Migration in progress");
-        
-        FacetERC20Storage storage fs = _FacetERC20Storage();
-        
-        for (uint256 i = 0; i < fs.balanceHoldersToInit.length(); i++) {
-            address holder = fs.balanceHoldersToInit.at(i);
-            uint256 balance = balanceOf(holder);
-            
-            if (balance > 0) {
-                emit Transfer(address(0), holder, balance);
+    error NotMigrationManager();
+    function emitTransferEvent(address to, uint256 value) external {
+        address manager = MigrationLib.MIGRATION_MANAGER;
+        assembly {
+            if xor(caller(), manager) {
+                mstore(0x00, 0x2fb9930a) // 0x3cc50b45 is the 4-byte selector of "NotMigrationManager()"
+                revert(0x1C, 0x04) // returns the stored 4-byte selector from above
             }
-            
-            fs.balanceHoldersToInit.removeFromMapping(holder);
         }
         
-        fs.balanceHoldersToInit.clearArray();
+        emit Transfer(address(0), to, value);
+    }
+    
+    function _afterTokenTransfer(address, address to, uint256) internal virtual override {
+        if (MigrationLib.isInMigration()) {
+            MigrationLib.manager().recordERC20Holder(to);
+        }
     }
 }

@@ -75,7 +75,9 @@ contract L2Genesis is Script {
             vm.setNonce(addr, 1);
         }
         
-        disableInitializableSlot(addr);
+        if (!contractName.eq("MigrationManager") && !contractName.eq("NonExistentContractShim")) {
+            disableInitializableSlot(addr);
+        }
         
         console.log("Etched", contractName, "at", vm.toString(addr));
     }

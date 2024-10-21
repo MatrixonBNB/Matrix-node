@@ -24,9 +24,25 @@ class GethClient
   alias :send_command :call
 
   def get_l1_attributes(l2_block_number)
-    l2_block = call("eth_getBlockByNumber", ["0x#{l2_block_number.to_s(16)}", true])
-    l2_attributes_tx = l2_block['transactions'].first
-    L1AttributesTxCalldata.decode(l2_attributes_tx['input'])
+    if l2_block_number > 0
+      l2_block = call("eth_getBlockByNumber", ["0x#{l2_block_number.to_s(16)}", true])
+      l2_attributes_tx = l2_block['transactions'].first
+      L1AttributesTxCalldata.decode(l2_attributes_tx['input'])
+    else
+      l1_block = EthRpcClient.l1.get_block(SysConfig.l1_genesis_block_number)
+      eth_block = EthBlock.from_rpc_result(l1_block)
+      {
+        timestamp: eth_block.timestamp,
+        number: eth_block.number,
+        base_fee: eth_block.base_fee_per_gas,
+        blob_base_fee: 1,
+        hash: eth_block.block_hash,
+        batcher_hash: ("\x00" * 32).hex_to_bytes,
+        sequence_number: 0,
+        base_fee_scalar: 0,
+        blob_base_fee_scalar: 1
+      }.with_indifferent_access
+    end
   end
   
   def send_request(payload)

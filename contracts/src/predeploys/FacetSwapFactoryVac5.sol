@@ -4,21 +4,19 @@ pragma solidity 0.8.24;
 import "src/libraries/Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
 import "solady/src/utils/LibString.sol";
-import "src/libraries/LimitedLibMappedAddressSet.sol";
 import "./FacetSwapPairVdfd.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";
+import "src/predeploys/MigrationManager.sol";
 
 contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     using LibString for *;
-    using LimitedLibMappedAddressSet for LimitedLibMappedAddressSet.MappedSet;
     
     struct FacetSwapFactoryStorage {
         address feeTo;
         address feeToSetter;
         mapping(address => mapping(address => address)) getPair;
         address[] allPairs;
-        LimitedLibMappedAddressSet.MappedSet pairsToMigrate;
         uint256 lpFeeBPS;
     }
     
@@ -42,6 +40,10 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
 
     function allPairsLength() public view returns (uint256) {
         return s().allPairs.length;
+    }
+    
+    function allPairs(uint256 index) public view returns (address) {
+        return s().allPairs[index];
     }
     
     function getPair(address tokenA, address tokenB) public view returns (address pair) {
@@ -79,11 +81,9 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         s().getPair[token0][token1] = pair;
         s().getPair[token1][token0] = pair;
         s().allPairs.push(pair);
-
+        
         if (MigrationLib.isInMigration()) {
-            s().pairsToMigrate.add(pair);
-        } else {
-            require(allPairsInitialized(), "Migrated pairs not initialized");
+            MigrationLib.manager().recordPairCreation(pair);
         }
 
         emit PairCreated(token0, token1, pair, s().allPairs.length);
@@ -109,6 +109,7 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         s().lpFeeBPS = lpFeeBPS;
     }
     
+    // TODO: ability to upgrade post-migration
     function upgradePairs(address[] calldata pairs, bytes32 newHash, string calldata newSource) public {
         require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
         require(pairs.length <= 10, "Too many pairs to upgrade at once");
@@ -124,31 +125,16 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         Upgradeable(pair).upgrade(newHash, newSource);
     }
     
-    function allPairsInitialized() public view returns (bool) {
-        return s().pairsToMigrate.length() == 0;
-    }
-    
-    function initAllPairsFromMigration() external {
-        require(MigrationLib.isNotInMigration(), "Still migrating");
-        
-        FacetSwapFactoryStorage storage fs = s();
-        
-        for (uint256 i = 0; i < fs.pairsToMigrate.length(); i++) {
-            address pair = fs.pairsToMigrate.at(i);
-            FacetERC20 token0 = FacetERC20(FacetSwapPairVdfd(pair).token0());
-            FacetERC20 token1 = FacetERC20(FacetSwapPairVdfd(pair).token1());
-            
-            token0.initAllBalances();
-            token1.initAllBalances();
-            
-            emit PairCreated(address(token0), address(token1), pair, i + 1);
-            
-            FacetERC20(pair).initAllBalances();
-            FacetSwapPairVdfd(pair).sync();
-            
-            fs.pairsToMigrate.removeFromMapping(pair);
+    error NotMigrationManager();
+    function emitPairCreated(address token0, address token1, address pair, uint256 pairLength) external {
+        address manager = MigrationLib.MIGRATION_MANAGER;
+        assembly {
+            if xor(caller(), manager) {
+                mstore(0x00, 0x2fb9930a) // 0x3cc50b45 is the 4-byte selector of "NotMigrationManager()"
+                revert(0x1C, 0x04) // returns the stored 4-byte selector from above
+            }
         }
         
-        fs.pairsToMigrate.clearArray();
+        emit PairCreated(token0, token1, pair, pairLength);
     }
 }
