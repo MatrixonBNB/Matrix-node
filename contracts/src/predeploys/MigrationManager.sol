@@ -61,6 +61,11 @@ contract MigrationManager {
     uint256 public totalEventsToEmit;
     uint256 public constant MAX_EVENTS_PER_BATCH = 100;
     
+    EnumerableSetLib.AddressSet pairCreateEventEmitted;
+    function getPairCreateEventEmitted() public view returns (address[] memory) {
+        return pairCreateEventEmitted.values();
+    }
+    
     function transactionsRequired() public view returns (uint256) {
         return (calculateTotalEventsToEmit() + MAX_EVENTS_PER_BATCH - 1) / MAX_EVENTS_PER_BATCH;
     }
@@ -208,12 +213,15 @@ contract MigrationManager {
                     migrateERC20(token1);
                     if (batchFinished()) return;
                     
-                    factory.emitPairCreated(address(pair), token0, token1, j);
+                    emitPairCreateEventIfNecessary(factory, address(pair), token0, token1, j);
+                    if (batchFinished()) return;
                     
-                    migrateERC20(address(pair), true);
+                    migrateERC20(address(pair));
+                    if (batchFinished()) return;
+                    
                     pair.sync();
+                    currentBatchEmittedEvents++;
                     
-                    currentBatchEmittedEvents += 2;
                     pairs.remove(address(pair));
                     
                     if (pairs.length() == 0) {
@@ -224,14 +232,33 @@ contract MigrationManager {
                     if (batchFinished()) return;
                 }
             }
+            
+            // Empty pairCreateEventEmitted set
+            uint256 emittedPairsLength = pairCreateEventEmitted.length();
+            for (uint256 i = emittedPairsLength; i > 0; --i) {
+                address pair = pairCreateEventEmitted.at(i - 1);
+                pairCreateEventEmitted.remove(pair);
+            }
+        }
+    }
+    
+    function emitPairCreateEventIfNecessary(
+        FacetSwapFactory factory,
+        address pair,
+        address token0,
+        address token1,
+        uint256 pairLength
+    ) internal {
+        if (!pairCreateEventEmitted.contains(pair)) {
+            pairCreateEventEmitted.add(pair);
+            
+            factory.emitPairCreated(pair, token0, token1, pairLength);
+            
+            currentBatchEmittedEvents++;
         }
     }
     
     function migrateERC20(address token) internal {
-        return migrateERC20(token, false);
-    }
-    
-    function migrateERC20(address token, bool isPair) internal {
         unchecked {
             EnumerableSetLib.AddressSet storage holders = erc20TokenToHolders[token];
             
@@ -254,7 +281,7 @@ contract MigrationManager {
                     allERC20Tokens.remove(token);
                 }
                 
-                if (batchFinished() && !isPair) return;
+                if (batchFinished()) return;
             }
         }
     }
