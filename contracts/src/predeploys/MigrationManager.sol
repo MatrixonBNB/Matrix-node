@@ -59,7 +59,7 @@ contract MigrationManager {
     uint256 public currentBatchEmittedEvents;
     uint256 public totalEmittedEvents;
     uint256 public totalEventsToEmit;
-    uint256 public constant MAX_EVENTS_PER_BATCH = 10_000;
+    uint256 public constant MAX_EVENTS_PER_BATCH = 100;
     
     function transactionsRequired() public view returns (uint256) {
         return (calculateTotalEventsToEmit() + MAX_EVENTS_PER_BATCH - 1) / MAX_EVENTS_PER_BATCH;
@@ -117,6 +117,13 @@ contract MigrationManager {
         }
     }
     
+    event BatchComplete(
+        uint256 eventsEmittedInBatch,
+        uint256 remainingEventsCounted,
+        uint256 remainingEventsComputed,
+        uint256 remainingTransactions
+    );
+    
     function executeMigration() external whileInV2 returns (uint256 remainingEvents) {
         require(msg.sender == MigrationLib.SYSTEM_ADDRESS, "Only system address can call");
         require(!migrationExecuted, "Migration already executed");
@@ -141,7 +148,16 @@ contract MigrationManager {
         
         if (remainingEvents == 0) {
             migrationExecuted = true;
+            
+            require(calculateTotalEventsToEmit() == 0 , "Remaining events should match total events to emit");
         }
+        
+        emit BatchComplete(
+            currentBatchEmittedEvents,
+            remainingEvents,
+            calculateTotalEventsToEmit(),
+            transactionsRequired()
+        );
     }
     
     function batchFinished() public view returns (bool) {

@@ -49,4 +49,8 @@ module SysConfig
   def is_first_v2_block?(block)
     block_in_v2?(block) && block.number == 1
   end
+  
+  def is_second_v2_block?(block)
+    block_in_v2?(block) && block.number == 2
+  end
 end

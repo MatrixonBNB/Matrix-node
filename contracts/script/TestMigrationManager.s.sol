@@ -23,8 +23,8 @@ contract TestMigrationManager is Script, Test {
     TestToken[] public tokens;
     address[] public holders;
     
-    uint256 constant NUM_TOKENS = 100;
-    uint256 constant NUM_HOLDERS = 1000;
+    uint256 constant NUM_TOKENS = 178;
+    uint256 constant NUM_HOLDERS = 777;
     
     address constant MIGRATION_MANAGER = MigrationLib.MIGRATION_MANAGER;
 
