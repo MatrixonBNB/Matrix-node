@@ -10,7 +10,7 @@ import "src/libraries/MigrationLib.sol";
 interface FacetSwapFactory {
     function allPairs(uint256 index) external view returns (address);
     function allPairsLength() external view returns (uint256);
-    function emitPairCreated(address pair, address token0, address token1, uint256 pairLength) external;
+    function emitPairCreated(address token0, address token1, address pair, uint256 pairLength) external;
 }
 
 interface FacetSwapPair {
@@ -213,7 +213,13 @@ contract MigrationManager {
                     migrateERC20(token1);
                     if (batchFinished()) return;
                     
-                    emitPairCreateEventIfNecessary(factory, address(pair), token0, token1, j);
+                    emitPairCreateEventIfNecessary({
+                        factory: factory,
+                        pair: address(pair),
+                        token0: token0,
+                        token1: token1,
+                        pairLength: j
+                    });
                     if (batchFinished()) return;
                     
                     migrateERC20(address(pair));

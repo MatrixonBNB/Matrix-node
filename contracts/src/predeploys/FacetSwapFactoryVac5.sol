@@ -7,7 +7,6 @@ import "solady/src/utils/LibString.sol";
 import "./FacetSwapPairVdfd.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";
-import "src/predeploys/MigrationManager.sol";
 
 contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
     using LibString for *;

@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "src/predeploys/MigrationManager.sol";
+interface IMigrationManager {
+    function recordERC20Holder(address holder) external;
+    function recordERC721TokenId(uint256 id) external;
+    function recordPairCreation(address pair) external;
+}
 
 library MigrationLib {
     address public constant DUMMY_ADDRESS = 0x11110000000000000000000000000000000000C5;
     address public constant MIGRATION_MANAGER = 0x22220000000000000000000000000000000000D6;
     address public constant SYSTEM_ADDRESS = 0xDeaDDEaDDeAdDeAdDEAdDEaddeAddEAdDEAd0001;
     
-    function manager() internal pure returns (MigrationManager) {
-        return MigrationManager(MIGRATION_MANAGER);
+    function manager() internal pure returns (IMigrationManager) {
+        return IMigrationManager(MIGRATION_MANAGER);
     }
     
     function isInV1() internal view returns (bool) {

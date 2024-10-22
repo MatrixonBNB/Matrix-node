@@ -6,7 +6,6 @@ import "./FacetBuddyLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
 import "./MigrationLib.sol";
-import "src/predeploys/MigrationManager.sol";
 
 abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     using LibString for *;
