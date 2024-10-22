@@ -60,7 +60,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     }
     
     error NotMigrationManager();
-    function emitTransferEvent(address to, uint256 value) external {
+    function emitTransferEvent(address to, uint256 amount) external {
         address manager = MigrationLib.MIGRATION_MANAGER;
         assembly {
             if xor(caller(), manager) {
@@ -69,7 +69,11 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
             }
         }
         
-        emit Transfer(address(0), to, value);
+        emit Transfer({
+            from: address(0),
+            to: to,
+            amount: amount
+        });
     }
     
     function _afterTokenTransfer(address, address to, uint256) internal virtual override {

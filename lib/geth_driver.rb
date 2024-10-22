@@ -141,6 +141,24 @@ module GethDriver
         system_txs << FacetTransaction.v1_to_v2_migration_tx_from_block(new_facet_block, batch_number: i + 1)
       end
     end
+
+    if SysConfig.is_second_v2_block?(new_facet_block)
+      first_block_receipts = EthRpcClient.l2.get_block_receipts(1)
+      
+      failed_system_txs = first_block_receipts.select do |receipt|
+        receipt['from'].downcase == FacetTransaction::SYSTEM_ADDRESS.downcase &&
+        receipt['status'] != '0x1'
+      end
+      
+      unless failed_system_txs.empty?
+        failed_system_txs.each do |tx|
+          trace = EthRpcClient.l2.trace_transaction(tx['transactionHash'])
+          ap trace
+        end
+        
+        raise "First v2 block system transactions did not execute successfully"
+      end
+    end
     
     transactions_with_attributes = system_txs + transactions
     transaction_payloads = transactions_with_attributes.map(&:to_facet_payload)

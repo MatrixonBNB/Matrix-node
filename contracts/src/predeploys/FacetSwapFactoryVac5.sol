@@ -135,6 +135,11 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
             }
         }
         
-        emit PairCreated(token0, token1, pair, pairLength);
+        emit PairCreated({
+            token0: token0,
+            token1: token1,
+            pair: pair,
+            pairLength: pairLength
+        });
     }
 }

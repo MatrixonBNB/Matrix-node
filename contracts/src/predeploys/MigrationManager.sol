@@ -252,7 +252,12 @@ contract MigrationManager {
         if (!pairCreateEventEmitted.contains(pair)) {
             pairCreateEventEmitted.add(pair);
             
-            factory.emitPairCreated(pair, token0, token1, pairLength);
+            factory.emitPairCreated({
+                token0: token0,
+                token1: token1,
+                pair: pair,
+                pairLength: pairLength
+            });
             
             currentBatchEmittedEvents++;
         }
@@ -270,7 +275,10 @@ contract MigrationManager {
                 require(holder != address(0), "Should not happen");
                 
                 if (balance > 0) {
-                    FacetERC20(token).emitTransferEvent(holder, balance);
+                    FacetERC20(token).emitTransferEvent({
+                        to: holder,
+                        amount: balance
+                    });
                 }
                 
                 currentBatchEmittedEvents++;
@@ -296,7 +304,10 @@ contract MigrationManager {
                 address owner = FacetERC721(token).safeOwnerOf(tokenId);
                 
                 if (owner != address(0)) {
-                    FacetERC721(token).emitTransferEvent(owner, tokenId);
+                    FacetERC721(token).emitTransferEvent({
+                        to: owner,
+                        id: tokenId
+                    });
                 }
                 
                 currentBatchEmittedEvents++;
