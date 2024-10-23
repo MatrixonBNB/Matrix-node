@@ -55,6 +55,12 @@ module FctMintCalculator
   def assign_mint_amounts(facet_txs, facet_block)
     if block_in_v1?(facet_block)
       facet_txs.each { |tx| tx.mint = 1e6.ether }
+      
+      facet_block.assign_attributes(
+        fct_mint_rate: BASE_RATE,
+        fct_minted_in_rate_adjustment_period: 0
+      )
+      
       return
     end
     
