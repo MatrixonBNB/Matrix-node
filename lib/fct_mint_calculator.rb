@@ -3,41 +3,81 @@ module FctMintCalculator
   include SysConfig
   extend self
   
+  ADJUSTMENT_PERIOD = 10_000 # blocks
   SECONDS_PER_YEAR = 31_556_952 # length of a gregorian year (365.2425 days)
-  SECONDS_PER_BLOCK = 12
-  HALVING_PERIOD_LENGTH = 1 * SECONDS_PER_YEAR
-  HALVING_PERIOD_IN_BLOCKS = HALVING_PERIOD_LENGTH / SECONDS_PER_BLOCK
+  HALVING_PERIOD_IN_SECONDS = 1 * SECONDS_PER_YEAR
   
-  def calculated_fct_mint_per_l1_gas(current_l2_block)
-    if block_in_v1?(current_l2_block)
-      return INITIAL_FCT_MINT_PER_L1_GAS
-    end
-    
-    INITIAL_FCT_MINT_PER_L1_GAS / (2 ** halving_periods_passed(current_l2_block))
-  end
+  RAW_HALVING_PERIOD_IN_BLOCKS = HALVING_PERIOD_IN_SECONDS / SysConfig::L2_BLOCK_TIME
+  ADJUSTMENT_PERIODS_PER_HALVING = RAW_HALVING_PERIOD_IN_BLOCKS / ADJUSTMENT_PERIOD
+  
+  HALVING_PERIOD_IN_BLOCKS = ADJUSTMENT_PERIOD * ADJUSTMENT_PERIODS_PER_HALVING
+  
+  TARGET_FCT_MINT_PER_L1_BLOCK = 40.ether
+  TARGET_MINT_PER_PERIOD = TARGET_FCT_MINT_PER_L1_BLOCK * ADJUSTMENT_PERIOD
+  MAX_ADJUSTMENT_FACTOR = 2
+  BASE_RATE = 100_000.gwei
+  MAX_RATE = BASE_RATE
+  MIN_RATE = 0
   
   def halving_periods_passed(current_l2_block)
-    unless block_in_v2?(current_l2_block)
-      raise "Halving only applies to v2 blocks: #{current_l2_block.number}"
-    end
-    
-    blocks_since_v2_fork = current_l2_block.number - l2_v2_fork_block_number
-    blocks_since_v2_fork / HALVING_PERIOD_IN_BLOCKS
+    current_l2_block.number / HALVING_PERIOD_IN_BLOCKS
   end
   
+  def halving_factor(l2_block)
+    2 ** halving_periods_passed(l2_block)
+  end
+  
+  def is_first_block_in_period?(l2_block)
+    l2_block.number % ADJUSTMENT_PERIOD == 0
+  end
+
+  def compute_new_rate(facet_block, prev_rate, cumulative_mint_in_period)
+    if is_first_block_in_period?(facet_block)
+      if cumulative_mint_in_period == 0
+        new_rate = MAX_RATE
+      else
+        halving_adjusted_target = TARGET_MINT_PER_PERIOD / halving_factor(facet_block)
+        new_rate = halving_adjusted_target / cumulative_mint_in_period
+      end
+
+      max_allowed_rate = [prev_rate * MAX_ADJUSTMENT_FACTOR, MAX_RATE].min
+      min_allowed_rate = [prev_rate / MAX_ADJUSTMENT_FACTOR, MIN_RATE].max
+      
+      new_rate = max_allowed_rate if new_rate > max_allowed_rate
+      new_rate = min_allowed_rate if new_rate < min_allowed_rate
+    else
+      new_rate = prev_rate
+    end
+
+    new_rate
+  end
+
   def assign_mint_amounts(facet_txs, facet_block)
     if block_in_v1?(facet_block)
-      facet_txs.each do |tx|
-        # The mint amount doesn't matter as the excess will be burned
-        tx.mint = 10.ether
-      end
-    else
-      fct_mint_per_gas = calculated_fct_mint_per_l1_gas(facet_block)
-      
-      facet_txs.each do |tx|
-        tx.mint = tx.l1_calldata_gas_used * fct_mint_per_gas
-      end
+      facet_txs.each { |tx| tx.mint = 1e6.ether }
+      return
     end
+    
+    prev_l1_attributes = GethDriver.client.get_l1_attributes(facet_block.number - 1)
+    prev_rate = prev_l1_attributes[:fct_mint_rate] 
+    cumulative_mint_in_period = prev_l1_attributes[:fct_minted_in_rate_adjustment_period]
+    
+    new_rate = compute_new_rate(facet_block, prev_rate, cumulative_mint_in_period)
+    
+    facet_txs.each do |tx|
+      tx.mint = tx.l1_calldata_gas_used * new_rate
+    end
+    
+    if is_first_block_in_period?(facet_block)
+      new_cumulative_mint = facet_txs.sum(&:mint)
+    else
+      new_cumulative_mint = cumulative_mint_in_period + facet_txs.sum(&:mint)
+    end
+    
+    facet_block.assign_attributes(
+      fct_mint_rate: new_rate,
+      fct_minted_in_rate_adjustment_period: new_cumulative_mint
+    )
     
     nil
   end

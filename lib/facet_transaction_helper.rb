@@ -121,13 +121,17 @@ module FacetTransactionHelper
     }
   end
   
-  def calldata_mint_amount_for_tx(hex_string)
-    halving_periods_passed = 0
-    calldata_mint_amount(hex_string) * SysConfig::INITIAL_FCT_MINT_PER_L1_GAS / (2 ** halving_periods_passed)
+  def calldata_mint_amount_for_tx(facet_block, hex_string)
+    prev_l1_attributes = GethDriver.client.get_l1_attributes(facet_block.number - 1)
+    prev_rate = prev_l1_attributes[:fct_mint_rate]
+    
+    new_rate = FctMintCalculator.compute_new_rate(facet_block, prev_rate, prev_l1_attributes[:fct_minted_in_rate_adjustment_period])
+    
+    calldata_mint_amount(hex_string) * new_rate
   end
   
-  def expect_calldata_mint_to_be(hex_string, expected_mint)
-    expect(calldata_mint_amount_for_tx(hex_string)).to eq(expected_mint)
+  def expect_calldata_mint_to_be(facet_block, hex_string, expected_mint)
+    expect(calldata_mint_amount_for_tx(facet_block, hex_string)).to eq(expected_mint)
   end
 
   def combine_transaction_data(receipt, tx_data)

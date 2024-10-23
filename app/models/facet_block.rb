@@ -13,7 +13,9 @@ class FacetBlock < ApplicationRecord
       eth_block_hash: l1_attributes.fetch(:hash),
       eth_block_number: l1_attributes.fetch(:number),
       eth_block_timestamp: l1_attributes.fetch(:timestamp),
-      eth_block_base_fee_per_gas: l1_attributes.fetch(:base_fee)
+      eth_block_base_fee_per_gas: l1_attributes.fetch(:base_fee),
+      fct_mint_rate: l1_attributes.fetch(:fct_mint_rate),
+      fct_minted_in_rate_adjustment_period: l1_attributes.fetch(:fct_minted_in_rate_adjustment_period)
     )
   end
   

@@ -40,7 +40,9 @@ class GethClient
         batcher_hash: ("\x00" * 32).hex_to_bytes,
         sequence_number: 0,
         base_fee_scalar: 0,
-        blob_base_fee_scalar: 1
+        blob_base_fee_scalar: 1,
+        fct_mint_rate: FctMintCalculator::BASE_RATE,
+        fct_minted_in_rate_adjustment_period: 0
       }.with_indifferent_access
     end
   end
