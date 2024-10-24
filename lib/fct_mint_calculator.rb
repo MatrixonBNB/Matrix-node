@@ -12,12 +12,12 @@ module FctMintCalculator
   
   HALVING_PERIOD_IN_BLOCKS = ADJUSTMENT_PERIOD * ADJUSTMENT_PERIODS_PER_HALVING
   
-  TARGET_FCT_MINT_PER_L1_BLOCK = 40.ether
+  TARGET_FCT_MINT_PER_L1_BLOCK = 64.ether
   TARGET_MINT_PER_PERIOD = TARGET_FCT_MINT_PER_L1_BLOCK * ADJUSTMENT_PERIOD
   MAX_ADJUSTMENT_FACTOR = 2
-  BASE_RATE = 100_000.gwei
+  BASE_RATE = 10_000_000.gwei
   MAX_RATE = BASE_RATE
-  MIN_RATE = 0
+  MIN_RATE = 1
   
   def halving_periods_passed(current_l2_block)
     current_l2_block.number / HALVING_PERIOD_IN_BLOCKS
@@ -30,13 +30,19 @@ module FctMintCalculator
   def is_first_block_in_period?(l2_block)
     l2_block.number % ADJUSTMENT_PERIOD == 0
   end
+  
+  def halving_adjusted_target(l2_block)
+    TARGET_MINT_PER_PERIOD / halving_factor(l2_block)
+  end
 
   def compute_new_rate(facet_block, prev_rate, cumulative_mint_in_period)
     if is_first_block_in_period?(facet_block)
       if cumulative_mint_in_period == 0
         new_rate = MAX_RATE
       else
-        halving_adjusted_target = TARGET_MINT_PER_PERIOD / halving_factor(facet_block)
+        halving_adjusted_target = halving_adjusted_target(facet_block)
+        return 0 if halving_adjusted_target == 0
+        
         new_rate = halving_adjusted_target / cumulative_mint_in_period
       end
 
