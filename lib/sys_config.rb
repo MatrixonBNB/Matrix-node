@@ -4,7 +4,6 @@ module SysConfig
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7".freeze
   L2_BLOCK_GAS_LIMIT = Integer(ENV.fetch('L2_BLOCK_GAS_LIMIT', 240_000_000))
   PER_L2_TX_GAS_LIMIT = Integer(ENV.fetch('PER_L2_TX_GAS_LIMIT', 50_000_000))
-  INITIAL_FCT_MINT_PER_L1_GAS = 4096.gwei
   L2_BLOCK_TIME = 12
   
   def block_gas_limit(block)
@@ -12,7 +11,7 @@ module SysConfig
       L2_BLOCK_GAS_LIMIT * 2
     elsif is_first_v2_block?(block)
       # TODO
-      L2_BLOCK_GAS_LIMIT * 10
+      L2_BLOCK_GAS_LIMIT * 20
     else
       L2_BLOCK_GAS_LIMIT
     end

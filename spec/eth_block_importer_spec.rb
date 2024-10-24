@@ -19,7 +19,9 @@ RSpec.describe EthBlockImporter do
       )
       
       expect(combined.to).to eq("0x" + "1" * 40)
-      expect_calldata_mint_to_be(facet_payload, combined.mint)
+      
+      facet_block = FacetBlock.from_rpc_result(combined.l2_block)
+      expect_calldata_mint_to_be(facet_block, facet_payload, combined.mint)
     end
 
     it 'handles an invalid Facet transaction with zero gas limit' do
