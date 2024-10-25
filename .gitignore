@@ -40,3 +40,4 @@ node_modules
 
 /contracts/forge-artifacts/
 /contracts/cache/
+/contracts/broadcast/*

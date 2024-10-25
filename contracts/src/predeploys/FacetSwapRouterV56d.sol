@@ -48,14 +48,20 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         _initializePausable(initialPauseState);
     }
     
-    function onUpgrade(address owner, bool initialPauseState) public reinitializer(3) {
-        _initializeOwner(owner);
-        
-        if (initialPauseState) {
-            _pause();
-        } else {
-            _unpause();
-        }
+    function setWETH(address _WETH) public onlyOwner {
+        s().WETH = _WETH;
+    }
+    
+    function getWETH() public view returns (address) {
+        return s().WETH;
+    }
+    
+    function setPathLength(uint256 maxPathLength) public onlyOwner {
+        s().maxPathLength = maxPathLength;
+    }
+    
+    function setFactory(address _factory) public onlyOwner {
+        s().factory = _factory;
     }
 
     function _addLiquidity(
