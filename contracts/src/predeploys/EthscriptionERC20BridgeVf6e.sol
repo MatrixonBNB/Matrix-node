@@ -44,7 +44,7 @@ contract EthscriptionERC20BridgeVf6e is FacetERC20, Initializable, Upgradeable {
         _initializeUpgradeAdmin(msg.sender);
     }
     
-    function onUpgrade(address newTrustedSmartContract) public reinitializer(2) {
+    function onUpgrade(address newTrustedSmartContract) public onlyUpgradeAdmin reinitializer(2) {
         s().trustedSmartContract = newTrustedSmartContract;
     }
 
