@@ -61,9 +61,9 @@ contract L2Genesis is Script {
     }
     
     function isDeployedByContract(string memory contractName) internal pure returns (bool) {
-        return contractName.startsWith("ERC20Bridge") ||
-               contractName.startsWith("FacetBuddy") ||
-               contractName.startsWith("FacetSwapPair");
+        return contractName.startsWith("ERC20BridgeV") ||
+               contractName.startsWith("FacetBuddyV") ||
+               contractName.startsWith("FacetSwapPairV");
     }
 
     function etchContract(string memory contractName, address addr) internal {

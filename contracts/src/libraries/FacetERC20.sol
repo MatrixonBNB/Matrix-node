@@ -2,14 +2,13 @@
 pragma solidity 0.8.24;
 
 import "solady/src/tokens/ERC20.sol";
-import "./FacetBuddyLib.sol";
+import "src/libraries/BuddyEnabled.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
 import "./MigrationLib.sol";
 
-abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
+abstract contract FacetERC20 is ERC20, BuddyEnabled, PublicImplementationAddress {
     using LibString for *;
-    using FacetBuddyLib for address;
     
     struct FacetERC20Storage {
         string name;
@@ -28,6 +27,8 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
         _FacetERC20Storage().name = name;
         _FacetERC20Storage().symbol = symbol;
         _FacetERC20Storage().decimals = decimals;
+        
+        _initializeBuddyFactory(msg.sender, BuddyEnabled.v1BuddyFactory);
     }
     
     function name() public view virtual override returns (string memory) {
@@ -43,7 +44,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     }
     
     function transferFrom(address from, address to, uint amount) public override returns (bool) {
-        if (msg.sender.isBuddyOfUser(from)) {
+        if (isBuddyOfUser({potentialBuddy: msg.sender, user: from})) {
             super._approve(from, msg.sender, type(uint256).max);
         }
         
@@ -51,7 +52,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     }
     
     function allowance(address owner, address spender) public view override returns (uint256) {
-        if (spender.isBuddyOfUser(owner)) {
+        if (isBuddyOfUser({potentialBuddy: spender, user: owner})) {
             return type(uint256).max;
         }
         

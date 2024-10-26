@@ -2,11 +2,10 @@
 pragma solidity 0.8.24;
 
 import "./FacetBuddyVe5c.sol";
-import "src/libraries/Upgradeable.sol";
 import "solady/src/utils/Initializable.sol";
 import "src/libraries/ERC1967Proxy.sol";
 
-contract FacetBuddyFactoryVef8 is Upgradeable, Initializable {
+contract FacetBuddyFactoryVef8 is Initializable {
     event BuddyCreated(address indexed forUser, address buddy);
 
     struct FacetBuddyFactoryStorage {
@@ -25,10 +24,13 @@ contract FacetBuddyFactoryVef8 is Upgradeable, Initializable {
     function buddyForUser(address forUser) public view returns (address) {
         return s().buddyForUser[forUser];
     }
+    
+    function isBuddyOfUser(address potentialBuddy, address forUser) public view returns (bool) {
+        return buddyForUser(forUser) == potentialBuddy;
+    }
 
     function initialize(address erc20Bridge) public initializer {
         require(erc20Bridge != address(0), "Invalid smart contract");
-        _initializeUpgradeAdmin(msg.sender);
         s().erc20Bridge = erc20Bridge;
     }
     

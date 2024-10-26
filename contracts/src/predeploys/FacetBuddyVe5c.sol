@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import "solady/src/tokens/ERC20.sol";
 import "solady/src/utils/Initializable.sol";
 import "src/libraries/PublicImplementationAddress.sol";
+import "src/libraries/MigrationLib.sol";
 
 contract FacetBuddyVe5c is Initializable, PublicImplementationAddress {
     event CallOnBehalfOfUser(address indexed onBehalfOf, address indexed addressToCall, bytes userCalldata, uint256 initialAmount, uint256 finalAmount, bool resultSuccess, string resultData);
@@ -13,6 +14,7 @@ contract FacetBuddyVe5c is Initializable, PublicImplementationAddress {
       address erc20Bridge;
       address forUser;
       bool locked;
+      bool bridgeSetPostMigration;
     }
     
     function s() internal pure returns (FacetBuddyStorage storage ns) {
@@ -26,6 +28,17 @@ contract FacetBuddyVe5c is Initializable, PublicImplementationAddress {
         s().factory = msg.sender;
         s().erc20Bridge = erc20Bridge;
         s().forUser = forUser;
+    }
+    
+    function setFactory(address factory) public {
+        require(msg.sender == s().forUser, "Only the user can set the factory");
+        s().factory = factory;
+    }
+    
+    function setERC20Bridge(address erc20Bridge) public {
+        require(msg.sender == s().forUser, "Only the user can set the erc20Bridge");
+        s().erc20Bridge = erc20Bridge;
+        s().bridgeSetPostMigration = true;
     }
 
     function _makeCall(address addressToCall, bytes memory userCalldata, bool revertOnFailure) internal {
@@ -58,6 +71,7 @@ contract FacetBuddyVe5c is Initializable, PublicImplementationAddress {
     }
 
     function callFromBridge(address addressToCall, bytes memory userCalldata) public {
+        require(MigrationLib.isInMigration() || s().bridgeSetPostMigration, "Bridge not set post migration");
         require(msg.sender == s().erc20Bridge, "Only the bridge can callFromBridge");
         _makeCall(addressToCall, userCalldata, false);
     }

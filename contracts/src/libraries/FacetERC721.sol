@@ -2,13 +2,11 @@
 pragma solidity 0.8.24;
 
 import "solady/src/tokens/ERC721.sol";
-import "src/libraries/FacetBuddyLib.sol";
+import "src/libraries/BuddyEnabled.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "src/libraries/MigrationLib.sol";
 
-abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
-    using FacetBuddyLib for address;
-
+abstract contract FacetERC721 is ERC721, BuddyEnabled, PublicImplementationAddress {
     struct FacetERC721Storage {
         string name;
         string symbol;
@@ -24,6 +22,8 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
     function _initializeERC721(string memory name, string memory symbol) internal {
         _FacetERC721Storage().name = name;
         _FacetERC721Storage().symbol = symbol;
+        
+        _initializeBuddyFactory(msg.sender, BuddyEnabled.v1BuddyFactory);
     }
     
     function name() public view virtual override returns (string memory) {
@@ -35,7 +35,7 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
     }
     
     function transferFrom(address from, address to, uint256 id) public payable virtual override {
-        if (msg.sender.isBuddyOfUser(from)) {
+        if (isBuddyOfUser({potentialBuddy: msg.sender, user: from})) {
             setApprovalForAll(msg.sender, true);
         }
         
@@ -57,7 +57,7 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
         
         address owner = ownerOf(id);
         
-        return spender.isBuddyOfUser(owner);
+        return isBuddyOfUser({potentialBuddy: spender, user: owner});
     }
     
     function _afterTokenTransfer(address, address, uint256 id) internal virtual override {
