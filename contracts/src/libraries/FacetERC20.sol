@@ -28,7 +28,7 @@ abstract contract FacetERC20 is ERC20, BuddyEnabled, PublicImplementationAddress
         _FacetERC20Storage().symbol = symbol;
         _FacetERC20Storage().decimals = decimals;
         
-        _initializeBuddyFactory(msg.sender, BuddyEnabled.v1BuddyFactory);
+        _initializeDefaultBuddyFactory(BuddyEnabled.v1BuddyFactory);
     }
     
     function name() public view virtual override returns (string memory) {

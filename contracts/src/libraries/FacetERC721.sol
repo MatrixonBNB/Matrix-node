@@ -23,7 +23,7 @@ abstract contract FacetERC721 is ERC721, BuddyEnabled, PublicImplementationAddre
         _FacetERC721Storage().name = name;
         _FacetERC721Storage().symbol = symbol;
         
-        _initializeBuddyFactory(msg.sender, BuddyEnabled.v1BuddyFactory);
+        _initializeDefaultBuddyFactory(BuddyEnabled.v1BuddyFactory);
     }
     
     function name() public view virtual override returns (string memory) {

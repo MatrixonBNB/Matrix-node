@@ -15,7 +15,6 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
         mapping(address => bytes32) userWithdrawalId;
         uint256 withdrawalIdNonce;
         address _bridgeAndCallHelper;
-        address facetBuddyFactory;
     }
     
     function s() internal pure returns (BridgeStorage storage cs) {
@@ -46,7 +45,7 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
     }
     
     function setFacetBuddyFactory(address facetBuddyFactory) public onlyOwner {
-        s().facetBuddyFactory = facetBuddyFactory;
+        _setDefaultBuddyFactory(facetBuddyFactory);
     }
 
     function bridgeIn(address to, uint256 amount) public {
@@ -61,19 +60,18 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
         address addressToCall,
         string memory base64Calldata
     ) public {
-        if (s().facetBuddyFactory == address(0)) {
+        address buddyFactory = buddyFactoryForUser(to);
+        
+        if (buddyFactory != _getDefaultBuddyFactory()) {
             bridgeIn(to, amount);
             return;
         }
 
-        address buddy = FacetBuddyFactoryVef8(s().facetBuddyFactory).findOrCreateBuddy(to);
-        bridgeIn(buddy, amount);
-        FacetBuddyVe5c(buddy).callFromBridge(addressToCall, Base64.decode(base64Calldata));
+        IBuddy buddy = findOrCreateBuddy(to);
+        bridgeIn(address(buddy), amount);
+        IBuddy(buddy).callFromBridge(addressToCall, Base64.decode(base64Calldata));
     }
 
-    function predictBuddyAddress(address forUser) public view returns (address) {
-        return FacetBuddyFactoryVef8(s().facetBuddyFactory).predictBuddyAddress(forUser);
-    }
 
     function bridgeOut(uint256 amount) public {
         bytes32 withdrawalId = generateWithdrawalId();
@@ -124,6 +122,6 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
     }
 
     function getFacetBuddyFactory() public view returns (address) {
-        return s().facetBuddyFactory;
+        return _getDefaultBuddyFactory();
     }
 }
