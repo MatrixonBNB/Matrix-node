@@ -35,6 +35,11 @@ abstract contract Upgradeable is PublicImplementationAddress {
         require(msg.sender == _upgradeStorage().upgradeAdmin, "NOT_AUTHORIZED TO UPGRADE");
     }
     
+    modifier onlyUpgradeAdmin() {
+        require(msg.sender == _upgradeStorage().upgradeAdmin, "NOT_AUTHORIZED TO UPGRADE");
+        _;
+    }
+    
     function upgradeToAndCall(address newImplementation, bytes calldata migrationCalldata) external {
         _authorizeUpgrade(newImplementation);
         ERC1967Utils.upgradeToAndCall(newImplementation, migrationCalldata);

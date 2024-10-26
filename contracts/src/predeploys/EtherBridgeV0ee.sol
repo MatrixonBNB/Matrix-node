@@ -45,7 +45,7 @@ contract EtherBridgeV0ee is FacetERC20, Initializable, Upgradeable, FacetOwnable
         _initializeOwner(msg.sender);
     }
     
-    function onUpgrade(address owner, address bridgeAndCallHelper) public reinitializer(2) {
+    function onUpgrade(address owner, address bridgeAndCallHelper) public onlyUpgradeAdmin reinitializer(2) {
         _setOwner(owner);
         s().bridgeAndCallHelper = bridgeAndCallHelper;
     }
