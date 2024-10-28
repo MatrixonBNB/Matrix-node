@@ -11,7 +11,7 @@ module L1AttributesTxCalldata
     hash:,
     sequence_number:,
     fct_mint_rate:,
-    fct_minted_in_rate_adjustment_period:
+    fct_mint_period_l1_data_gas:
   )
     base_fee_scalar = 0
     blob_base_fee_scalar = 1
@@ -34,8 +34,8 @@ module L1AttributesTxCalldata
       blob_base_fee.zpad(32),
       hash,
       batcher_hash,
-      fct_mint_rate.zpad(32),
-      fct_minted_in_rate_adjustment_period.zpad(32)
+      fct_mint_period_l1_data_gas.zpad(16),
+      fct_mint_rate.zpad(16)
     ].join
     
     packed_data.bytes_to_hex
@@ -57,8 +57,8 @@ module L1AttributesTxCalldata
     blob_base_fee = data[64...96].unpack1('H*').to_i(16)
     hash = data[96...128].unpack1('H*')
     batcher_hash = data[128...160].unpack1('H*')
-    fct_mint_rate = data[160...192].unpack1('H*').to_i(16)
-    fct_minted_in_rate_adjustment_period = data[192...224].unpack1('H*').to_i(16)
+    fct_mint_period_l1_data_gas = data[160...176].unpack1('H*').to_i(16)
+    fct_mint_rate = data[176...192].unpack1('H*').to_i(16)
     
     {
       timestamp: timestamp,
@@ -71,7 +71,7 @@ module L1AttributesTxCalldata
       blob_base_fee_scalar: blob_base_fee_scalar,
       base_fee_scalar: base_fee_scalar,
       fct_mint_rate: fct_mint_rate,
-      fct_minted_in_rate_adjustment_period: fct_minted_in_rate_adjustment_period
+      fct_mint_period_l1_data_gas: fct_mint_period_l1_data_gas
     }.with_indifferent_access
   end
 end

@@ -24,7 +24,7 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       t.integer :sequence_number, null: false
       
       t.bigint :fct_mint_rate
-      t.numeric :fct_minted_in_rate_adjustment_period, precision: 78, scale: 0
+      t.numeric :fct_mint_period_l1_data_gas, precision: 78, scale: 0
       
       t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
       t.check_constraint "parent_hash ~ '^0x[a-f0-9]{64}$'"

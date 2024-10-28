@@ -6,7 +6,7 @@ class FacetTransaction < ApplicationRecord
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   
-  attr_accessor :chain_id, :l1_tx_origin, :l1_calldata_gas_used, :contract_initiated, :ethscription
+  attr_accessor :chain_id, :l1_tx_origin, :l1_data_gas_used, :contract_initiated, :ethscription
   
   FACET_TX_TYPE = 0x46
   DEPOSIT_TX_TYPE = 0x7E
@@ -61,7 +61,7 @@ class FacetTransaction < ApplicationRecord
     self.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
   end
   
-  def self.calculate_calldata_cost(hex_string, contract_initiated:)
+  def self.calculate_data_gas_used(hex_string, contract_initiated:)
     bytes = hex_string.hex_to_bytes
     zero_count = bytes.count("\x00")
     non_zero_count = bytes.bytesize - zero_count
@@ -131,7 +131,7 @@ class FacetTransaction < ApplicationRecord
     
     tx.contract_initiated = tx.l1_tx_origin != tx.from_address
     
-    tx.l1_calldata_gas_used = calculate_calldata_cost(
+    tx.l1_data_gas_used = calculate_data_gas_used(
       input,
       contract_initiated: tx.contract_initiated
     )
@@ -154,7 +154,7 @@ class FacetTransaction < ApplicationRecord
       hash: facet_block.eth_block_hash,
       sequence_number: facet_block.sequence_number,
       fct_mint_rate: facet_block.fct_mint_rate,
-      fct_minted_in_rate_adjustment_period: facet_block.fct_minted_in_rate_adjustment_period
+      fct_mint_period_l1_data_gas: facet_block.fct_mint_period_l1_data_gas
     )
     
     tx = new
