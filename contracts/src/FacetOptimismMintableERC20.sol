@@ -2,9 +2,10 @@
 pragma solidity 0.8.24;
 
 // import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "src/libraries/FacetERC20.sol";
+import { FacetERC20 } from "src/libraries/FacetERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { ILegacyMintableERC20, IOptimismMintableERC20 } from "src/interfaces/IOptimismMintableERC20.sol";
+import { Upgradeable } from "src/libraries/Upgradeable.sol";
 
 import "solady/src/utils/Initializable.sol";
 import "src/libraries/FacetOwnable.sol";

@@ -8,7 +8,7 @@ import "src/libraries/MigrationLib.sol";
 
 abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
     using FacetBuddyLib for address;
-
+    
     struct FacetERC721Storage {
         string name;
         string symbol;
@@ -35,7 +35,7 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
     }
     
     function transferFrom(address from, address to, uint256 id) public payable virtual override {
-        if (msg.sender.isBuddyOfUser(from)) {
+        if (MigrationLib.isInMigration() && msg.sender.isBuddyOfUser(from)) {
             setApprovalForAll(msg.sender, true);
         }
         
@@ -57,7 +57,7 @@ abstract contract FacetERC721 is ERC721, PublicImplementationAddress {
         
         address owner = ownerOf(id);
         
-        return spender.isBuddyOfUser(owner);
+        return MigrationLib.isInMigration() && spender.isBuddyOfUser(owner);
     }
     
     function _afterTokenTransfer(address, address, uint256 id) internal virtual override {

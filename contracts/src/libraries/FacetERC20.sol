@@ -2,7 +2,8 @@
 pragma solidity 0.8.24;
 
 import "solady/src/tokens/ERC20.sol";
-import "./FacetBuddyLib.sol";
+import "src/libraries/FacetBuddyLib.sol";
+import "src/libraries/MigrationLib.sol";
 import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
 import "./MigrationLib.sol";
@@ -43,7 +44,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     }
     
     function transferFrom(address from, address to, uint amount) public override returns (bool) {
-        if (msg.sender.isBuddyOfUser(from)) {
+        if (MigrationLib.isInMigration() && msg.sender.isBuddyOfUser(from)) {
             super._approve(from, msg.sender, type(uint256).max);
         }
         
@@ -51,7 +52,7 @@ abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
     }
     
     function allowance(address owner, address spender) public view override returns (uint256) {
-        if (spender.isBuddyOfUser(owner)) {
+        if (MigrationLib.isInMigration() && spender.isBuddyOfUser(owner)) {
             return type(uint256).max;
         }
         

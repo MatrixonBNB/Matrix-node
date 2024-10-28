@@ -7,6 +7,7 @@ import "solady/src/utils/Base64.sol";
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/FacetOwnable.sol";
 import "./FacetBuddyFactoryVef8.sol";
+import "src/libraries/MigrationLib.sol";
 
 contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable {
     struct BridgeStorage {
@@ -61,7 +62,7 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
         address addressToCall,
         string memory base64Calldata
     ) public {
-        if (s().facetBuddyFactory == address(0)) {
+        if (MigrationLib.isNotInMigration() || s().facetBuddyFactory == address(0)) {
             bridgeIn(to, amount);
             return;
         }
