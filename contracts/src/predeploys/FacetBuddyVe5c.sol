@@ -37,11 +37,6 @@ contract FacetBuddyVe5c is Initializable, PublicImplementationAddress {
         s().forUser = forUser;
     }
     
-    function setERC20Bridge(address erc20Bridge) public {
-        require(msg.sender == s().forUser, "Only the user can set the erc20Bridge");
-        s().erc20Bridge = erc20Bridge;
-    }
-
     function _makeCall(address addressToCall, bytes calldata userCalldata, bool revertOnFailure) internal {
         require(addressToCall != address(this), "Cannot call self");
         require(!s().locked, "No reentrancy allowed");
@@ -79,6 +74,7 @@ contract FacetBuddyVe5c is Initializable, PublicImplementationAddress {
     }
 
     function callFromBridge(address addressToCall, bytes calldata userCalldata) public {
+        require(MigrationLib.isInMigration(), "Only during migration");
         require(msg.sender == s().erc20Bridge, "Only the bridge can callFromBridge");
         _makeCall(addressToCall, userCalldata, false);
     }

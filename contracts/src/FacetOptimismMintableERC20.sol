@@ -2,10 +2,9 @@
 pragma solidity 0.8.24;
 
 // import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "src/libraries/FacetERC20.sol";
+import { FacetERC20 } from "src/libraries/FacetERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { ILegacyMintableERC20, IOptimismMintableERC20 } from "src/interfaces/IOptimismMintableERC20.sol";
-
 import { Upgradeable } from "src/libraries/Upgradeable.sol";
 
 import "solady/src/utils/Initializable.sol";
@@ -24,6 +23,7 @@ contract FacetOptimismMintableERC20 is IOptimismMintableERC20, ILegacyMintableER
         mapping(address => bytes32) _userWithdrawalId;
         uint256 _withdrawalIdNonce;
         address _bridgeAndCallHelper;
+        address _facetBuddyFactory;
         
         address remoteToken;
         address bridge;
@@ -34,14 +34,6 @@ contract FacetOptimismMintableERC20 is IOptimismMintableERC20, ILegacyMintableER
         assembly {
            cs.slot := position
         }
-    }
-    
-    function setFacetBuddyFactory(address facetBuddyFactory) public onlyOwner {
-        _setDefaultBuddyFactory(facetBuddyFactory);
-    }
-    
-    function getFacetBuddyFactory() public view returns (address) {
-        return _getDefaultBuddyFactory();
     }
     
     /// @notice Emitted whenever tokens are minted for an account.
@@ -90,36 +82,13 @@ contract FacetOptimismMintableERC20 is IOptimismMintableERC20, ILegacyMintableER
         address _to,
         uint256 _amount
     )
-        public
+        external
         virtual
         override(IOptimismMintableERC20, ILegacyMintableERC20)
         onlyBridge
     {
         _mint(_to, _amount);
         emit Mint(_to, _amount);
-    }
-    
-    function mintAndCall(
-        address _to,
-        uint256 _amount,
-        bytes calldata addressAndCalldata
-    ) external virtual onlyBridge {
-        address buddyFactory = buddyFactoryForUser(_to);
-        
-        if (
-            buddyFactory != _getDefaultBuddyFactory() ||
-            addressAndCalldata.length == 0
-        ) {
-            mint(_to, _amount);
-            return;
-        }
-        
-        address addressToCall = address(bytes20(addressAndCalldata[:20]));
-        bytes calldata userCalldata = addressAndCalldata[20:];
-        
-        IBuddy buddy = findOrCreateBuddy(_to);
-        mint(address(buddy), _amount);
-        buddy.callFromBridge(addressToCall, userCalldata);
     }
 
     /// @notice Allows the StandardBridge on this network to burn tokens.

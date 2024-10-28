@@ -25,10 +25,6 @@ contract FacetBuddyFactoryVef8 is Initializable {
         return s().buddyForUser[forUser];
     }
     
-    function isBuddyOfUser(address potentialBuddy, address forUser) public view returns (bool) {
-        return buddyForUser(forUser) == potentialBuddy;
-    }
-
     function initialize(address erc20Bridge) public initializer {
         require(erc20Bridge != address(0), "Invalid smart contract");
         s().erc20Bridge = erc20Bridge;

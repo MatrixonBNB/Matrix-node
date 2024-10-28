@@ -7,6 +7,7 @@ import "solady/src/utils/Base64.sol";
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/FacetOwnable.sol";
 import "./FacetBuddyFactoryVef8.sol";
+import "src/libraries/MigrationLib.sol";
 
 contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable {
     struct BridgeStorage {
@@ -15,6 +16,7 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
         mapping(address => bytes32) userWithdrawalId;
         uint256 withdrawalIdNonce;
         address _bridgeAndCallHelper;
+        address facetBuddyFactory;
     }
     
     function s() internal pure returns (BridgeStorage storage cs) {
@@ -45,7 +47,7 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
     }
     
     function setFacetBuddyFactory(address facetBuddyFactory) public onlyOwner {
-        _setDefaultBuddyFactory(facetBuddyFactory);
+        s().facetBuddyFactory = facetBuddyFactory;
     }
 
     function bridgeIn(address to, uint256 amount) public {
@@ -60,18 +62,19 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
         address addressToCall,
         string memory base64Calldata
     ) public {
-        address buddyFactory = buddyFactoryForUser(to);
-        
-        if (buddyFactory != _getDefaultBuddyFactory()) {
+        if (MigrationLib.isNotInMigration() || s().facetBuddyFactory == address(0)) {
             bridgeIn(to, amount);
             return;
         }
 
-        IBuddy buddy = findOrCreateBuddy(to);
-        bridgeIn(address(buddy), amount);
-        IBuddy(buddy).callFromBridge(addressToCall, Base64.decode(base64Calldata));
+        address buddy = FacetBuddyFactoryVef8(s().facetBuddyFactory).findOrCreateBuddy(to);
+        bridgeIn(buddy, amount);
+        FacetBuddyVe5c(buddy).callFromBridge(addressToCall, Base64.decode(base64Calldata));
     }
 
+    function predictBuddyAddress(address forUser) public view returns (address) {
+        return FacetBuddyFactoryVef8(s().facetBuddyFactory).predictBuddyAddress(forUser);
+    }
 
     function bridgeOut(uint256 amount) public {
         bytes32 withdrawalId = generateWithdrawalId();
@@ -122,6 +125,6 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
     }
 
     function getFacetBuddyFactory() public view returns (address) {
-        return _getDefaultBuddyFactory();
+        return s().facetBuddyFactory;
     }
 }
