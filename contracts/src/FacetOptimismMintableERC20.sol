@@ -74,6 +74,14 @@ contract FacetOptimismMintableERC20 is IOptimismMintableERC20, ILegacyMintableER
         s().bridge = _bridge;
         s().remoteToken = _remoteToken;
     }
+    
+    function setBridge(address _bridge) public onlyOwner {
+        s().bridge = _bridge;
+    }
+    
+    function setRemoteToken(address _remoteToken) public onlyOwner {
+        s().remoteToken = _remoteToken;
+    }
 
     /// @notice Allows the StandardBridge on this network to mint tokens.
     /// @param _to     Address to mint tokens to.

@@ -46,6 +46,10 @@ contract EtherBridgeVd58 is FacetERC20, Initializable, Upgradeable, FacetOwnable
         _initializeOwner(msg.sender);
     }
     
+    function setTrustedSmartContract(address trustedSmartContract) public onlyOwner {
+        s().trustedSmartContract = trustedSmartContract;
+    }
+    
     function setFacetBuddyFactory(address facetBuddyFactory) public onlyOwner {
         s().facetBuddyFactory = facetBuddyFactory;
     }
