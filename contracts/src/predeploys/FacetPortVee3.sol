@@ -129,11 +129,11 @@ contract FacetPortVee3 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
             keccak256(bytes(offerType)),
             offerId,
             offerer,
-            LegacyAddressable(assetContract).getLegacyContractAddress(),
+            assetContract,
             assetId,
             keccak256(bytes(assetType)),
             assetAmount,
-            LegacyAddressable(considerationToken).getLegacyContractAddress(),
+            considerationToken,
             considerationAmount,
             startTime,
             endTime

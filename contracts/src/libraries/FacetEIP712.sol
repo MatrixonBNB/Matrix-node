@@ -5,7 +5,6 @@ import "solady/src/utils/EIP712.sol";
 import "solady/src/utils/ECDSA.sol";
 import "solady/src/utils/LibString.sol";
 import "solady/src/utils/LibRLP.sol";
-import "./LegacyAddressable.sol";
 
 abstract contract FacetEIP712 is EIP712 {
     using ECDSA for bytes32;
@@ -26,9 +25,7 @@ abstract contract FacetEIP712 is EIP712 {
         
         bool valid = oldTypedDataHash.recover(signature) == signer || newTypedDataHash.recover(signature) == signer;
         
-        address legacyContractAddress = LegacyAddressable(address(this)).getLegacyContractAddress();
-        
-        require(valid, "FacetEIP712: signature does not match any valid chain id, legacy contract address: ".concat(legacyContractAddress.toHexString()));
+        require(valid, "FacetEIP712: signature does not match any valid chain id");
     }
   
     /// @dev Returns the EIP-712 domain separator.
@@ -36,11 +33,7 @@ abstract contract FacetEIP712 is EIP712 {
         // We will use `separator` to store the name hash to save a bit of gas.
         bytes32 versionHash;
         
-        address verifyingAddress = LegacyAddressable(address(this)).getLegacyContractAddress();
-        
-        if (address(this) == 0xd5533CDC7948827dfE2b36B1aB759e9384e2FC85) {
-            verifyingAddress = 0xC59DEC74518c6C86B90107C3644ac9dAcA149e70;
-        }
+        address verifyingAddress = address(this);
         
         (string memory name, string memory version) = _domainNameAndVersion();
         separator = keccak256(bytes(name));
