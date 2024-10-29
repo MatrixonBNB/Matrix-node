@@ -7,3 +7,6 @@
 [submodule "contracts/lib/solady"]
 	path = contracts/lib/solady
 	url = https://github.com/vectorized/solady
+[submodule "contracts/lib/facet-sol"]
+	path = contracts/lib/facet-sol
+	url = https://github.com/0xFacet/facet-sol
