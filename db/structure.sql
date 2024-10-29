@@ -149,7 +149,7 @@ CREATE TABLE public.facet_blocks (
     eth_block_base_fee_per_gas bigint,
     sequence_number integer NOT NULL,
     fct_mint_rate bigint,
-    fct_minted_in_rate_adjustment_period numeric(78,0),
+    fct_mint_period_l1_data_gas numeric(78,0),
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_e289f61f63 CHECK (((block_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),
