@@ -16,6 +16,10 @@ contract ERC1967Proxy is Proxy, LegacyAddressable {
         return ERC1967Utils.getImplementation();
     }
     
+    function __getImplementation__() external view returns (address) {
+        return _implementation();
+    }
+    
     receive() external payable virtual {
         _fallback();
     }

@@ -298,12 +298,14 @@ module EthscriptionEVMConverter
     
     def get_implementation(to_address)
       TransactionHelper.static_call(
-        # Every contract has this function so the choice of EtherBridgeV064 is arbitrary
-        contract: PredeployManager.get_contract_from_predeploy_info(name: "EtherBridgeV064"),
+        contract: PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy"),
         address: to_address,
-        function: 'getImplementation',
+        function: '__getImplementation__',
         args: []
       ).freeze
+    rescue => e
+      binding.irb
+      raise
     end
     memoize :get_implementation
     

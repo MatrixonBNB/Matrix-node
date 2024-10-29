@@ -3,10 +3,9 @@ pragma solidity 0.8.24;
 
 import "solady/src/tokens/ERC20.sol";
 import "solady/src/utils/Initializable.sol";
-import "src/libraries/PublicImplementationAddress.sol";
 import "src/libraries/MigrationLib.sol";
 
-contract FacetBuddyVe5c is Initializable, PublicImplementationAddress {
+contract FacetBuddyVe5c is Initializable {
     event CallOnBehalfOfUser(
         address indexed onBehalfOf,
         address indexed addressToCall,

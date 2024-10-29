@@ -2,9 +2,8 @@
 pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
-import "src/libraries/PublicImplementationAddress.sol";
 
-abstract contract Upgradeable is PublicImplementationAddress {
+abstract contract Upgradeable {
     struct UpgradeStorage {
         address upgradeAdmin;
     }

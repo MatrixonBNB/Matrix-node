@@ -4,11 +4,10 @@ pragma solidity 0.8.24;
 import "solady/src/tokens/ERC20.sol";
 import "src/libraries/FacetBuddyLib.sol";
 import "src/libraries/MigrationLib.sol";
-import "src/libraries/PublicImplementationAddress.sol";
 import "solady/src/utils/LibString.sol";
 import "./MigrationLib.sol";
 
-abstract contract FacetERC20 is ERC20, PublicImplementationAddress {
+abstract contract FacetERC20 is ERC20 {
     using LibString for *;
     using FacetBuddyLib for address;
     
