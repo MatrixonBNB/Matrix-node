@@ -1,7 +1,6 @@
 class FacetTransaction < ApplicationRecord
   include SysConfig
   class InvalidAddress < StandardError; end
-  class TxOutsideGasLimit < StandardError; end
   class InvalidRlpInt < StandardError; end
   
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
@@ -19,10 +18,6 @@ class FacetTransaction < ApplicationRecord
   SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
   L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
   MIGRATION_MANAGER_ADDRESS = "0x22220000000000000000000000000000000000d6"
-  
-  def within_gas_limit?
-    gas_limit <= PER_L2_TX_GAS_LIMIT
-  end
   
   def self.from_ethscription(ethscription)
     tx = new
@@ -122,10 +117,6 @@ class FacetTransaction < ApplicationRecord
     tx.gas_limit = clamp_uint(gas_limit, 64)
     tx.input = data
     
-    unless tx.within_gas_limit?
-      raise TxOutsideGasLimit, "Transaction outside gas limit!"
-    end
-    
     tx.eth_transaction_hash = tx_hash
     tx.from_address = from_address
     tx.l1_tx_origin = l1_tx_origin
@@ -143,7 +134,7 @@ class FacetTransaction < ApplicationRecord
     )
     
     tx
-  rescue *tx_decode_errors, InvalidAddress, TxOutsideGasLimit, InvalidRlpInt => e
+  rescue *tx_decode_errors, InvalidAddress, InvalidRlpInt => e
     nil
   end
   

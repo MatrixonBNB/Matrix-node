@@ -140,7 +140,7 @@ RSpec.describe "Reverts" do
       from: from_address,
       function: 'runOutOfGas',
       args: [],
-      expect_blank: true,
+      expect_failure: true,
       gas_limit: over_limit
     )
   end
