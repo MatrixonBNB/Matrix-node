@@ -2,6 +2,7 @@ class FacetTransaction < ApplicationRecord
   include SysConfig
   class InvalidAddress < StandardError; end
   class TxOutsideGasLimit < StandardError; end
+  class InvalidRlpInt < StandardError; end
   
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
@@ -101,16 +102,16 @@ class FacetTransaction < ApplicationRecord
       raise Eth::Tx::ParameterError, "Transaction fields are not strings!"
     end
 
-    chain_id = Eth::Util.deserialize_big_endian_to_int(tx[0])
+    chain_id = deserialize_rlp_int(tx[0])
     
     unless chain_id == ChainIdManager.current_l2_chain_id
       raise Eth::Tx::ParameterError, "Invalid chain ID #{chain_id}!"
     end
     
     to = tx[1].length.zero? ? nil : tx[1].bytes_to_hex
-    value = Eth::Util.deserialize_big_endian_to_int(tx[2])
-    max_gas_fee = Eth::Util.deserialize_big_endian_to_int(tx[3])
-    gas_limit = Eth::Util.deserialize_big_endian_to_int(tx[4])
+    value = deserialize_rlp_int(tx[2])
+    max_gas_fee = deserialize_rlp_int(tx[3])
+    gas_limit = deserialize_rlp_int(tx[4])
     data = tx[5].bytes_to_hex
 
     tx = new
@@ -142,7 +143,7 @@ class FacetTransaction < ApplicationRecord
     )
     
     tx
-  rescue *tx_decode_errors, InvalidAddress, TxOutsideGasLimit => e
+  rescue *tx_decode_errors, InvalidAddress, TxOutsideGasLimit, InvalidRlpInt => e
     nil
   end
   
@@ -283,5 +284,17 @@ class FacetTransaction < ApplicationRecord
   
   def self.clamp_uint(input, max_bits)
     [input.to_i, 2 ** max_bits - 1].min
+  end
+  
+  def self.deserialize_rlp_int(bytes)
+    unless bytes.encoding == Encoding::ASCII_8BIT
+      raise ArgumentError, "RLP integer must be binary encoded (ASCII-8BIT), got #{bytes.encoding}"
+    end
+    
+    if bytes.starts_with?("\x00")
+      raise InvalidRlpInt, "Invalid RLP integer: #{bytes.bytes_to_hex}"
+    end
+    
+    Eth::Util.deserialize_big_endian_to_int(bytes)
   end
 end
