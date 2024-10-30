@@ -287,9 +287,7 @@ class FacetTransaction < ApplicationRecord
   end
   
   def self.deserialize_rlp_int(bytes)
-    unless bytes.encoding == Encoding::ASCII_8BIT
-      raise ArgumentError, "RLP integer must be binary encoded (ASCII-8BIT), got #{bytes.encoding}"
-    end
+    bytes = bytes.b
     
     if bytes.starts_with?("\x00")
       raise InvalidRlpInt, "Invalid RLP integer: #{bytes.bytes_to_hex}"
