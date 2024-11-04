@@ -41,7 +41,7 @@ class GethClient
         sequence_number: 0,
         base_fee_scalar: 0,
         blob_base_fee_scalar: 1,
-        fct_mint_rate: FctMintCalculator::BASE_RATE,
+        fct_mint_rate: FctMintCalculator::INITIAL_RATE,
         fct_mint_period_l1_data_gas: 0
       }.with_indifferent_access
     end

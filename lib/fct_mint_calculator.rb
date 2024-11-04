@@ -15,8 +15,8 @@ module FctMintCalculator
   TARGET_FCT_MINT_PER_L1_BLOCK = 40.ether
   TARGET_MINT_PER_PERIOD = TARGET_FCT_MINT_PER_L1_BLOCK * ADJUSTMENT_PERIOD
   MAX_ADJUSTMENT_FACTOR = 2
-  BASE_RATE = 10_000_000.gwei
-  MAX_RATE = BASE_RATE
+  INITIAL_RATE = 200_000.gwei
+  MAX_RATE = 10_000_000.gwei
   MIN_RATE = 1
   
   def halving_periods_passed(current_l2_block)
@@ -63,7 +63,7 @@ module FctMintCalculator
       facet_txs.each { |tx| tx.mint = 1e6.ether }
       
       facet_block.assign_attributes(
-        fct_mint_rate: BASE_RATE,
+        fct_mint_rate: INITIAL_RATE,
         fct_mint_period_l1_data_gas: 0
       )
       
