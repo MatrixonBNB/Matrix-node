@@ -9,6 +9,13 @@ import "solady/src/utils/Base64.sol";
 import "solady/src/utils/LibString.sol";
 import "solady/src/utils/Initializable.sol";
 
+/// @title IL1Block
+/// @notice Minimal interface for accessing L1 block information
+interface IL1Block {
+    /// @notice The latest L1 blockhash
+    function hash() external view returns (bytes32);
+}
+
 contract TokenUpgradeRendererV3d1 is Upgradeable, Initializable {
     using LibString for *;
     
@@ -16,6 +23,8 @@ contract TokenUpgradeRendererV3d1 is Upgradeable, Initializable {
     event UpgradeLevelUpdated(address indexed collection, uint256 index, string name, string imageURI, string animationURI, uint256 startTime, uint256 endTime, bool newRecord);
     event TokenUpgraded(address indexed collection, uint256 tokenId, uint256 upgradeLevel);
     event ContractInfoUpdated(address indexed collection, ContractInfo newInfo);
+    
+    IL1Block public constant l1Block = IL1Block(0x4200000000000000000000000000000000000015);
 
     struct TokenUpgradeLevel {
         string name;
@@ -93,7 +102,7 @@ contract TokenUpgradeRendererV3d1 is Upgradeable, Initializable {
         s().tokenUpgradeLevelsByCollection[collection].push(newLevel);
         uint256 index = s().tokenUpgradeLevelsByCollection[collection].length - 1;
         s().tokenUpgradeLevelImageURIsByCollection[collection][index] = imageURIs;
-        s().blockHashByTokenLevelByCollection[collection][index] = blockhash(block.number - 1);
+        s().blockHashByTokenLevelByCollection[collection][index] = l1Block.hash();
 
         emit UpgradeLevelUpdated(collection, index, newLevel.name, newLevel.imageURI, newLevel.animationURI, newLevel.startTime, newLevel.endTime, true);
     }
