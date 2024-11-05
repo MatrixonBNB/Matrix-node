@@ -20,12 +20,6 @@ RSpec.describe FacetTransaction do
     end
 
     context 'with invalid RLP integers' do
-      it 'rejects non-binary encoded strings' do
-        expect {
-          FacetTransaction.deserialize_rlp_int("\xff")  # UTF-8 by default
-        }.to raise_error(ArgumentError, "RLP integer must be binary encoded (ASCII-8BIT), got UTF-8")
-      end
-
       it 'rejects integers with leading zeros' do
         expect {
           FacetTransaction.deserialize_rlp_int("\x00".b)

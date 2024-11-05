@@ -1,39 +1,34 @@
 module FacetTransactionHelper
-  def import_eth_tx(
-    from_address: "0x" + "2" * 40,
-    input:,
-    events: [],
-    expect_error: false,
-    expect_no_tx: false
-  )
-    from_address = from_address.downcase
+  def import_eth_txs(transactions)
     mock_ethereum_client = instance_double(EthRpcClient)
     
     current_max_eth_block = EthBlockImporter.instance.current_max_eth_block
     
-    eth_transaction = EthTransaction.new(
-      block_hash: bytes_stub(rand),
-      block_number: current_max_eth_block.number + 1,
-      block_timestamp: current_max_eth_block.timestamp + 12,
-      tx_hash: bytes_stub(rand),
-      transaction_index: 0,
-      input: input,
-      chain_id: 1,
-      from_address: from_address,
-      to_address: FacetTransaction::FACET_INBOX_ADDRESS,
-      status: 1,
-      logs: events
-    )
- 
-    rpc_results = eth_txs_to_rpc_result([eth_transaction])
+    # Convert transaction params to EthTransaction objects
+    eth_transactions = transactions.map.with_index do |tx_params, index|
+      EthTransaction.new(
+        block_hash: bytes_stub(rand),
+        block_number: current_max_eth_block.number + 1,
+        block_timestamp: current_max_eth_block.timestamp + 12,
+        tx_hash: bytes_stub(rand),
+        transaction_index: index,  # Use index for transaction ordering
+        input: tx_params[:input],
+        chain_id: 1,
+        from_address: (tx_params[:from_address] || "0x" + "2" * 40).downcase,
+        to_address: FacetTransaction::FACET_INBOX_ADDRESS,
+        status: 1,
+        logs: tx_params[:events] || []
+      )
+    end
+
+    rpc_results = eth_txs_to_rpc_result(eth_transactions)
     block_result = rpc_results[0].merge('parentHash' => current_max_eth_block.block_hash)
     receipt_result = rpc_results[1]
     
     instance = EthBlockImporter.instance
-    
     instance.ethereum_client = mock_ethereum_client
 
-    allow(mock_ethereum_client).to receive(:get_block_number).and_return(eth_transaction.block_number)
+    allow(mock_ethereum_client).to receive(:get_block_number).and_return(eth_transactions.first.block_number)
     allow(mock_ethereum_client).to receive(:get_block).and_return(block_result)
     allow(mock_ethereum_client).to receive(:get_transaction_receipts).and_return(receipt_result)
 
@@ -44,33 +39,45 @@ module FacetTransactionHelper
     
     latest_l2_block = EthRpcClient.l2.get_block("latest", true)
     
-    tx_in_geth = latest_l2_block['transactions'].find do |tx|
-      tx['sourceHash'] == eth_transaction.facet_tx_source_hash
-    end
+    # Return array of receipts
+    eth_transactions.map do |eth_tx|
+      tx_in_geth = latest_l2_block['transactions'].find do |tx|
+        tx['sourceHash'] == eth_tx.facet_tx_source_hash
+      end
+      
+      next nil if tx_in_geth.nil?
+      
+      receipt_in_geth = EthRpcClient.l2.get_transaction_receipt(tx_in_geth['hash'])
+      next nil if receipt_in_geth.nil?
+      
+      combined_receipt = combine_transaction_data(receipt_in_geth, tx_in_geth)
+      combined_receipt.l2_block = latest_l2_block
+      
+      combined_receipt
+    end.compact
+  end
+
+  # Keep the original method for backwards compatibility
+  def import_eth_tx(**params)
+    receipts = import_eth_txs([params])
     
-    if expect_no_tx
-      expect(tx_in_geth).to be_nil
+    if params[:expect_no_tx]
+      expect(receipts).to be_empty
       return
     end
     
-    expect(tx_in_geth).to be_present
+    receipt = receipts.first
+    expect(receipt).to be_present
     
-    receipt_in_geth = EthRpcClient.l2.get_transaction_receipt(tx_in_geth['hash'])
-    
-    expect(receipt_in_geth).to be_present
-    
-    combined_receipt = combine_transaction_data(receipt_in_geth, tx_in_geth)
-    combined_receipt.l2_block = latest_l2_block
-    
-    expected_status = expect_error ? 0 : 1
-    unless combined_receipt.status == expected_status
-      ap EthRpcClient.l2.trace(combined_receipt.hash)
+    expected_status = params[:expect_error] ? 0 : 1
+    unless receipt.status == expected_status
+      ap EthRpcClient.l2.trace(receipt.hash)
       binding.irb
     end
-    expect(combined_receipt.status).to eq(expected_status)
-    expect(combined_receipt.l1TxOrigin).to eq(eth_transaction.from_address)
+    expect(receipt.status).to eq(expected_status)
+    expect(receipt.l1TxOrigin).to eq(params[:from_address]&.downcase || "0x" + "2" * 40)
     
-    combined_receipt
+    receipt
   end
 
   def alias_addr(addr)

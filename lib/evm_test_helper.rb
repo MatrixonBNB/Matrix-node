@@ -23,19 +23,19 @@ module EVMTestHelper
     expect_blank: false,
     sub_calls: []
   )
-    data = TransactionHelper.get_function_calldata(contract: contract, function: function, args: args)
-    
-    create_and_import_block(
-      facet_data: data,
-      to_address: address,
-      from_address: from,
+    call_contract_functions([{
+      contract: contract,
+      address: address,
+      from: from,
+      function: function,
+      args: args,
       value: value,
       gas_limit: gas_limit,
       max_fee_per_gas: max_fee_per_gas,
       expect_failure: expect_failure,
       expect_blank: expect_blank,
       sub_calls: sub_calls
-    )
+    }]).first
   end
   
   def deploy_contract(
@@ -135,51 +135,48 @@ module EVMTestHelper
     hex_payload
   end
   
-  def create_and_import_block(
-    facet_data:,
-    from_address:,
-    to_address:,
-    value: 0,
-    block_timestamp: nil,
-    max_fee_per_gas: 10.gwei,
-    sub_calls: [],
-    gas_limit: 1_000_000,
-    eth_base_fee: 200.gwei,
-    eth_gas_used: 1e18.to_i,
-    chain_id: ChainIdManager.current_l2_chain_id,
-    expect_failure: false,
-    expect_blank: false,
-    in_v2: true
-  )
-    facet_payload = generate_facet_tx_payload(
-      input: facet_data,
-      to: to_address,
-      gas_limit: gas_limit,
-      max_fee_per_gas: max_fee_per_gas,
-      value: value
-    )
-    
-    import_eth_tx(
-      input: facet_payload,
-      expect_error: expect_failure,
-      expect_no_tx: expect_blank,
-      from_address: from_address
-    )
-
-  end
-  
-  def create_and_import_block2(
-    block_number:
-  )
-    EthBlockImporter.instance.define_singleton_method(:next_block_to_import) do
-      block_number
+  def create_and_import_block(*args, **kwargs)
+    # If first arg is an array, we're doing multiple transactions
+    if args.first.is_a?(Array)
+      transactions = args.first
+      
+      # Convert each transaction params to facet payload
+      eth_transactions = transactions.map do |tx|
+        facet_payload = generate_facet_tx_payload(
+          input: tx[:facet_data],
+          to: tx[:to_address],
+          gas_limit: tx[:gas_limit] || 1_000_000,
+          max_fee_per_gas: tx[:max_fee_per_gas] || 10.gwei,
+          value: tx[:value] || 0
+        )
+        
+        {
+          input: facet_payload,
+          from_address: tx[:from_address],
+          expect_error: tx[:expect_failure],
+          expect_no_tx: tx[:expect_blank],
+          events: tx[:events] || []
+        }
+      end
+      
+      import_eth_txs(eth_transactions)
+    else
+      # Original single transaction case
+      facet_payload = generate_facet_tx_payload(
+        input: kwargs[:facet_data],
+        to: kwargs[:to_address],
+        gas_limit: kwargs[:gas_limit] || 1_000_000,
+        max_fee_per_gas: kwargs[:max_fee_per_gas] || 10.gwei,
+        value: kwargs[:value] || 0
+      )
+      
+      import_eth_tx(
+        input: facet_payload,
+        expect_error: kwargs[:expect_failure],
+        expect_no_tx: kwargs[:expect_blank],
+        from_address: kwargs[:from_address]
+      )
     end
-    
-    EthBlockImporter.instance.define_singleton_method(:in_v2?) do |block_number|
-      true
-    end
-    
-    EthBlockImporter.instance.import_next_block
   end
   
   def trigger_contract_interaction(from:, payload:, expect_failure: false, expect_blank: false, block_timestamp: nil)
@@ -322,5 +319,29 @@ module EVMTestHelper
   rescue => e
     binding.irb
     raise
+  end
+
+  def call_contract_functions(calls)
+    transactions = calls.map do |call|
+      data = TransactionHelper.get_function_calldata(
+        contract: call[:contract], 
+        function: call[:function], 
+        args: call[:args] || []
+      )
+      
+      {
+        facet_data: data,
+        to_address: call[:address],
+        from_address: call[:from],
+        value: call[:value] || 0,
+        gas_limit: call[:gas_limit] || 1_000_000,
+        max_fee_per_gas: call[:max_fee_per_gas] || 1.gwei,
+        expect_failure: call[:expect_failure] || false,
+        expect_blank: call[:expect_blank] || false,
+        sub_calls: call[:sub_calls] || []
+      }
+    end
+    
+    create_and_import_block(transactions)
   end
 end
