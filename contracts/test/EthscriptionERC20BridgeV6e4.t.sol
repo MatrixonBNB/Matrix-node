@@ -74,7 +74,7 @@ contract EthscriptionERC20BridgeV6e4Test is Test {
         
         assertEq(bridge.totalSupply(), l2TokenAmount);
         assertEq(bridge.balanceOf(user1), l2TokenAmount);
-        assertEq(bridge.getTotalBridgedIn(), l2TokenAmount);
+        assertEq(bridge.getTotalBridgedIn(), int256(l2TokenAmount));
     }
     
     function test_BridgeOut() public {
@@ -122,7 +122,7 @@ contract EthscriptionERC20BridgeV6e4Test is Test {
         assertEq(bridge.getWithdrawalIdAmount(withdrawalId), 0);
         assertEq(bridge.getWithdrawalIdL1BlockNumber(withdrawalId), 0);
         assertEq(bridge.getWithdrawalIdL1BlockHash(withdrawalId), bytes32(0));
-        assertEq(bridge.getTotalWithdrawComplete(), l2TokenAmount);
+        assertEq(bridge.getTotalWithdrawComplete(), int256(l2TokenAmount));
     }
     
     function testFail_BridgeOutOverLimit() public {
@@ -142,7 +142,7 @@ contract EthscriptionERC20BridgeV6e4Test is Test {
         vm.prank(trustedSmartContract);
         bridge.bridgeIn(user1, l1BridgeInAmount);
         
-        assertEq(bridge.getTotalBridgedIn(), l2BridgeInAmount);
+        assertEq(bridge.getTotalBridgedIn(), int256(l2BridgeInAmount));
         
         // Force an inconsistency by directly setting totalBridgedIn
         uint256 slot = uint256(keccak256("EthscriptionERC20BridgeStorage.contract.storage.v1")) + 7; // totalBridgedIn slot
@@ -152,7 +152,7 @@ contract EthscriptionERC20BridgeV6e4Test is Test {
         // (int256 balanceDiff, bool bridgeBalanceValid) = bridge.consistencyCheck();
         int256 balanceDiff = bridge.consistencyCheck();
         assertTrue(balanceDiff != 0, "No inconsistency created");
-        assertEq(bridge.getTotalBridgedIn(), l2InconsistentAmount);
+        assertEq(bridge.getTotalBridgedIn(), int256(l2InconsistentAmount));
         
         vm.expectRevert();
         vm.prank(trustedSmartContract);
@@ -215,8 +215,8 @@ contract EthscriptionERC20BridgeV6e4Test is Test {
         
         // Verify final state
         assertEq(bridge.balanceOf(user1), l2Amount / 2, "Incorrect final balance");
-        assertEq(bridge.getTotalBridgedIn(), l2Amount, "Incorrect total bridged in");
-        assertEq(bridge.getTotalWithdrawComplete(), l2Amount / 2, "Incorrect total withdrawn");
+        assertEq(bridge.getTotalBridgedIn(), int256(l2Amount), "Incorrect total bridged in");
+        assertEq(bridge.getTotalWithdrawComplete(), int256(l2Amount / 2), "Incorrect total withdrawn");
         assertEq(bridge.getPendingWithdrawalAmount(), 0, "Should have no pending withdrawals");
     }
     

@@ -29,9 +29,9 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         uint256 withdrawalIdNonce;
         uint256 bridgeLimit;
         
-        uint256 totalBridgedIn;
-        uint256 totalWithdrawComplete;
-        uint256 pendingWithdrawalAmount;
+        int256 totalBridgedIn;
+        int256 totalWithdrawComplete;
+        int256 pendingWithdrawalAmount;
         
         mapping(bytes32 => bytes32) withdrawalIdL1BlockHash;
         mapping(bytes32 => uint256) withdrawalIdL1BlockNumber;
@@ -87,7 +87,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         uint256 l2TokenAmount = l2TokenAmount(l1TokenAmount);
         
         _mint(to, l2TokenAmount);
-        s().totalBridgedIn += l2TokenAmount;
+        s().totalBridgedIn += int256(l2TokenAmount);
         emit BridgedIn(to, l1TokenAmount);
     }
     
@@ -107,7 +107,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         
         _burn(msg.sender, l2TokenAmount);
         
-        s().pendingWithdrawalAmount += l2TokenAmount;
+        s().pendingWithdrawalAmount += int256(l2TokenAmount);
         
         emit InitiateWithdrawal(msg.sender, l1TokenAmount, withdrawalId);
     }
@@ -121,8 +121,8 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         
         _deleteWithdrawal(to, withdrawalId);
         
-        s().totalWithdrawComplete += l2TokenAmount;
-        s().pendingWithdrawalAmount -= l2TokenAmount;
+        s().totalWithdrawComplete += int256(l2TokenAmount);
+        s().pendingWithdrawalAmount -= int256(l2TokenAmount);
         
         emit WithdrawalComplete(to, l1TokenAmount, withdrawalId);
     }
@@ -148,15 +148,15 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         _unpause();
     }
     
-    function getPendingWithdrawalAmount() public view returns (uint256) {
+    function getPendingWithdrawalAmount() public view returns (int256) {
         return s().pendingWithdrawalAmount;
     }
     
-    function getTotalBridgedIn() public view returns (uint256) {
+    function getTotalBridgedIn() public view returns (int256) {
         return s().totalBridgedIn;
     }
 
-    function getTotalWithdrawComplete() public view returns (uint256) {
+    function getTotalWithdrawComplete() public view returns (int256) {
         return s().totalWithdrawComplete;
     }
     
@@ -225,8 +225,8 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     }
     
     function consistencyCheck() public view returns (int256) {
-        int256 rhs = int256(s().totalBridgedIn) - int256(s().totalWithdrawComplete);
-        int256 lhs = int256(totalSupply()) + int256(s().pendingWithdrawalAmount);
+        int256 rhs = s().totalBridgedIn - s().totalWithdrawComplete;
+        int256 lhs = int256(totalSupply()) + s().pendingWithdrawalAmount;
         
         return lhs - rhs;
     }
@@ -234,16 +234,16 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     function adminResetInvariants() public onlyOwner {
         int256 diff = consistencyCheck();
         if (diff > 0) {
-            s().totalBridgedIn += uint256(diff);
+            s().totalBridgedIn += diff;
         } else if (diff < 0) {
-            s().pendingWithdrawalAmount += uint256(diff);
+            s().pendingWithdrawalAmount += diff;
         }
     }
     
     function _verifyInvariants() internal view returns (bool) {
         if (MigrationLib.isInMigration()) return true;
         
-        bool c1 = totalSupply() == s().totalBridgedIn - s().totalWithdrawComplete - s().pendingWithdrawalAmount;
+        bool c1 = int256(totalSupply()) == s().totalBridgedIn - s().totalWithdrawComplete - s().pendingWithdrawalAmount;
         bool c2 = s().totalWithdrawComplete + s().pendingWithdrawalAmount <= s().totalBridgedIn;
         return c1 && c2;
     }
