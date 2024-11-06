@@ -496,35 +496,13 @@ module EthscriptionEVMConverter
         return false
       end
       
-      known_l1_contracts = [
-        "0xd729345aa12c5af2121d96f87b673987f354496b",
-        "0x03f84c2b50442332802b7ca8dbbefad1633f2547",
-        "0xee752cb3e8bf9e01f721113e26baecdf429efa8d",
-        "0xb2b01decb6cd36e7396b78d3744482627f22c525",
-        "0xb3b1e568a70bc315e7b448affa4c3ab437bbe9bc",
-        "0xd729a94d6366a4feac4a6869c8b3573cee4701a9",
-        "0x720ea6e5fb47d69744559063b4a3adcd903932b6",
-        "0xafd1c394f054ef0845e64429aaaf8c6ca8f51306",
-        "0x91dc93cd8336d30a4679b1d29c9592c117a896fd",
-        "0x061eaf68b2069ed7708af1893f4499960a0156c5",
-        "0xb01278c0fc86d1cd4de513ca03bf7dacc2dbd1a4",
-        "0x342979c2edad4fe8dc3fff12d429b0b608c1699c",
-        "0x000000000006f291b587f39b6960dd32e31400bf",
-        "0xbc77ce4b8465dc6ed1fe4930c5c63ff8e8d45fc9",
-        "0x1f7ffb55dcbbe953b9dc5b34333849d5b259393f",
-        "0xc6d6ebf238b2def7a456dbec6c1532d5fc337469",
-        "0x426614a1de756017c39ad86540f0423b006c31ff",
-        "0x57b8792c775d34aa96092400983c3e112fcbc296",
-        "0x00000000000001a49e2dac26e7a55efb3f8fc0b6"
-      ]
-      
-      if known_l1_contracts.include?(address)
+      if L1SmartContract::KNOWN_L1_CONTRACTS.include?(address)
         return true
       end
       
       block = LegacyMigrationDataGenerator.instance.current_import_block_number
       
-      if block < 19561909
+      if block < 19692029
         return false
       end
       
