@@ -11,13 +11,6 @@ class FacetTransactionReceipt < ApplicationRecord
       self.legacy_contract_address_map[calculate_legacy_contract_address] = contract_address
       self.legacy_contract_address_map.reject! { |k, v| k.nil? || v.nil? }
       
-      self.legacy_contract_address_map.each do |legacy_address, new_address|
-        LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-          legacy_value: legacy_address,
-          new_value: new_address
-        )
-      end
-      
       return
     end
   
@@ -28,32 +21,6 @@ class FacetTransactionReceipt < ApplicationRecord
     update_legacy_contract_address_map('BuddyCreated', 'buddy')
   
     self.legacy_contract_address_map.reject! { |k, v| k.nil? || v.nil? }
-    
-    # puts JSON.pretty_generate(self.as_json)
-    # puts JSON.pretty_generate(legacy_receipt.as_json)
-    
-    self.legacy_contract_address_map.each do |legacy_address, new_address|
-      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-        legacy_value: legacy_address,
-        new_value: new_address
-      )
-    end
-  end
-  
-  def update_real_withdrawal_id
-    initiate_event = decoded_logs.detect { |i| i['event'] == 'InitiateWithdrawal' }
-    
-    return unless initiate_event
-    
-    withdrawal_id = initiate_event['data']['withdrawalId']
-    
-    LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-      legacy_value: legacy_receipt.transaction_hash,
-      new_value: withdrawal_id
-    )
-  rescue => e
-    binding.irb
-    raise
   end
   
   def update_legacy_contract_address_map(event_name, key_name)

@@ -6,7 +6,7 @@ class LegacyMigrationDataGenerator
   class BlockNotReadyToImportError < StandardError; end
   
   attr_accessor :imported_facet_transaction_receipts, :imported_facet_transactions,
-    :ethereum_client, :legacy_value_mapping, :current_import_block_number
+    :ethereum_client, :current_import_block_number
 
   def initialize
     reset_state
@@ -19,7 +19,6 @@ class LegacyMigrationDataGenerator
   def reset_state
     @imported_facet_transaction_receipts = []
     @imported_facet_transactions = []
-    @legacy_value_mapping = {}
   end
   
   def logger
@@ -38,23 +37,6 @@ class LegacyMigrationDataGenerator
   def import_batch_size
     # [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
     ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i
-  end
-  
-  def add_legacy_value_mapping_item(legacy_value:, new_value:)
-    if legacy_value.blank? || new_value.blank?
-      raise "Legacy value or new value is blank: #{legacy_value} -> #{new_value}"
-    end
-    
-    legacy_value = legacy_value.downcase
-    new_value = new_value.downcase
-    
-    current_value = legacy_value_mapping[legacy_value]
-    
-    if current_value.present? && current_value != new_value
-      raise "Mismatch: #{legacy_value} -> #{current_value} != #{new_value}"
-    end
-    
-    legacy_value_mapping[legacy_value] = new_value
   end
   
   def import_blocks_until_done
@@ -270,7 +252,6 @@ class LegacyMigrationDataGenerator
 
           receipts.each do |receipt|
             receipt.set_legacy_contract_address_map
-            receipt.update_real_withdrawal_id
           end
           
           validate_receipts(block_legacy_tx_receipts, receipts, facet_txs) if validate_import?
@@ -294,12 +275,6 @@ class LegacyMigrationDataGenerator
       FacetBlock.import!(facet_blocks)
       FacetTransaction.import!(all_facet_txs)
       FacetTransactionReceipt.import!(all_receipts)
-      
-      legacy_value_objects = legacy_value_mapping.map do |legacy_value, new_value|
-        LegacyValueMapping.new(legacy_value: legacy_value, new_value: new_value)
-      end
-      
-      LegacyValueMapping.import!(legacy_value_objects, on_duplicate_key_update: { conflict_target: [:legacy_value], columns: [:new_value] })
       
       validate_receipt_counts if validate_import?
     end

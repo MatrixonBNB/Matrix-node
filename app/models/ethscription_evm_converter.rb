@@ -27,14 +27,7 @@ module EthscriptionEVMConverter
     return if parsed_content['op'] == 'create'
     calculate_to_address(parsed_content['data']['to'])
   rescue ContractMissing => e
-    shim_val = "0x11110000000000000000000000000000000000c5"
-    
-    LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-      legacy_value: parsed_content['data']['to'],
-      new_value: shim_val
-    )
-    
-    shim_val
+    "0x11110000000000000000000000000000000000c5"
   rescue => e
     binding.irb
     puts JSON.pretty_generate(self.as_json)
@@ -323,20 +316,9 @@ module EthscriptionEVMConverter
     def calculate_to_address(legacy_to)
       legacy_to = legacy_to.downcase
       
-      unless LegacyMigrationDataGenerator.instance.current_import_block_number
-        return lookup_new_value(legacy_to)
-      end
-      
       LegacyMigrationDataGenerator.instance.imported_facet_transaction_receipts.each do |receipt|
         if receipt.legacy_contract_address_map.key?(legacy_to)
-          new_to = receipt.legacy_contract_address_map[legacy_to]
-          
-          LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-            legacy_value: legacy_to,
-            new_value: new_to
-          )
-          
-          return new_to
+          return receipt.legacy_contract_address_map[legacy_to]
         end
       end  
       
@@ -346,20 +328,13 @@ module EthscriptionEVMConverter
         raise ContractMissing, "Contract #{legacy_to} not found"
       end
       
-      new_to = deploy_receipt.legacy_contract_address_map[legacy_to]
-      
-      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-        legacy_value: legacy_to,
-        new_value: new_to
-      )
-      
-      new_to
+      deploy_receipt.legacy_contract_address_map[legacy_to]
     end
     memoize :calculate_to_address
     
     def safe_calculate_to_address(arg)
       mapped = Ethscription.calculate_to_address(arg)
-    rescue EthscriptionEVMConverter::ContractMissing, LegacyValueMapping::NoMappingSource, KeyError
+    rescue EthscriptionEVMConverter::ContractMissing, KeyError
       arg
     end
     
@@ -485,26 +460,7 @@ module EthscriptionEVMConverter
     end
     memoize :normalize_arg_value
     
-    def lookup_new_value(legacy_value)
-      new_value = LegacyValueMapping.lookup(legacy_value)
-      
-      if new_value == "0x11110000000000000000000000000000000000c5"
-        raise ContractMissing, "Contract #{legacy_value} not found"
-      end
-      
-      if new_value == "0x" + "0" * 62 + "c5"
-        raise InvalidArgValue, "Withdrawal ID not found: #{legacy_value}"
-      end
-      
-      new_value
-    end
-    memoize :lookup_new_value
-    
     def real_withdrawal_id(user_withdrawal_id)
-      unless LegacyMigrationDataGenerator.instance.current_import_block_number
-        return lookup_new_value(user_withdrawal_id)
-      end
-      
       # Check in-memory cache first
       transaction = LegacyMigrationDataGenerator.instance.imported_facet_transactions.find { |tx| tx.eth_transaction_hash == user_withdrawal_id }
       
@@ -516,48 +472,21 @@ module EthscriptionEVMConverter
         if transaction
           receipt = transaction.facet_transaction_receipt
         else
-          LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-            legacy_value: user_withdrawal_id,
-            new_value: "0x" + "0" * 62 + "c5",
-          )
-          
           raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
         end
       end
       
       unless receipt
-        LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-          legacy_value: user_withdrawal_id,
-          new_value: "0x" + "0" * 62 + "c5",
-        )
-        
         raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
       end
       
       if receipt.status == 0
-        LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-          legacy_value: user_withdrawal_id,
-          new_value: user_withdrawal_id,
-        )
-        
         return user_withdrawal_id
       end
       
-      new_withdrawal_id = receipt.decoded_logs.
+      receipt.decoded_logs.
         detect { |i| i['event'] == 'InitiateWithdrawal' }['data']['withdrawalId']
-      
-      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-        legacy_value: user_withdrawal_id,
-        new_value: new_withdrawal_id,
-      )
-      
-      new_withdrawal_id
     rescue ActiveRecord::RecordNotFound => e
-      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-        legacy_value: user_withdrawal_id,
-        new_value: "0x" + "0" * 62 + "c5",
-      )
-      
       raise InvalidArgValue, "Withdrawal ID not found: #{user_withdrawal_id}"
     end
     memoize :real_withdrawal_id
@@ -611,23 +540,12 @@ module EthscriptionEVMConverter
     
     def alias_address_if_necessary(address)
       hashed_address = Eth::Util.keccak256(address.hex_to_bytes).bytes_to_hex
-
-      unless LegacyMigrationDataGenerator.instance.current_import_block_number
-        return lookup_new_value(hashed_address)
-      end
       
-      aliased_address = if is_smart_contract_on_l1?(address)
+      if is_smart_contract_on_l1?(address)
         AddressAliasHelper.apply_l1_to_l2_alias(address)
       else
         address
       end
-      
-      LegacyMigrationDataGenerator.instance.add_legacy_value_mapping_item(
-        legacy_value: hashed_address,
-        new_value: aliased_address,
-      )
-      
-      aliased_address
     end
     memoize :alias_address_if_necessary
   end

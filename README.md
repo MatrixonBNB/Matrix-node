@@ -102,7 +102,6 @@ However, as Facet V1 will continue to be used until V2 launches, this data must 
     | `MIGRATION_MODE` | Set to `true` to enable migration mode. |
     | `LOCAL_GETH_DIR` | Location of the directory into which you cloned facet-geth |
     | `FACET_V1_VM_DATABASE_URL` | (Optional) URL for v1 database, if available. You probably won't need this. |
-    | `LEGACY_VALUE_ORACLE_URL` | URL for the legacy value oracle service. You can use one of the values from the sample. This is only necessary if you're doing a v1 import that extends beyond the legacy data included in the repo. |
 
 8. Put your JWT_SECRET in `/tmp/jwtsecret` on your local machine:
 

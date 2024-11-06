@@ -39,12 +39,7 @@ class LegacyContractArtifact < ApplicationRecord
   end
   
   def self.all_json
-    if base_url = LegacyValueMapping.oracle_base_url
-      endpoint = '/legacy_value_mappings/contract_artifacts'
-      
-      response = HttpPartyWithRetry.get_with_retry("#{base_url}#{endpoint}")
-      response.body
-    elsif File.exist?(file_location)
+    if File.exist?(file_location)
       File.read(file_location)
     else
       LegacyContractArtifact.all.oldest_first.to_json
