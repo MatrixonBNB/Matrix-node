@@ -521,7 +521,8 @@ class LegacyMigrationDataGenerator
       return true
     end
 
-    Ethscription.safe_calculate_to_address(legacy_addr) == facet_addr
+    mapped, found = Ethscription.safe_calculate_to_address(legacy_addr)
+    mapped == facet_addr
   end
 
   def compare_events_multi(legacy_receipt, facet_receipt, events, except: {})

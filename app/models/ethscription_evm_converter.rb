@@ -334,8 +334,9 @@ module EthscriptionEVMConverter
     
     def safe_calculate_to_address(arg)
       mapped = Ethscription.calculate_to_address(arg)
+      [mapped, true]
     rescue EthscriptionEVMConverter::ContractMissing, KeyError
-      arg
+      [arg, false]
     end
     
     def convert_args(contract, function_name, args)
@@ -442,8 +443,7 @@ module EthscriptionEVMConverter
           raise InvalidArgValue, "Invalid address: #{arg_value.inspect}!"
         end
         
-        new_value = safe_calculate_to_address(arg_value)
-        is_facet_contract = new_value != arg_value
+        new_value, is_facet_contract = safe_calculate_to_address(arg_value)
         
         unless is_facet_contract
           new_value = alias_address_if_necessary(new_value)
@@ -539,8 +539,6 @@ module EthscriptionEVMConverter
     memoize :is_smart_contract_on_l1?
     
     def alias_address_if_necessary(address)
-      hashed_address = Eth::Util.keccak256(address.hex_to_bytes).bytes_to_hex
-      
       if is_smart_contract_on_l1?(address)
         AddressAliasHelper.apply_l1_to_l2_alias(address)
       else
