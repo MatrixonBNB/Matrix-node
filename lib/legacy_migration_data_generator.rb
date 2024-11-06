@@ -546,15 +546,6 @@ class LegacyMigrationDataGenerator
       return true
     end
 
-    legacy_address = TransactionHelper.static_call(
-      contract: PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy"),
-      address: facet_addr,
-      function: 'getLegacyContractAddress',
-      args: []
-    )
-
-    return true if legacy_address == legacy_addr
-
     Ethscription.safe_calculate_to_address(legacy_addr) == facet_addr
   end
 
