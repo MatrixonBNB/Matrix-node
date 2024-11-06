@@ -227,7 +227,7 @@ contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
     function transferNFTs(address[] memory assetContracts, uint256[] memory assetIds, address[] memory recipients) external {
         require(assetContracts.length == assetIds.length, "Array lengths mismatch");
         require(assetContracts.length == recipients.length, "Array lengths mismatch");
-        require(assetIds.length <= 20, "Cannot transfer more than 20 NFTs at a time");
+        require(MigrationLib.isNotInMigration() || assetIds.length <= 20, "Cannot transfer more than 20 NFTs at a time");
 
         for (uint256 i = 0; i < recipients.length; i++) {
             _transferNFT(assetContracts[i], assetIds[i], recipients[i], msg.sender);

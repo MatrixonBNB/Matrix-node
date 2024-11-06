@@ -645,6 +645,8 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
     }
     
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
-        return super.supportsInterface(interfaceId);
+        return 
+            ERC2981.supportsInterface(interfaceId) || 
+            ERC721.supportsInterface(interfaceId);
     }
 }

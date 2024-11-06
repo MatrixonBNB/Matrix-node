@@ -325,6 +325,8 @@ contract NFTCollectionV5f8 is FacetERC721, FacetERC2981, Upgradeable, FacetOwnab
     }
     
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
-        return super.supportsInterface(interfaceId);
+        return 
+            ERC2981.supportsInterface(interfaceId) || 
+            ERC721.supportsInterface(interfaceId);
     }
 }

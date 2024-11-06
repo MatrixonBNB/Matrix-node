@@ -137,6 +137,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     }
 
     function updateTrustedSmartContract(address newTrustedSmartContract) public onlyOwner {
+        require(newTrustedSmartContract != address(0), "Invalid smart contract");
         s().trustedSmartContract = newTrustedSmartContract;
     }
 

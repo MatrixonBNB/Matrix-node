@@ -96,8 +96,8 @@ contract TokenUpgradeRendererV3d1 is Upgradeable, Initializable {
         TokenUpgradeLevel memory lastLevel = s().tokenUpgradeLevelsByCollection[collection][s().tokenUpgradeLevelsByCollection[collection].length - 1];
         require(newLevel.endTime > newLevel.startTime, "End time must be after start time");
         require(newLevel.startTime > lastLevel.endTime, "Start time must be after last level end time");
-        require(s().tokenUpgradeLevelsByCollection[collection].length + 1 <= s().maxUpgradeLevelCount, "Max upgrade level count reached");
-        require(imageURIs.length <= 25, "Max 25 image URIs allowed");
+        require(MigrationLib.isNotInMigration() || s().tokenUpgradeLevelsByCollection[collection].length + 1 <= s().maxUpgradeLevelCount, "Max upgrade level count reached");
+        require(MigrationLib.isNotInMigration() || imageURIs.length <= 25, "Max 25 image URIs allowed");
         
         s().tokenUpgradeLevelsByCollection[collection].push(newLevel);
         uint256 index = s().tokenUpgradeLevelsByCollection[collection].length - 1;
@@ -109,7 +109,7 @@ contract TokenUpgradeRendererV3d1 is Upgradeable, Initializable {
 
     function editUpgradeLevel(address collection, uint256 index, TokenUpgradeLevel memory newLevel, string[] memory imageURIs) public {
         requireSenderAdmin(collection);
-        require(imageURIs.length <= 25, "Max 25 image URIs allowed");
+        require(MigrationLib.isNotInMigration() || imageURIs.length <= 25, "Max 25 image URIs allowed");
         
         if(s().tokenUpgradeLevelsByCollection[collection].length == 0) {
             s().tokenUpgradeLevelsByCollection[collection].push(TokenUpgradeLevel("", "", "", "", 0, 0));
@@ -165,7 +165,7 @@ contract TokenUpgradeRendererV3d1 is Upgradeable, Initializable {
     }
 
     function upgradeMultipleTokens(address collection, uint256[] memory tokenIds) public {
-        require(tokenIds.length <= 100, "TokenUpgradeRenderer: Cannot upgrade more than 50 tokens at once");
+        require(MigrationLib.isNotInMigration() || tokenIds.length <= 100, "TokenUpgradeRenderer: Cannot upgrade more than 50 tokens at once");
         uint256 totalFee = s().perUpgradeFee * tokenIds.length;
         if (totalFee > 0 && s().feeTo != address(0)) {
             ERC20(s().WETH).transferFrom(msg.sender, s().feeTo, totalFee);
@@ -249,5 +249,10 @@ contract TokenUpgradeRendererV3d1 is Upgradeable, Initializable {
     function setFeeTo(address _feeTo) public {
         require(msg.sender == s().feeTo, "Only feeTo can change feeTo");
         s().feeTo = _feeTo;
+    }
+    
+    function setPerUpgradeFee(uint256 perUpgradeFee) public {
+        require(msg.sender == s().feeTo, "Only feeTo can change perUpgradeFee");
+        s().perUpgradeFee = perUpgradeFee;
     }
 }

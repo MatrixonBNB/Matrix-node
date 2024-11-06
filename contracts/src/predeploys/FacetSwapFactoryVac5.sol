@@ -108,7 +108,6 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         s().lpFeeBPS = lpFeeBPS;
     }
     
-    // TODO: ability to upgrade post-migration
     function upgradePairs(address[] calldata pairs, bytes32 newHash, string calldata newSource) public {
         require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
         require(pairs.length <= 10, "Too many pairs to upgrade at once");
@@ -119,9 +118,19 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         }
     }
 
+    function upgradePairsToAndCall(address[] calldata pairs, address newImplementation, bytes calldata data) public onlyUpgradeAdmin {
+        for (uint256 i = 0; i < pairs.length; i++) {
+            upgradePairToAndCall(pairs[i], newImplementation, data);
+        }
+    }
+
     function upgradePair(address pair, bytes32 newHash, string memory newSource) public {
         require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
         Upgradeable(pair).upgrade(newHash, newSource);
+    }
+    
+    function upgradePairToAndCall(address pair, address newImplementation, bytes calldata data) public onlyUpgradeAdmin {
+        Upgradeable(pair).upgradeToAndCall(newImplementation, data);
     }
     
     error NotMigrationManager();

@@ -18,7 +18,7 @@ import "src/libraries/FacetOwnable.sol";
 ///         meant for use on L2.
 contract FacetOptimismMintableERC20 is IOptimismMintableERC20, ILegacyMintableERC20, FacetERC20, Initializable, Upgradeable, FacetOwnable {
     struct BridgeStorage {
-        address _trustedSmartContract;
+        address _deprecatedL1Bridge;
         mapping(bytes32 => uint256) _withdrawalIdAmount;
         mapping(address => bytes32) _userWithdrawalId;
         uint256 _withdrawalIdNonce;
