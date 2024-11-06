@@ -33,6 +33,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         int256 totalWithdrawComplete;
         int256 pendingWithdrawalAmount;
         
+        mapping(bytes32 => address) withdrawalIdUser;
         mapping(bytes32 => bytes32) withdrawalIdL1BlockHash;
         mapping(bytes32 => uint256) withdrawalIdL1BlockNumber;
     }
@@ -176,6 +177,10 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     function getWithdrawalIdAmount(bytes32 withdrawalId) public view returns (uint256) {
         return s().withdrawalIdAmount[withdrawalId];
     }
+    
+    function getWithdrawalIdUser(bytes32 withdrawalId) public view returns (address) {
+        return s().withdrawalIdUser[withdrawalId];
+    }
 
     function getUserWithdrawalId(address user) public view returns (bytes32) {
         return s().userWithdrawalId[user];
@@ -200,6 +205,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     
     function _withdrawalDoesNotExist(address user, bytes32 withdrawalId) internal view returns (bool) {
         return s().withdrawalIdAmount[withdrawalId] == 0 &&
+            s().withdrawalIdUser[withdrawalId] == address(0) &&
             s().withdrawalIdL1BlockHash[withdrawalId] == bytes32(0) &&
             s().withdrawalIdL1BlockNumber[withdrawalId] == 0 &&
             s().userWithdrawalId[user] == bytes32(0);
@@ -213,6 +219,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         require(_withdrawalDoesNotExist(recipient, withdrawalId), "Withdrawal already exists");
         
         s().withdrawalIdAmount[withdrawalId] = l1TokenAmount;
+        s().withdrawalIdUser[withdrawalId] = recipient;
         s().withdrawalIdL1BlockHash[withdrawalId] = l1Block.hash();
         s().withdrawalIdL1BlockNumber[withdrawalId] = l1Block.number();
         s().userWithdrawalId[recipient] = withdrawalId;
@@ -220,6 +227,7 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     
     function _deleteWithdrawal(address user, bytes32 withdrawalId) internal {
         s().withdrawalIdAmount[withdrawalId] = 0;
+        s().withdrawalIdUser[withdrawalId] = address(0);
         s().withdrawalIdL1BlockHash[withdrawalId] = bytes32(0);
         s().withdrawalIdL1BlockNumber[withdrawalId] = 0;
         s().userWithdrawalId[user] = bytes32(0);
