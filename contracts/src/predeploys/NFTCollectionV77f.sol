@@ -342,4 +342,8 @@ contract NFTCollectionV77f is FacetERC721, FacetERC2981, Upgradeable, FacetOwnab
             burn(tokenIds[i]);
         }
     }
+    
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
 }

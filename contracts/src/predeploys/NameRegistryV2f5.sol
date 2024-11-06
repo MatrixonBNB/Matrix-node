@@ -643,4 +643,8 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
         Token storage token = s().tokens[id];
         return (token.name, token.expiry, token.registrationTimestamp, token.stickerPositions);
     }
+    
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
 }

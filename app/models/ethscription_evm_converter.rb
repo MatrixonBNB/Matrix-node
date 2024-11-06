@@ -56,6 +56,8 @@ module EthscriptionEVMConverter
         end
         
         predeploy_address = "0x5844bea96e5ac147cd9ddc7daa22a0899659d2f5"
+      elsif predeploy_address == "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d"
+        predeploy_address = "0x89cfcf16d1fffb3937b47f1d1a22850c0ad80f6e"
       end
       
       begin

@@ -323,4 +323,8 @@ contract NFTCollectionV5f8 is FacetERC721, FacetERC2981, Upgradeable, FacetOwnab
         require(msg.sender == s().feeTo, "Only feeTo can change feeTo");
         s().feeTo = feeTo;
     }
+    
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
 }

@@ -165,6 +165,14 @@ contract FacetPortV27b is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
         return transferSucceeded;
     }
 
+    function _supportsERC2981(address contractAddress) internal view returns (bool) {
+        try IERC165(contractAddress).supportsInterface(type(IERC2981).interfaceId) returns (bool supported) {
+            return supported;
+        } catch {
+            return false;
+        }
+    }
+
     function _payRoyaltiesAndTransfer(
         address assetContract,
         uint256 assetId,
@@ -178,11 +186,10 @@ contract FacetPortV27b is Upgradeable, FacetOwnable, Pausable, Initializable, Fa
             return false;
         }
 
-        (bool success, bytes memory data) = assetContract.call(abi.encodeWithSignature("supportsERC2981()"));
         uint256 royaltyAmount = 0;
 
-        if (success && abi.decode(data, (bool))) {
-            (address receiver, uint256 _royaltyAmount) = FacetERC2981(assetContract).royaltyInfo(assetId, considerationAmount);
+        if (_supportsERC2981(assetContract)) {
+            (address receiver, uint256 _royaltyAmount) = ERC2981(assetContract).royaltyInfo(assetId, considerationAmount);
             royaltyAmount = _royaltyAmount;
 
             if (receiver == address(0)) {
