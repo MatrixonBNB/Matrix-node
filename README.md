@@ -99,7 +99,7 @@ However, as Facet V1 will continue to be used until V2 launches, this data must 
     | `JWT_SECRET` | Secret key for JWT authentication. **The value you put here must also go in `/tmp/jwtsecret` on your local machine** |
     | `DATABASE_URL` | URL your local postgresql db |
     | `L1_GENESIS_BLOCK` | The genesis block number. To sync Facet mainnet from genesis set it to 18684899. To sync Sepolia from genesis set it to 5193574. To test in Sepolia with current data, set it to the current block number. |
-    | `V2_FORK_TIMESTAMP` | Timestamp for v2 fork. After this timestamp `facet-node` will use the new V2 logic to build blocks. Set to the same value as L1_GENESIS_BLOCK to skip the v1 import. |
+    | `MIGRATION_MODE` | Set to `true` to enable migration mode. |
     | `LOCAL_GETH_DIR` | Location of the directory into which you cloned facet-geth |
     | `FACET_V1_VM_DATABASE_URL` | (Optional) URL for v1 database, if available. You probably won't need this. |
     | `LEGACY_VALUE_ORACLE_URL` | URL for the legacy value oracle service. You can use one of the values from the sample. This is only necessary if you're doing a v1 import that extends beyond the legacy data included in the repo. |

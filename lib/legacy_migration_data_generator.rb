@@ -140,6 +140,10 @@ class LegacyMigrationDataGenerator
       raise "FACET_V1_VM_DATABASE_URL is not set"
     end
     
+    unless in_migration_mode?
+      raise "Not in migration mode"
+    end
+    
     logger.info "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
     
@@ -223,10 +227,6 @@ class LegacyMigrationDataGenerator
           receipt_result = block_response['receipts']
                     
           eth_block = EthBlock.from_rpc_result(block_result)
-          
-          if block_in_v2?(eth_block)
-            raise "Block in v2: #{eth_block.number}"
-          end
                     
           facet_block = FacetBlock.from_eth_block(eth_block)
 

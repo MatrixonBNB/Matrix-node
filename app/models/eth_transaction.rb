@@ -53,14 +53,10 @@ class EthTransaction < T::Struct
     eth_txs.sort_by(&:transaction_index).map(&:to_facet_tx).compact
   end
   
-  def block_timestamp_proxy
-    Struct.new(:timestamp, :number).new(block_timestamp, block_number)
-  end
-  
   def to_facet_tx
     return unless is_success?
     
-    block_in_v2?(block_timestamp_proxy) ? to_facet_tx_v2 : to_facet_tx_v1
+    in_migration_mode? ? to_facet_tx_v1 : to_facet_tx_v2
   end
   
   def to_facet_tx_v2

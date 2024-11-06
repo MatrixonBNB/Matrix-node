@@ -59,7 +59,7 @@ module FctMintCalculator
   end
 
   def assign_mint_amounts(facet_txs, facet_block)
-    if block_in_v1?(facet_block)
+    if in_migration_mode?
       facet_txs.each { |tx| tx.mint = 1e6.ether }
       
       facet_block.assign_attributes(

@@ -263,6 +263,10 @@ class EthBlockImporter
     puts "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
 
+    if in_migration_mode?
+      raise "Use LegacyMigrationDataGenerator to import migration data"
+    end
+    
     block_responses = l1_rpc_results.select do |block_number, _|
       block_numbers.include?(block_number)
     end.to_h.transform_values do |hsh|
@@ -302,10 +306,6 @@ class EthBlockImporter
       
       facet_txs.each do |facet_tx|
         facet_tx.facet_block = facet_block
-        
-        if block_in_v1?(eth_block)
-          facet_tx.assign_gas_limit_from_tx_count_in_block(facet_txs.count)
-        end
       end
       
       imported_facet_blocks = propose_facet_block(

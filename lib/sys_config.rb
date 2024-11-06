@@ -6,8 +6,8 @@ module SysConfig
   L2_BLOCK_TIME = 12
   
   def block_gas_limit(block)
-    if block_in_v1?(block)
-      L2_BLOCK_GAS_LIMIT * 2
+    if in_migration_mode?
+      1_000_000_000
     elsif is_first_v2_block?(block)
       # TODO
       L2_BLOCK_GAS_LIMIT * 20
@@ -20,35 +20,25 @@ module SysConfig
     ENV.fetch("L1_GENESIS_BLOCK").to_i
   end
   
-  def v2_fork_timestamp
-    ENV.fetch("V2_FORK_TIMESTAMP").to_i
-  end
-  
   def genesis_timestamp
     @_genesis_timestamp ||= EthRpcClient.l1.get_block(l1_genesis_block_number)["timestamp"].to_i(16)
   end
   
-  def l2_v2_fork_block_number
-    [(v2_fork_timestamp - genesis_timestamp) / L2_BLOCK_TIME, 0].max
+  def in_migration_mode?
+    return false if [nil, "false"].include?(ENV['MIGRATION_MODE'])
+    return true if ENV['MIGRATION_MODE'] == "true"
+    raise "Invalid MIGRATION_MODE value: #{ENV['MIGRATION_MODE']}"
   end
   
-  def block_in_v1?(block)
-    unless block.respond_to?(:timestamp)
-      raise "Invalid block: #{block.inspect}"
-    end
-    
-    block.timestamp < v2_fork_timestamp
-  end
-  
-  def block_in_v2?(block)
-    !block_in_v1?(block)
+  def in_v2?
+    !in_migration_mode?
   end
   
   def is_first_v2_block?(block)
-    block_in_v2?(block) && block.number == 1
+    in_v2? && block.number == 1
   end
   
   def is_second_v2_block?(block)
-    block_in_v2?(block) && block.number == 2
+    in_v2? && block.number == 2
   end
 end

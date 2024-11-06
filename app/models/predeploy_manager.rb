@@ -14,12 +14,7 @@ module PredeployManager
       filename = File.basename(file_path, ".sol")
   
       if filename.match(/V[a-f0-9]{3}$/i)
-        begin
-          address = LegacyContractArtifact.address_from_suffix(filename)
-        rescue LegacyContractArtifact::AmbiguousSuffixError => e
-          next if ChainIdManager.on_testnet?
-          raise
-        end
+        address = LegacyContractArtifact.address_from_suffix(filename)
         
         map[address] = filename
       end
@@ -81,20 +76,11 @@ module PredeployManager
     merged = optimism_allocs.merge(our_allocs)
     
     if use_dump
-      dump = get_alloc_from_geth
-      dump_migration_data = dump.dig('0x22220000000000000000000000000000000000d6', 'storage') || {}
-      dump_migration_code = dump.dig('0x22220000000000000000000000000000000000d6', 'code') || "0x"
-      
-      final = dump.merge(merged).sort_by { |key, _| key.downcase }.to_h
-      
-      final.delete('0x11110000000000000000000000000000000000c5')
-      
-      if dump_migration_code != "0x" && dump_migration_code != final['0x22220000000000000000000000000000000000d6']['code']
-        raise "Migration data or code mismatch!"
-      end
-      
-      final['0x22220000000000000000000000000000000000d6']['storage'] = dump_migration_data
-      return final
+      merged = get_alloc_from_geth.merge(merged)
+    end
+    
+    unless in_migration_mode?
+      merged.delete('0x11110000000000000000000000000000000000c5')
     end
     
     merged.sort_by { |key, _| key.downcase }.to_h
@@ -132,7 +118,7 @@ module PredeployManager
     puts "Generated predeploy_info.json"
   end
   
-  def generate_full_genesis_json(l1_network_name, l1_genesis_block_number = SysConfig.l1_genesis_block_number)
+  def generate_full_genesis_json(l1_network_name:, l1_genesis_block_number:, use_dump:)
     config = {
       chainId: ChainIdManager.l2_chain_id_from_l1_network_name(l1_network_name),
       homesteadBlock: 0,
@@ -167,8 +153,6 @@ module PredeployManager
     
     timestamp, mix_hash = get_timestamp_and_mix_hash(l1_genesis_block_number)
     
-    use_dump = l1_network_name == 'sepolia'
-    
     {
       config: config,
       timestamp: "0x#{timestamp.to_s(16)}",
@@ -191,7 +175,7 @@ module PredeployManager
     l1_network_name == "mainnet" ? 1710338135 : 1706655072
   end
   
-  def write_genesis_json(clear_cache: true)
+  def write_genesis_json(clear_cache: true, use_dump: ENV["USE_DUMP"] == 'true')
     Rails.cache.clear if clear_cache
     MemeryExtensions.clear_all_caches!
     SolidityCompiler.reset_checksum
@@ -209,7 +193,11 @@ module PredeployManager
       genesis_path = File.join(facet_chain_dir, filename)
 
       # Generate the genesis data for the specific network
-      genesis_data = generate_full_genesis_json(network)
+      genesis_data = generate_full_genesis_json(
+        l1_network_name: network,
+        l1_genesis_block_number: SysConfig.l1_genesis_block_number,
+        use_dump: use_dump
+      )
 
       # Write the data to the appropriate file
       File.write(genesis_path, JSON.pretty_generate(genesis_data))
@@ -235,7 +223,6 @@ module PredeployManager
       address = entry['address']
       
       next unless address
-      next if address == "0x11110000000000000000000000000000000000c5"
       
       code = entry['code'].presence || "0x"
       
