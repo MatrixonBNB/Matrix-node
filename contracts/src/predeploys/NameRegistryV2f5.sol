@@ -306,7 +306,7 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
         // Create JSON data
         string memory json_data = string(abi.encodePacked(
             '{"name":"', name.escapeJSON(), '",',
-            '"description":"', name.escapeJSON(), ', a Facet Card name.",',
+            '"description":"', name.escapeJSON(), ', a Facet Name name.",',
             '"animation_url":"', b64Card, '",',
             '"attributes":', attributes, '}'
         ));
@@ -551,7 +551,14 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
         override
         returns (string memory name, string memory version)
     {
-        name = _FacetERC721Storage().name;
+        string memory collectionName = _FacetERC721Storage().name;
+        
+        if (collectionName.eq("Facet Names")) {
+            name = "Facet Cards";
+        } else {
+            name = collectionName;
+        }
+        
         version = "1";
     }
     

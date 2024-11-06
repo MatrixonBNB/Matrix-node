@@ -75,9 +75,12 @@ contract FacetBuddyFactoryVef8 is Initializable {
         return address(uint160(uint256(bytecodeHash)));
     }
     
-    function setUpgradeAdmin(address) public {
-        if (MigrationLib.isInMigration()) return;
-        
-        revert("Contract not upgradeable");
+    event UpgradeAdminChanged(address indexed newUpgradeAdmin);
+    function setUpgradeAdmin(address newUpgradeAdmin) public {
+        if (MigrationLib.isInMigration()) {
+            emit UpgradeAdminChanged(newUpgradeAdmin);
+        } else {
+            revert("Contract not upgradeable");
+        }
     }
 }
