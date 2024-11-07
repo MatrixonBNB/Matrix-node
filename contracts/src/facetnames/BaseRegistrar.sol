@@ -204,14 +204,30 @@ contract BaseRegistrar is ERC721, Ownable {
     // / @param baseURI_ The base token URI for NFT metadata.
     // / @param collectionURI_ The URI for the collection's metadata.
     constructor(
-        address _owner,
-        string memory _baseDomainName,
-        uint256[] memory _prices,
-        uint256 _premiumStart,
-        uint256 _totalDays,
-        string memory baseURI_,
-        string memory collectionURI_
+        // address _owner,
+        // string memory _baseDomainName,
+        // uint256[] memory _prices,
+        // uint256 _premiumStart,
+        // uint256 _totalDays,
+        // string memory baseURI_,
+        // string memory collectionURI_
     ) {
+        
+        address _owner = address(0x1234);  // Dummy owner address
+        string memory _baseDomainName = "test.eth";  // Dummy domain name
+        uint256[] memory _prices = new uint256[](6);
+        _prices[0] = 316_808_781_402;
+        _prices[1] = 31_680_878_140;
+        _prices[2] = 3_168_087_814;
+        _prices[3] = 316_808_781;
+        _prices[4] = 31_680_878;
+        _prices[5] = 3_168_087;
+        uint256 _premiumStart = 500 ether;
+        uint256 _totalDays = 28 days;
+        string memory baseURI_ = "https://test.uri/";  // Dummy base URI
+        string memory collectionURI_ = "https://test.collection/";  // Dummy collection URI
+        
+        
         _initializeOwner(_owner);
         string[] memory baseNameParts = _baseDomainName.split(".");
         require(baseNameParts.length == 2, "Base domain name must contain exactly one dot");
@@ -261,7 +277,7 @@ contract BaseRegistrar is ERC721, Ownable {
         
         // 4. Deploy Controller
         controller = new RegistrarController(
-            BaseRegistrar(address(this)),
+            this,
             oracle,
             IReverseRegistrar(address(reverseRegistrar)),
             address(this),

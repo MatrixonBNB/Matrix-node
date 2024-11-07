@@ -29,15 +29,15 @@ contract Stresser {
 contract StressTest is Script, Test, FoundryFacetSender {
     using AddressAliasHelper for address;
     
-    // function run() public broadcast {
-    //     for (uint256 i = 0; i < 10; i++) {
-    //         deployContract(
-    //             "Stresser",
-    //             type(Stresser).creationCode,
-    //             ""
-    //         );
-    //     }
-    // }
+    function run() public broadcast {
+        for (uint256 i = 0; i < 10; i++) {
+            deployContract(
+                "Stresser",
+                type(Stresser).creationCode,
+                ""
+            );
+        }
+    }
     
     function deployContract(string memory _name, bytes memory _creationCode, bytes memory _initData) public returns (address addr_) {
         addr_ = nextL2Address();

@@ -43,9 +43,15 @@ module EthscriptionEVMConverter
       predeploy_address = "0x" + data['init_code_hash'].last(40)
       
       if predeploy_address == "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139"
-        if data['args']['name'] == "Facet Cards"
+        if data['args']['name'] == "Facet Cards" && creator == '0xc2172a6315c1d7f6855768f843c420ebb36eda97'
           data['args']['name'] = "Facet Names"
           data['args']['symbol'] = "FACETNAME"
+          
+          contract = EVMHelpers.compile_contract("facetnames/BaseRegistrar")
+          
+          return EVMHelpers.get_deploy_data(
+            contract, []
+          )
         end
         
         predeploy_address = "0x5844bea96e5ac147cd9ddc7daa22a0899659d2f5"
