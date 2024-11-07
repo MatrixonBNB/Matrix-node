@@ -2,25 +2,13 @@
 pragma solidity ^0.8.23;
 
 import {ENS} from "ens-contracts/registry/ENS.sol";
-import {ERC721} from "lib/solady/tokens/ERC721.sol";
+import {ERC721} from "solady/tokens/ERC721.sol";
 import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import {IERC165} from "openzeppelin-contracts/contracts/utils/introspection/ERC165.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {LibString} from "solady/utils/LibString.sol";
 
 import {GRACE_PERIOD} from "./Constants.sol";
-import {console} from "forge-std/console.sol";
-
-
-import {Registry} from "src/facetnames/Registry.sol";
-import {StablePriceOracle, IPriceOracle} from "src/facetnames/StablePriceOracle.sol";
-import {ExponentialPremiumPriceOracle} from "src/facetnames/ExponentialPremiumPriceOracle.sol";
-import {L2Resolver} from "src/facetnames/L2Resolver.sol";
-import {ReverseRegistrar} from "src/facetnames/ReverseRegistrar.sol";
-import {RegistrarController, IReverseRegistrar} from "src/facetnames/RegistrarController.sol";
-import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
-import "./Constants.sol";
-
 
 /// @title Base Registrar
 ///
@@ -34,12 +22,7 @@ import "./Constants.sol";
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
 contract BaseRegistrar is ERC721, Ownable {
-    using LibString for *;
-    
-    // Registry public immutable registry;
-    ReverseRegistrar public immutable reverseRegistrar;
-    RegistrarController public immutable controller;
-    L2Resolver public immutable resolver;
+    using LibString for uint256;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
@@ -72,7 +55,7 @@ contract BaseRegistrar is ERC721, Ownable {
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          ERRORS                            */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.��°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     /// @notice Thrown when the name has expired.
     ///
@@ -196,181 +179,26 @@ contract BaseRegistrar is ERC721, Ownable {
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
-    // / @notice BaseRegistrar constructor used to initialize the configuration of the implementation.
-    // /
-    // / @param registry_ The Registry contract.
-    // / @param owner_ The permissioned address initialized as the `owner` in the `Ownable` context.
-    // / @param baseNode_ The node that this contract manages registrations for.
-    // / @param baseURI_ The base token URI for NFT metadata.
-    // / @param collectionURI_ The URI for the collection's metadata.
+    /// @notice BaseRegistrar constructor used to initialize the configuration of the implementation.
+    ///
+    /// @param registry_ The Registry contract.
+    /// @param owner_ The permissioned address initialized as the `owner` in the `Ownable` context.
+    /// @param baseNode_ The node that this contract manages registrations for.
+    /// @param baseURI_ The base token URI for NFT metadata.
+    /// @param collectionURI_ The URI for the collection's metadata.
     constructor(
-        // address _owner,
-        // string memory _baseDomainName,
-        // uint256[] memory _prices,
-        // uint256 _premiumStart,
-        // uint256 _totalDays,
-        // string memory baseURI_,
-        // string memory collectionURI_
+        ENS registry_,
+        address owner_,
+        bytes32 baseNode_,
+        string memory baseURI_,
+        string memory collectionURI_
     ) {
-        
-        address _owner = address(0x1234);  // Dummy owner address
-        string memory _baseDomainName = "test.eth";  // Dummy domain name
-        uint256[] memory _prices = new uint256[](6);
-        _prices[0] = 316_808_781_402;
-        _prices[1] = 31_680_878_140;
-        _prices[2] = 3_168_087_814;
-        _prices[3] = 316_808_781;
-        _prices[4] = 31_680_878;
-        _prices[5] = 3_168_087;
-        uint256 _premiumStart = 500 ether;
-        uint256 _totalDays = 28 days;
-        string memory baseURI_ = "https://test.uri/";  // Dummy base URI
-        string memory collectionURI_ = "https://test.collection/";  // Dummy collection URI
-        
-        
-        _initializeOwner(_owner);
-        string[] memory baseNameParts = _baseDomainName.split(".");
-        require(baseNameParts.length == 2, "Base domain name must contain exactly one dot");
-        require(baseNameParts[1].eq("eth"), "Base domain name must end with .eth");
-        
-        string memory baseName = baseNameParts[0]; // facet
-        bytes32 baseNameLabel = keccak256(bytes(baseName)); // keccak256(facet)
-        baseNode = _encodeName(_baseDomainName); // _encodeName(facet.eth)
-        string memory rootName = ".".concat(_baseDomainName); // .facet.eth
-        
-        string memory l2ReverseLabelString = (0x80000000 | block.chainid).toHexStringNoPrefix();
-        bytes32 baseReverseLabel = keccak256(bytes(l2ReverseLabelString)); // keccak256(0x80000000 | 137)
-        bytes32 baseReverseNode = _encodeName(l2ReverseLabelString.concat(".reverse")); // _encodeName("80001325.reverse")
-        
+        _initializeOwner(owner_);
+        registry = registry_;
+        baseNode = baseNode_;
         _baseURI = baseURI_;
         _collectionURI = collectionURI_;
-        
-        // 1. Deploy Registry
-        registry = new Registry(address(this));
-        
-        // 2. Deploy Price Oracle
-        StablePriceOracle oracle = new ExponentialPremiumPriceOracle(
-            _prices,
-            _premiumStart,
-            _totalDays
-        );
-        
-        // 3. Deploy ReverseRegistrar
-        reverseRegistrar = new ReverseRegistrar(
-            registry,
-            address(this),
-            baseReverseNode
-        );
-        
-        bytes32 reverseLabel = keccak256("reverse");
-        
-        // console.logBytes32(REVERSE_NODE);
-        // console.logBytes32(_encodeName("reverse"));
-        // console.logBytes32(keccak256("reverse"));
-        
-        bytes32 addrLabel = keccak256("addr");
-        
-        
-        registry.setSubnodeOwner(0x0, reverseLabel, address(this));
-        registry.setSubnodeOwner(REVERSE_NODE, baseReverseLabel, address(reverseRegistrar));
-        registry.setSubnodeOwner(REVERSE_NODE, addrLabel, address(reverseRegistrar));
-        
-        // 4. Deploy Controller
-        controller = new RegistrarController(
-            this,
-            oracle,
-            IReverseRegistrar(address(reverseRegistrar)),
-            address(this),
-            baseNode,
-            rootName,
-            owner()
-        );
-        
-        // 5. Deploy Resolver
-        resolver = new L2Resolver(
-            registry,
-            address(controller),
-            address(reverseRegistrar),
-            address(this)
-        );
-        
-        // 6. Configure everything
-        _configure(baseNode, baseNameLabel);
-        
-        registry.setSubnodeOwner(0x0, reverseLabel, owner());
-        registry.setSubnodeOwner(0x0, keccak256("eth"), owner());
-        registry.setSubnodeOwner(0x0, keccak256("reverse"), owner());
-        registry.setOwner(0x0, owner());
-        reverseRegistrar.transferOwnership(owner());
-        controller.transferOwnership(owner());
-        resolver.transferOwnership(owner());
     }
-    
-    function _encodeName(string memory name) internal pure returns (bytes32) {
-        (, bytes32 node) = NameEncoder.dnsEncodeName(name);
-        return node;
-    }
-    
-    function _configure(
-        bytes32 node,
-        bytes32 baseNameLabel
-    ) internal {
-        // 1. First establish ownership of reverse namespace
-        registry.setSubnodeOwner(0x0, keccak256("eth"), address(this));
-        registry.setSubnodeOwner(ETH_NODE, baseNameLabel, address(this));
-
-        // 2. Set up controller permissions
-        _addController(address(controller));
-        reverseRegistrar.setControllerApproval(address(controller), true);
-        // 4. Finally transfer ownership to baseRegistrar
-        // 3. Set resolvers (we need to do this before transferring ownership to baseRegistrar)
-        registry.setResolver(node, address(resolver));
-        registry.setResolver(REVERSE_NODE, address(resolver));
-        // 4. Finally transfer ownership to baseRegistrar
-        registry.setSubnodeOwner(ETH_NODE, baseNameLabel, address(this));
-    }
-
-    // Proxy function that users can call
-    function __register(
-        string calldata name,
-        address owner,
-        uint256 duration,
-        address resolver,
-        bool reverseRecord
-    ) external payable {
-        // Pack the request
-        RegistrarController.RegisterRequest memory request = RegistrarController.RegisterRequest({
-            name: name,
-            owner: owner,
-            duration: duration,
-            resolver: resolver,
-            data: new bytes[](0), // Optional resolver data
-            reverseRecord: reverseRecord
-        });
-        
-        // Forward the call to controller
-        controller.register{value: msg.value}(request);
-    }
-    
-    function registerName(
-        string calldata name,
-        uint256 duration,
-        address resolver,
-        bool reverseRecord
-    ) external payable {
-        RegistrarController.RegisterRequest memory request = RegistrarController.RegisterRequest({
-            name: name,
-            owner: msg.sender, // The user calling this function becomes the owner
-            duration: duration,
-            resolver: resolver,
-            data: new bytes[](0),
-            reverseRecord: reverseRecord
-        });
-        
-        controller.register{value: msg.value}(request);
-    }
-    
-    receive() external payable {}
 
     /// @notice Authorises a controller, who can register and renew domains.
     ///
@@ -378,11 +206,6 @@ contract BaseRegistrar is ERC721, Ownable {
     ///
     /// @param controller The address of the new controller.
     function addController(address controller) external onlyOwner {
-        controllers[controller] = true;
-        emit ControllerAdded(controller);
-    }
-    
-    function _addController(address controller) internal {
         controllers[controller] = true;
         emit ControllerAdded(controller);
     }

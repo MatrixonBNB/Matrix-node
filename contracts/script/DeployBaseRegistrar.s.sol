@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
 import {BaseRegistrar} from "src/facetnames/BaseRegistrar.sol";
+import {RegistrarController} from "src/facetnames/RegistrarController.sol";
 import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
 import "src/facetnames/Constants.sol";
 import {LibString} from "solady/utils/LibString.sol";
@@ -40,7 +41,7 @@ contract DeployBaseRegistrarAll is Script {
         // uint256 premiumStart = 500 ether;
         // uint256 totalDays = 28 days;
 
-        BaseRegistrar registrar = new BaseRegistrar();
+        RegistrarController controller = new RegistrarController();
 
         // Deploy the all-in-one contract
         // BaseRegistrar registrar = new BaseRegistrar(
@@ -53,18 +54,23 @@ contract DeployBaseRegistrarAll is Script {
         //     ""
         // );
 
-        console.log("BaseRegistrarDeployAll deployed to:", address(registrar));
+        console.log("BaseRegistrarDeployAll deployed to:", address(controller));
 
         // // Optional: Register a test name to verify everything works
         vm.deal(deployerAddress, 10 ether);
         vm.warp(1735689600);
-        registrar.registerName{value: 8 ether}(
-            "tester12345",
-            366 days,
-            address(registrar.resolver()),
-            false
-        );
-
+        
+        RegistrarController.RegisterRequest memory request = RegistrarController.RegisterRequest({
+            name: "tester12345",
+            owner: msg.sender, // The user calling this function becomes the owner
+            duration: 366 days,
+            resolver: address(controller.resolver()),
+            data: new bytes[](0),
+            reverseRecord: true
+        });
+        
+        controller.register{value: 8 ether}(request);
+        
         vm.stopBroadcast();
     }
 }

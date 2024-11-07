@@ -13,6 +13,17 @@ import {IDiscountValidator} from "./interface/IDiscountValidator.sol";
 import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {L2Resolver} from "./L2Resolver.sol";
 import {IReverseRegistrar} from "./interface/IReverseRegistrar.sol";
+import {Registry} from "src/facetnames/Registry.sol";
+import {StablePriceOracle, IPriceOracle} from "src/facetnames/StablePriceOracle.sol";
+import {ExponentialPremiumPriceOracle} from "src/facetnames/ExponentialPremiumPriceOracle.sol";
+import {L2Resolver} from "src/facetnames/L2Resolver.sol";
+import {ReverseRegistrar} from "src/facetnames/ReverseRegistrar.sol";
+import {RegistrarController, IReverseRegistrar} from "src/facetnames/RegistrarController.sol";
+import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
+import "./Constants.sol";
+import {LibString} from "solady/utils/LibString.sol";
+import {ENS} from "ens-contracts/registry/ENS.sol";
+import "forge-std/Script.sol";
 
 /// @title Registrar Controller
 ///
@@ -26,9 +37,13 @@ import {IReverseRegistrar} from "./interface/IReverseRegistrar.sol";
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
 contract RegistrarController is Ownable {
+    using LibString for *;
     using StringUtils for *;
     using SafeERC20 for IERC20;
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
+    
+    ENS public immutable registry;
+    L2Resolver public immutable resolver;
 
     /// @notice The details of a registration request.
     struct RegisterRequest {
@@ -258,33 +273,113 @@ contract RegistrarController is Ownable {
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
-    /// @notice Registrar Controller construction sets all of the requisite external contracts.
-    ///
-    /// @dev Assigns ownership of this contract's reverse record to the `owner_`.
-    ///
-    /// @param base_ The base registrar contract.
-    /// @param prices_ The pricing oracle contract.
-    /// @param reverseRegistrar_ The reverse registrar contract.
-    /// @param owner_ The permissioned address initialized as the `owner` in the `Ownable` context.
-    /// @param rootNode_ The node for which this registrar manages registrations.
-    /// @param rootName_ The name of the root node which this registrar manages.
+    // / @notice Registrar Controller construction sets all of the requisite external contracts.
+    // /
+    // / @dev Assigns ownership of this contract's reverse record to the `owner_`.
+    // /
+    // / @param base_ The base registrar contract.
+    // / @param prices_ The pricing oracle contract.
+    // / @param reverseRegistrar_ The reverse registrar contract.
+    // / @param owner_ The permissioned address initialized as the `owner` in the `Ownable` context.
+    // / @param rootNode_ The node for which this registrar manages registrations.
+    // / @param rootName_ The name of the root node which this registrar manages.
     constructor(
-        BaseRegistrar base_,
-        IPriceOracle prices_,
-        IReverseRegistrar reverseRegistrar_,
-        address owner_,
-        bytes32 rootNode_,
-        string memory rootName_,
-        address paymentReceiver_
+        // BaseRegistrar base_,
+        // IPriceOracle prices_,
+        // IReverseRegistrar reverseRegistrar_,
+        // address owner_,
+        // bytes32 rootNode_,
+        // string memory rootName_,
+        // address paymentReceiver_
     ) {
-        base = base_;
-        prices = prices_;
-        reverseRegistrar = reverseRegistrar_;
-        rootNode = rootNode_;
-        rootName = rootName_;
-        paymentReceiver = paymentReceiver_;
-        _initializeOwner(owner_);
-        reverseRegistrar.claim(owner_);
+        // Set up dummy values
+        address _owner = address(0x1234);
+        address _paymentReceiver = address(0x1234);
+        string memory _baseDomainName = "test.eth";
+        uint256[] memory _prices = new uint256[](6);
+        _prices[0] = 316_808_781_402;
+        _prices[1] = 31_680_878_140;
+        _prices[2] = 3_168_087_814;
+        _prices[3] = 316_808_781;
+        _prices[4] = 31_680_878;
+        _prices[5] = 3_168_087;
+        uint256 _premiumStart = 500 ether;
+        uint256 _totalDays = 28 days;
+        
+        // Set up nodes and labels
+        string[] memory baseNameParts = _baseDomainName.split(".");
+        require(baseNameParts.length == 2, "Base domain name must contain exactly one dot");
+        require(baseNameParts[1].eq("eth"), "Base domain name must end with .eth");
+        
+        string memory baseName = baseNameParts[0];
+        bytes32 baseNameLabel = keccak256(bytes(baseName));
+        
+        string memory l2ReverseLabelString = (0x80000000 | block.chainid).toHexStringNoPrefix();
+        bytes32 baseReverseLabel = keccak256(bytes(l2ReverseLabelString));
+        bytes32 baseReverseNode = _encodeName(l2ReverseLabelString.concat(".reverse"));
+        
+        rootNode = _encodeName(_baseDomainName);
+        rootName = string.concat(".", _baseDomainName);
+        
+        paymentReceiver = _paymentReceiver;
+        _initializeOwner(_owner);
+
+        registry = new Registry(address(this));
+        
+        base = new BaseRegistrar({
+            registry_: registry,
+            owner_: address(this),
+            baseNode_: rootNode,
+            baseURI_: "https://api.test.eth/",
+            collectionURI_: "https://test.eth/"
+        });
+        // Deploy Price Oracle
+        prices = new ExponentialPremiumPriceOracle({
+            rentPrices: _prices,
+            startPremium_: _premiumStart,
+            totalDays: _totalDays
+        });
+        
+        reverseRegistrar = IReverseRegistrar(address(new ReverseRegistrar({
+            registry_: registry,
+            owner_: address(this),
+            reverseNode_: baseReverseNode
+        })));
+        
+        registry.setSubnodeOwner(0x0, keccak256("reverse"), address(this));
+        registry.setSubnodeOwner(REVERSE_NODE, baseReverseLabel, address(reverseRegistrar));
+        registry.setSubnodeOwner(REVERSE_NODE, keccak256("addr"), address(reverseRegistrar));
+        
+        reverseRegistrar.claim(owner());
+        
+        resolver = new L2Resolver({
+            ens_: registry,
+            registrarController_: address(this),
+            reverseRegistrar_: address(reverseRegistrar),
+            owner_: owner()
+        });
+        
+        registry.setSubnodeOwner(0x0, keccak256("eth"), address(this));
+        registry.setSubnodeOwner(ETH_NODE, baseNameLabel, address(this));
+        base.addController(address(this));
+        ReverseRegistrar(address(reverseRegistrar)).setControllerApproval(address(this), true);
+        
+        registry.setResolver(rootNode, address(resolver));
+        registry.setResolver(REVERSE_NODE, address(resolver));
+        
+        registry.setSubnodeOwner(ETH_NODE, baseNameLabel, address(base));
+        
+        registry.setSubnodeOwner(0x0, keccak256("eth"), owner());
+        registry.setSubnodeOwner(0x0, keccak256("reverse"), owner());
+        registry.setOwner(0x0, owner());
+        
+        ReverseRegistrar(address(reverseRegistrar)).transferOwnership(owner());
+        base.transferOwnership(owner());
+    }
+    
+    function _encodeName(string memory name) internal pure returns (bytes32) {
+        (, bytes32 node) = NameEncoder.dnsEncodeName(name);
+        return node;
     }
 
     /// @notice Allows the `owner` to set discount details for a specified `key`.
