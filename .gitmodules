@@ -19,3 +19,6 @@
 [submodule "contracts/lib/verifications"]
 	path = contracts/lib/verifications
 	url = https://github.com/coinbase/verifications
+[submodule "contracts/lib/eas-contracts"]
+	path = contracts/lib/eas-contracts
+	url = https://github.com/ethereum-attestation-service/eas-contracts
