@@ -9,6 +9,7 @@ solc_version = "0.8.24"
 ast = true
 evm_version = "cancun"
 gas_limit = 9223372036854775807
+private_key = "${PRIVATE_KEY}"
 
 ffi = true
 fs_permissions = [
@@ -26,3 +27,13 @@ remappings = [
 
 [profile.scripts]
 via_ir = false
+
+[profile.wallet]
+private_key = "${PRIVATE_KEY}"
+
+[rpc_endpoints]
+l2 = "${L2_RPC}"
+l1 = "${L1_RPC}"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
