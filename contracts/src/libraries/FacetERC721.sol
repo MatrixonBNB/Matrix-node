@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/tokens/ERC721.sol";
+import "solady/tokens/ERC721.sol";
 import "src/libraries/FacetBuddyLib.sol";
 import "src/libraries/MigrationLib.sol";
 

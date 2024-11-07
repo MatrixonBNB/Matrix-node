@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import "./FacetBuddyVe5c.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 import "src/libraries/ERC1967Proxy.sol";
 
 contract FacetBuddyFactoryVef8 is Initializable {

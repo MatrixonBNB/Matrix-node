@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/FacetERC721.sol";
-import "lib/solady/src/utils/EnumerableSetLib.sol";
-import "lib/solady/src/utils/LibString.sol";
+import "lib/solady/utils/EnumerableSetLib.sol";
+import "lib/solady/utils/LibString.sol";
 import "src/libraries/MigrationLib.sol";
 
 interface FacetSwapFactory {

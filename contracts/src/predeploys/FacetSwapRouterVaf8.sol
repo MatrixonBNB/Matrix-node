@@ -7,7 +7,7 @@ import "./FacetSwapFactoryVac5.sol";
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/Pausable.sol";
 import "src/libraries/FacetOwnable.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 
 contract FacetSwapRouterVaf8 is Initializable, Upgradeable, FacetOwnable, Pausable {
     struct FacetSwapRouterStorage {

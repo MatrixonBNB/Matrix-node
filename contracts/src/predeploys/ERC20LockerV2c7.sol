@@ -5,8 +5,8 @@ import "src/libraries/FacetOwnable.sol";
 import "src/libraries/Upgradeable.sol";
 import "src/libraries/Pausable.sol";
 import "src/libraries/FacetERC20.sol";
-import "solady/src/utils/Initializable.sol";
-import "solady/src/utils/SafeTransferLib.sol";
+import "solady/utils/Initializable.sol";
+import "solady/utils/SafeTransferLib.sol";
 
 contract ERC20LockerV2c7 is FacetOwnable, Upgradeable, Pausable, Initializable {
     using SafeTransferLib for address;

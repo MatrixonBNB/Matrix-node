@@ -1,10 +1,10 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {MerkleProofLib} from "lib/solady/src/utils/MerkleProofLib.sol";
+import {MerkleProofLib} from "lib/solady/utils/MerkleProofLib.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 
-import {IDiscountValidator} from "src/L2/interface/IDiscountValidator.sol";
+import {IDiscountValidator} from "src/facetnames/interface/IDiscountValidator.sol";
 
 /// @title Discount Validator for: cb.id
 ///

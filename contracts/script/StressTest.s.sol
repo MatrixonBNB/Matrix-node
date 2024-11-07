@@ -12,11 +12,11 @@ import "src/predeploys/FacetSwapRouterV56d.sol";
 import { EtherBridgeVd58 } from "src/predeploys/EtherBridgeVd58.sol";
 import { FacetOptimismMintableERC20 } from "src/FacetOptimismMintableERC20.sol";
 import { FoundryFacetSender } from "lib/facet-sol/src/foundry-utils/FoundryFacetSender.sol";
-import { JSONParserLib } from "solady/src/utils/JSONParserLib.sol";
-import { LibRLP } from "solady/src/utils/LibRLP.sol";
-import "solady/src/utils/ERC1967FactoryConstants.sol";
-import "solady/src/utils/ERC1967Factory.sol";
-import "solady/src/utils/GasBurnerLib.sol";
+import { JSONParserLib } from "solady/utils/JSONParserLib.sol";
+import { LibRLP } from "solady/utils/LibRLP.sol";
+import "solady/utils/ERC1967FactoryConstants.sol";
+import "solady/utils/ERC1967Factory.sol";
+import "solady/utils/GasBurnerLib.sol";
 
 contract Stresser {
     using AddressAliasHelper for address;
@@ -29,15 +29,15 @@ contract Stresser {
 contract StressTest is Script, Test, FoundryFacetSender {
     using AddressAliasHelper for address;
     
-    function run() public broadcast {
-        for (uint256 i = 0; i < 10; i++) {
-            deployContract(
-                "Stresser",
-                type(Stresser).creationCode,
-                ""
-            );
-        }
-    }
+    // function run() public broadcast {
+    //     for (uint256 i = 0; i < 10; i++) {
+    //         deployContract(
+    //             "Stresser",
+    //             type(Stresser).creationCode,
+    //             ""
+    //         );
+    //     }
+    // }
     
     function deployContract(string memory _name, bytes memory _creationCode, bytes memory _initData) public returns (address addr_) {
         addr_ = nextL2Address();

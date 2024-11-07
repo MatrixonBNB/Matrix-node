@@ -5,9 +5,9 @@ import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {StringUtils} from "ens-contracts/ethregistrar/StringUtils.sol";
+import {StringUtils} from "ens-contracts/utils/StringUtils.sol";
 
-import {BASE_ETH_NODE, GRACE_PERIOD} from "src/util/Constants.sol";
+import {BASE_ETH_NODE, GRACE_PERIOD} from "./Constants.sol";
 import {BaseRegistrar} from "./BaseRegistrar.sol";
 import {IDiscountValidator} from "./interface/IDiscountValidator.sol";
 import {IPriceOracle} from "./interface/IPriceOracle.sol";

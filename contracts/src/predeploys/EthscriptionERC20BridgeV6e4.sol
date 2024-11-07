@@ -5,7 +5,7 @@ import "src/libraries/FacetERC20.sol";
 import "src/libraries/Upgradeable.sol";
 import "src/libraries/FacetOwnable.sol";
 import "src/libraries/Pausable.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 
 /// @title IL1Block
 /// @notice Minimal interface for accessing L1 block information

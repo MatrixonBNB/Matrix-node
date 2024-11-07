@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/utils/Initializable.sol";
-import "solady/src/utils/MerkleProofLib.sol";
+import "solady/utils/Initializable.sol";
+import "solady/utils/MerkleProofLib.sol";
 import "src/libraries/FacetERC721.sol";
 import "src/libraries/FacetERC2981.sol";
 import "src/libraries/Upgradeable.sol";
@@ -10,7 +10,7 @@ import "src/libraries/FacetOwnable.sol";
 import "src/libraries/Pausable.sol";
 import "src/libraries/FacetERC20.sol";
 import "./EditionMetadataRendererV3f8.sol";
-import "solady/src/utils/LibString.sol";
+import "solady/utils/LibString.sol";
 
 contract NFTCollectionV77f is FacetERC721, FacetERC2981, Upgradeable, FacetOwnable, Pausable, Initializable {
     using LibString for uint256;

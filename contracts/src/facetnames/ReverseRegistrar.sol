@@ -5,7 +5,7 @@ import {ENS} from "ens-contracts/registry/ENS.sol";
 import {NameResolver} from "ens-contracts/resolvers/profiles/NameResolver.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 
-import {Sha3} from "src/lib/Sha3.sol";
+import {Sha3} from "./lib/Sha3.sol";
 
 /// @title Reverse Registrar
 ///

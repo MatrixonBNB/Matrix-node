@@ -19,8 +19,11 @@ fs_permissions = [
 ignored_error_codes = ["transient-storage", "code-size", "init-code-size", 5159]
 
 remappings = [
-  "solady/=lib/solady/",
+  "solady/=lib/solady/src",
+  "lib/solady/=lib/solady/src",
   "src/=src/",
+  "@ensdomains/buffer/=lib/buffer",
+  "ens-contracts/=lib/ens-contracts/contracts",
   '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
   'forge-std/=lib/forge-std/src',
 ]

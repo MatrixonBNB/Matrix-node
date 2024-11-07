@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/utils/GasBurnerLib.sol";
+import "solady/utils/GasBurnerLib.sol";
 
 contract Counter {
     event Deployed(address indexed addr, string greeting);

@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import "src/libraries/Upgradeable.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 import "src/libraries/FacetERC20.sol";
 
 contract EtherBridgeV064 is FacetERC20, Initializable, Upgradeable {

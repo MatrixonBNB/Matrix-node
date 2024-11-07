@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 
-import {IDiscountValidator} from "src/L2/interface/IDiscountValidator.sol";
+import {IDiscountValidator} from "src/facetnames/interface/IDiscountValidator.sol";
 
 /// @title Discount Validator for: Talent Protocol Builder Score
 ///

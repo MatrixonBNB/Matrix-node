@@ -15,7 +15,7 @@ import {NameResolver} from "ens-contracts/resolvers/profiles/NameResolver.sol";
 import {PubkeyResolver} from "ens-contracts/resolvers/profiles/PubkeyResolver.sol";
 import {TextResolver} from "ens-contracts/resolvers/profiles/TextResolver.sol";
 
-import {IReverseRegistrar} from "src/L2/interface/IReverseRegistrar.sol";
+import {IReverseRegistrar} from "src/facetnames/interface/IReverseRegistrar.sol";
 
 /// @title L2 Resolver
 ///

@@ -7,7 +7,7 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 import { ILegacyMintableERC20, IOptimismMintableERC20 } from "src/interfaces/IOptimismMintableERC20.sol";
 import { Upgradeable } from "src/libraries/Upgradeable.sol";
 
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 import "src/libraries/FacetOwnable.sol";
 
 /// @title OptimismMintableERC20

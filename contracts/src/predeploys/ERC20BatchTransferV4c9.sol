@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 
 import "src/libraries/FacetERC20.sol";
-import "solady/src/utils/LibString.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/LibString.sol";
+import "solady/utils/Initializable.sol";
 
 contract ERC20BatchTransferV4c9 is Initializable {
     using LibString for uint256;

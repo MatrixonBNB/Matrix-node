@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/tokens/ERC20.sol";
+import "solady/tokens/ERC20.sol";
 import "src/libraries/FacetBuddyLib.sol";
 import "src/libraries/MigrationLib.sol";
-import "solady/src/utils/LibString.sol";
+import "solady/utils/LibString.sol";
 import "./MigrationLib.sol";
 
 abstract contract FacetERC20 is ERC20 {

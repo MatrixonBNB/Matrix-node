@@ -2,26 +2,24 @@
 pragma solidity ^0.8.23;
 
 import {ENS} from "ens-contracts/registry/ENS.sol";
-import {ERC721} from "lib/solady/src/tokens/ERC721.sol";
+import {ERC721} from "lib/solady/tokens/ERC721.sol";
 import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import {IERC165} from "openzeppelin-contracts/contracts/utils/introspection/ERC165.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {LibString} from "solady/utils/LibString.sol";
 
-import {GRACE_PERIOD} from "src/util/Constants.sol";
+import {GRACE_PERIOD} from "./Constants.sol";
 import {console} from "forge-std/console.sol";
 
 
-import {Registry} from "src/L2/Registry.sol";
-import {BaseRegistrar} from "src/L2/BaseRegistrar.sol";
-import {StablePriceOracle, IPriceOracle} from "src/L2/StablePriceOracle.sol";
-import {ExponentialPremiumPriceOracle} from "src/L2/ExponentialPremiumPriceOracle.sol";
-import {L2Resolver} from "src/L2/L2Resolver.sol";
-import {ReverseRegistrar} from "src/L2/ReverseRegistrar.sol";
-import {RegistrarController, IReverseRegistrar} from "src/L2/RegistrarController.sol";
-import {L1Resolver} from "src/L1/L1Resolver.sol";
+import {Registry} from "src/facetnames/Registry.sol";
+import {StablePriceOracle, IPriceOracle} from "src/facetnames/StablePriceOracle.sol";
+import {ExponentialPremiumPriceOracle} from "src/facetnames/ExponentialPremiumPriceOracle.sol";
+import {L2Resolver} from "src/facetnames/L2Resolver.sol";
+import {ReverseRegistrar} from "src/facetnames/ReverseRegistrar.sol";
+import {RegistrarController, IReverseRegistrar} from "src/facetnames/RegistrarController.sol";
 import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
-import "src/util/Constants.sol";
+import "./Constants.sol";
 
 
 /// @title Base Registrar
@@ -35,7 +33,7 @@ import "src/util/Constants.sol";
 ///         https://github.com/ensdomains/ens-contracts/blob/staging/contracts/ethregistrar/BaseRegistrarImplementation.sol
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
-contract BaseRegistrarDeployAll is ERC721, Ownable {
+contract BaseRegistrar is ERC721, Ownable {
     using LibString for *;
     
     // Registry public immutable registry;

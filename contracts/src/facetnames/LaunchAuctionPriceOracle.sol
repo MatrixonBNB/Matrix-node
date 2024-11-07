@@ -3,8 +3,8 @@ pragma solidity ^0.8.23;
 
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
-import {EDAPrice} from "src/lib/EDAPrice.sol";
-import {StablePriceOracle} from "src/L2/StablePriceOracle.sol";
+import {EDAPrice} from "./lib/EDAPrice.sol";
+import {StablePriceOracle} from "src/facetnames/StablePriceOracle.sol";
 
 /// @title Launch Auction Price Oracle
 ///

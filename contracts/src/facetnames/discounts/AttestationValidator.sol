@@ -6,8 +6,8 @@ import {AttestationVerifier} from "verifications/libraries/AttestationVerifier.s
 import {IAttestationIndexer} from "verifications/interfaces/IAttestationIndexer.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 
-import {IDiscountValidator} from "src/L2/interface/IDiscountValidator.sol";
-import {SybilResistanceVerifier} from "src/lib/SybilResistanceVerifier.sol";
+import {IDiscountValidator} from "src/facetnames/interface/IDiscountValidator.sol";
+import {SybilResistanceVerifier} from "../lib/SybilResistanceVerifier.sol";
 
 /// @title Discount Validator for: Coinbase Attestation Validator
 ///

@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/FacetOwnable.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 
 contract AirdropERC20Vb02 is FacetERC20, FacetOwnable, Initializable {
     struct AirdropERC20Storage {

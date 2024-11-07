@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/utils/SafeTransferLib.sol";
-import "solady/src/utils/Initializable.sol";
-import "solady/src/utils/Base64.sol";
-import "solady/src/utils/LibString.sol";
-import "solady/src/utils/ECDSA.sol";
+import "solady/utils/SafeTransferLib.sol";
+import "solady/utils/Initializable.sol";
+import "solady/utils/Base64.sol";
+import "solady/utils/LibString.sol";
+import "solady/utils/ECDSA.sol";
 import "src/libraries/Upgradeable.sol";
 import "src/libraries/Pausable.sol";
 import "src/libraries/FacetERC20.sol";
@@ -445,7 +445,16 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
         require(bytes(description).length <= s().bioMaxLength, "DTL");
         require(bytes(imageURI).length <= s().uriMaxLength, "ITL");
         require(grantingAddress != address(0), "Granting address must be non-zero");
-
+            
+        stickerManager.controllerCreateSticker(
+            msg.sender,
+            name,
+            description,
+            imageURI,
+            stickerExpiry,
+            grantingAddress
+        );
+            
         uint256 currentId = s().nextStickerId;
         s().nextStickerId += 1;
 
@@ -467,6 +476,13 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
         require(
             s().stickers[stickerId].expiry > block.timestamp,
             "Sticker expired"
+        );
+        
+        stickerManager.controllerClaimSticker(
+            msg.sender,
+            stickerId,
+            deadline,
+            signature
         );
         
         bytes memory message = abi.encode(

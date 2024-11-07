@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import "src/libraries/FacetERC20.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 
 contract StubERC20 is FacetERC20, Initializable {
     constructor() {

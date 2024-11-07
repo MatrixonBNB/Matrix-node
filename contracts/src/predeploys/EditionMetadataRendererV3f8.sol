@@ -2,10 +2,10 @@
 pragma solidity 0.8.24;
 
 import "src/libraries/Upgradeable.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 import "src/libraries/FacetERC20.sol";
-import "solady/src/utils/Base64.sol";
-import "solady/src/utils/LibString.sol";
+import "solady/utils/Base64.sol";
+import "solady/utils/LibString.sol";
 
 interface INFTCollection01 {
   function owner() external view returns (address);

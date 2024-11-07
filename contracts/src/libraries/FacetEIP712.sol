@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/utils/EIP712.sol";
-import "solady/src/utils/ECDSA.sol";
-import "solady/src/utils/LibString.sol";
-import "solady/src/utils/LibRLP.sol";
+import "solady/utils/EIP712.sol";
+import "solady/utils/ECDSA.sol";
+import "solady/utils/LibString.sol";
+import "solady/utils/LibRLP.sol";
 
 abstract contract FacetEIP712 is EIP712 {
     using ECDSA for bytes32;
