@@ -43,7 +43,7 @@ module GethDriver
     puts command
   end
   
-  def dump_state
+  def get_state_dump
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
 
     command = [
@@ -54,7 +54,25 @@ module GethDriver
     
     full_command = command.join(' ')
     
-    `#{full_command}`
+    data = `#{full_command}`
+    
+    alloc = {}
+    
+    data.each_line do |line|
+      entry = JSON.parse(line)
+      address = entry['address']
+      
+      next unless address
+      
+      alloc[address] = {
+        'balance' => entry['balance'].to_i(16),
+        'nonce' => entry['nonce'],
+        'code' => entry['code'].presence || "0x",
+        'storage' => entry['storage'].presence || {}
+      }
+    end
+    
+    alloc
   end
   
   def client

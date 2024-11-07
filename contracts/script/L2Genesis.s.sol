@@ -71,9 +71,7 @@ contract L2Genesis is Script {
         bytes memory bytecode = vm.getDeployedCode(artifactPath);
         vm.etch(addr, bytecode);
         
-        if (vm.getNonce(addr) == 0) {
-            vm.setNonce(addr, 1);
-        }
+        vm.setNonce(addr, 1);
         
         if (!contractName.eq("MigrationManager") && !contractName.eq("NonExistentContractShim")) {
             disableInitializableSlot(addr);

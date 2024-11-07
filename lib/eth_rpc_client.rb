@@ -1,16 +1,16 @@
 class EthRpcClient
   attr_accessor :base_url
 
-  def initialize(base_url: ENV['L1_RPC_URL'])
+  def initialize(base_url = ENV['L1_RPC_URL'])
     self.base_url = base_url
   end
   
   def self.l1
-    @_l1_client ||= new(base_url: ENV.fetch('L1_RPC_URL'))
+    @_l1_client ||= new(ENV.fetch('L1_RPC_URL'))
   end
 
   def self.l2
-    @_l2_client ||= new(base_url: ENV.fetch('NON_AUTH_GETH_RPC_URL'))
+    @_l2_client ||= new(ENV.fetch('NON_AUTH_GETH_RPC_URL'))
   end
 
   def get_block(block_number, include_txs = false)
@@ -81,7 +81,7 @@ class EthRpcClient
     )
   end
   
-  def account_range(block_number, start = "", max_results: 256256256)
+  def account_range(block_number = "latest", start = "0x", max_results: 256256256)
     if block_number.is_a?(Integer)
       block_number = "0x" + block_number.to_s(16)
     end

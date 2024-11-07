@@ -12,9 +12,7 @@ class EthBlockImporter
     @facet_block_cache = {}
     @eth_block_cache = {}
     
-    @ethereum_client ||= EthRpcClient.new(
-      base_url: ENV.fetch('L1_RPC_URL')
-    )
+    @ethereum_client ||= EthRpcClient.new(ENV.fetch('L1_RPC_URL'))
     
     @geth_driver = GethDriver
     

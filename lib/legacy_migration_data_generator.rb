@@ -11,9 +11,7 @@ class LegacyMigrationDataGenerator
   def initialize
     reset_state
     
-    @ethereum_client ||= EthRpcClient.new(
-      base_url: ENV.fetch('L1_RPC_URL')
-    )
+    @ethereum_client ||= EthRpcClient.new(ENV.fetch('L1_RPC_URL'))
   end
   
   def reset_state

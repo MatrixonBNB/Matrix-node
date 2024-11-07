@@ -76,7 +76,7 @@ module PredeployManager
     merged = optimism_allocs.merge(our_allocs)
     
     if use_dump
-      merged = get_alloc_from_geth.merge(merged)
+      merged = processed_geth_dump.merge(merged)
     end
     
     unless in_migration_mode?
@@ -209,37 +209,29 @@ module PredeployManager
   end
   
   def l1_rpc_client
-    @_l1_rpc_client ||= EthRpcClient.new(
-      base_url: ENV.fetch('L1_RPC_URL')
-    )
+    @_l1_rpc_client ||= EthRpcClient.new(ENV.fetch('L1_RPC_URL'))
   end
   
-  def get_alloc_from_geth
-    data = GethDriver.dump_state
-    
-    alloc = {}
-    data.each_line do |line|
-      entry = JSON.parse(line)
-      address = entry['address']
-      
-      next unless address
-      
-      code = entry['code'].presence || "0x"
-      
-      next if code == "0x"
-      
-      nonce = [entry['nonce'], 1].max
-      nonce = "0x" + nonce.to_s(16)
-      
-      alloc[address] = {
-        'balance' => "0x0",
-        'nonce' => nonce,
-        'code' => code,
-        'storage' => entry['storage'].presence || {}
+  def processed_geth_dump
+    raw_dump = GethDriver.get_state_dump
+
+    processed_alloc = {}
+
+    raw_dump.each do |address, entry|
+      next if entry['code'] == '0x'
+
+      nonce = [entry['nonce'], 1].min
+      nonce_hex = "0x" + nonce.to_s(16)
+
+      processed_alloc[address] = {
+        'balance' => '0x0',
+        'nonce' => nonce_hex,
+        'code' => entry['code'],
+        'storage' => entry['storage']
       }
     end
-    
-    alloc
+
+    processed_alloc
   end
   
   def verify_contracts(rpc_url = "http://localhost:8545", blockscout_url = "http://localhost/api/")
