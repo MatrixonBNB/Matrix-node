@@ -28,6 +28,8 @@ import "forge-std/Script.sol";
 import {Pausable} from "src/libraries/Pausable.sol";
 import {console} from "forge-std/console.sol";
 import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";
+import "src/libraries/FacetEIP712.sol";
+
 /// @title Registrar Controller
 ///
 /// @notice A permissioned controller for managing registering and renewing names against the `base` registrar.
@@ -41,8 +43,10 @@ import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";
 /// @author Coinbase (https://github.com/base-org/usernames)
 
 import {ERC20} from "solady/tokens/ERC20.sol";
-import {StickerRegistry} from "src/facetnames/StickerRegistry.sol";
-contract RegistrarController is Ownable, Pausable {
+import {StickerRegistry} from "src/predeploys/StickerRegistry.sol";
+import "src/libraries/MigrationLib.sol";
+
+contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     using LibString for *;
     using StringUtils for *;
     using SafeERC20 for IERC20;
@@ -51,6 +55,10 @@ contract RegistrarController is Ownable, Pausable {
     ENS public immutable registry;
     L2Resolver public immutable resolver;
     ERC20 public wethToken;
+    
+    function __getImplementationName__() public pure returns (string memory) {
+        return "RegistrarController";
+    }
     
     function setWethToken(address wethToken_) public onlyOwner {
         wethToken = ERC20(wethToken_);
@@ -302,7 +310,7 @@ contract RegistrarController is Ownable, Pausable {
         uint256 premiumStart_,
         uint256 totalDays_,
         ERC20 wethToken_
-    ) {
+    ) EIP712() {
         // Set up dummy values
         // address _owner = address(0x1234);
         // address _paymentReceiver = address(0x1234);
@@ -381,7 +389,7 @@ contract RegistrarController is Ownable, Pausable {
         ReverseRegistrar(address(reverseRegistrar)).transferOwnership(owner());
         base.transferOwnership(owner());
         
-        address stickerRegistryImpl = address(new StickerRegistry());
+        address stickerRegistryImpl = 0xA83fDc18871Ae3595c6f801aF55Bc699e1810974;
         ERC1967Proxy proxy = new ERC1967Proxy(stickerRegistryImpl, "");
         
         stickerRegistry = StickerRegistry(address(proxy));
@@ -389,6 +397,19 @@ contract RegistrarController is Ownable, Pausable {
         stickerRegistry.addController(address(this));
         stickerRegistry.transferOwnership(owner());
         stickerRegistry.setUpgradeAdmin(owner());
+    }
+    
+    function transferFrom(address from, address to, uint256 id) public {
+        require(MigrationLib.isInMigration(), "Migration only");
+        uint256 v2TokenId = v1TokenIdToV2TokenId[id];
+        
+        require(base.isApprovedOrOwner(msg.sender, v2TokenId), "Not approved");
+        base.transferFrom(from, to, v2TokenId);
+    }
+    
+    function setApprovalForAll(address operator, bool approved) public {
+        require(MigrationLib.isInMigration(), "Migration only");
+        base.controllerSetApprovalForAll(msg.sender, operator, approved);
     }
     
     function _encodeName(string memory name) public pure returns (bytes32) {
@@ -772,8 +793,13 @@ contract RegistrarController is Ownable, Pausable {
         _setReverseRecord(name, address(resolver), msg.sender);
     }
     
+    event UpgradeAdminChanged(address indexed newUpgradeAdmin);
     function setUpgradeAdmin(address newUpgradeAdmin) public {
-
+        if (MigrationLib.isInMigration()) {
+            emit UpgradeAdminChanged(newUpgradeAdmin);
+        } else {
+            revert("Contract not upgradeable");
+        }
     }
     
     function markPreregistrationComplete() public onlyOwner {
@@ -850,6 +876,17 @@ contract RegistrarController is Ownable, Pausable {
     }
     
     function claimSticker(uint256 stickerId, uint256 deadline, uint256 tokenId, uint256[2] memory position, bytes memory signature) public {
+        bytes memory message = abi.encode(
+            keccak256("StickerClaim(uint256 stickerId,address claimer,uint256 deadline)"),
+            stickerId,
+            msg.sender,
+            deadline
+        );
+        
+        StickerRegistry.Sticker memory sticker = stickerRegistry.getSticker(stickerId);
+        
+        verifySignatureAgainstNewAndOldChainId(message, signature, sticker.signer);
+        
         stickerRegistry.claimSticker(
             msg.sender,
             stickerId,
@@ -870,6 +907,18 @@ contract RegistrarController is Ownable, Pausable {
         );
     }
 
+    event ContractUpgraded(address indexed newImplementation);
     function upgrade(bytes32 newHash, string calldata newSource) external {
+        emit ContractUpgraded(address(0));
+    }
+    
+    function _domainNameAndVersion() 
+        internal
+        view
+        override
+        returns (string memory name, string memory version)
+    {
+        name = "Facet Cards";
+        version = "1";
     }
 }

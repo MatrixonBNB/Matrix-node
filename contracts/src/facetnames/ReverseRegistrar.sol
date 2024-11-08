@@ -18,6 +18,11 @@ import {Sha3} from "./lib/Sha3.sol";
 /// @author Coinbase (https://github.com/base-org/usernames)
 /// @author ENS (https://github.com/ensdomains/ens-contracts)
 contract ReverseRegistrar is Ownable {
+    
+    function __getImplementationName__() public pure returns (string memory) {
+        return "ReverseRegistrar";
+    }
+    
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/

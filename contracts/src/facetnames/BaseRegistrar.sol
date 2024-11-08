@@ -10,6 +10,9 @@ import {LibString} from "solady/utils/LibString.sol";
 
 import {GRACE_PERIOD} from "./Constants.sol";
 
+import "src/libraries/MigrationLib.sol";
+import {FacetERC721} from "src/libraries/FacetERC721.sol";
+
 /// @title Base Registrar
 ///
 /// @notice The base-level tokenization contract for an ens domain. The Base Registrar implements ERC721 and, as the owner
@@ -21,7 +24,7 @@ import {GRACE_PERIOD} from "./Constants.sol";
 ///         https://github.com/ensdomains/ens-contracts/blob/staging/contracts/ethregistrar/BaseRegistrarImplementation.sol
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
-contract BaseRegistrar is ERC721, Ownable {
+contract BaseRegistrar is FacetERC721, Ownable {
     using LibString for uint256;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -198,6 +201,8 @@ contract BaseRegistrar is ERC721, Ownable {
         baseNode = baseNode_;
         _baseURI = baseURI_;
         _collectionURI = collectionURI_;
+        
+        _initializeERC721("Facet Names", "FACETNAME");
     }
 
     /// @notice Authorises a controller, who can register and renew domains.
@@ -248,7 +253,9 @@ contract BaseRegistrar is ERC721, Ownable {
     function registerOnly(uint256 id, address owner, uint256 duration) external returns (uint256) {
         return _register(id, owner, duration, false);
     }
-
+    function __getImplementationName__() public pure returns (string memory) {
+        return "BaseRegistrar";
+    }
     /// @notice Register a name and add details to the record in the Registry.
     ///
     /// @dev This method can only be called if:
@@ -342,19 +349,7 @@ contract BaseRegistrar is ERC721, Ownable {
             || interfaceID == RECLAIM_ID;
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                      ERC721 METADATA                       */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
-    /// @dev Returns the token collection name.
-    function name() public pure override returns (string memory) {
-        return "Basenames";
-    }
-
-    /// @dev Returns the token collection symbol.
-    function symbol() public pure override returns (string memory) {
-        return "BASENAME";
-    }
 
     /// @notice Returns the Uniform Resource Identifier (URI) for token `id`.
     ///

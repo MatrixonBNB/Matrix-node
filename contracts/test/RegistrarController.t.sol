@@ -16,13 +16,21 @@ contract RegistrarControllerTest is Test {
         weth = new MockWETH();
         
         // Set up price array
+        uint256 usdWeiCentsInOneEth = 200000000000000000000000;  // Original value
+        
         uint256[] memory prices = new uint256[](6);
-        prices[0] = 316_808_781_402;
-        prices[1] = 31_680_878_140;
-        prices[2] = 3_168_087_814;
-        prices[3] = 316_808_781;
-        prices[4] = 31_680_878;
-        prices[5] = 3_168_087;
+        // Convert each USD cent price to ETH: (priceInUsdCents * 1 ether) / usdWeiCentsInOneEth
+        prices[0] = (31709791983764584 * 1 ether) / usdWeiCentsInOneEth;  // 1 letter
+        prices[1] = (3170979198376458 * 1 ether) / usdWeiCentsInOneEth;   // 2 letter
+        prices[2] = (1585489599188229 * 1 ether) / usdWeiCentsInOneEth;   // 3 letter
+        prices[3] = (317097919837645 * 1 ether) / usdWeiCentsInOneEth;    // 4 letter
+        prices[4] = (31709791983764 * 1 ether) / usdWeiCentsInOneEth;     // 5-9 letter
+        prices[5] = (31709791983764 * 1 ether) / usdWeiCentsInOneEth;     // 10+ letter (same as 5-9)
+        
+        for (uint256 i = 0; i < prices.length; i++) {
+            console.log("Price for %d letters: %d ETH", i + 1, prices[i]);
+        }
+        
         
         // Deploy controller
         controller = new RegistrarController({

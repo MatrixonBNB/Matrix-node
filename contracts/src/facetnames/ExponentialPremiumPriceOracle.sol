@@ -9,7 +9,9 @@ import {StablePriceOracle} from "src/facetnames/StablePriceOracle.sol";
 contract ExponentialPremiumPriceOracle is StablePriceOracle {
     uint256 public immutable startPremium;
     uint256 public immutable endValue;
-
+    function __getImplementationName__() public pure returns (string memory) {
+        return "ExponentialPremiumPriceOracle";
+    }
     constructor(uint256[] memory rentPrices, uint256 startPremium_, uint256 totalDays) StablePriceOracle(rentPrices) {
         startPremium = startPremium_;
         endValue = startPremium >> totalDays;

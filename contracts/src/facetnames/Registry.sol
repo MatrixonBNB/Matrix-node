@@ -123,6 +123,10 @@ contract Registry is ENS {
         return subnode;
     }
 
+    function __getImplementationName__() public pure returns (string memory) {
+        return "Registry";
+    }
+
     /// @notice Sets the resolver address for the specified node.
     ///
     /// @dev May only be called by the current owner or operator of the node.

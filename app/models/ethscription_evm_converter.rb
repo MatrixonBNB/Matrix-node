@@ -47,14 +47,29 @@ module EthscriptionEVMConverter
           data['args']['name'] = "Facet Names"
           data['args']['symbol'] = "FACETNAME"
           
-          contract = EVMHelpers.compile_contract("facetnames/BaseRegistrar")
+          contract = get_contract_from_predeploy_info(name: "RegistrarController")
+          
+          prices = [
+            158548959918,
+            15854895991,
+            7927447995,
+            1585489599,
+            158548959,
+            158548959
+          ]
           
           return EVMHelpers.get_deploy_data(
-            contract, []
+            contract, [
+              "0x0C051103f51C0C5d81209fE6057468B3F6297969".downcase,
+              "0x0C051103f51C0C5d81209fE6057468B3F6297969".downcase,
+              "facet.eth",
+              prices,
+              500.ether,
+              20.days,
+              "0x1673540243e793b0e77c038d4a88448eff524dce".downcase
+            ]
           )
         end
-        
-        predeploy_address = "0x5844bea96e5ac147cd9ddc7daa22a0899659d2f5"
       elsif predeploy_address == "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d"
         predeploy_address = "0x89cfcf16d1fffb3937b47f1d1a22850c0ad80f6e"
       end
@@ -311,6 +326,13 @@ module EthscriptionEVMConverter
         contract: PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy"),
         address: to_address,
         function: '__getImplementation__',
+        args: []
+      ).freeze
+    rescue => e
+      TransactionHelper.static_call(
+        contract: PredeployManager.get_contract_from_predeploy_info(name: "RegistrarController"),
+        address: to_address,
+        function: '__getImplementationName__',
         args: []
       ).freeze
     rescue => e

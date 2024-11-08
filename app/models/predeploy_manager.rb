@@ -20,6 +20,8 @@ module PredeployManager
       end
     end 
     
+    map["0xa83FDc18871Ae3595c6f801Af55bC699E1810974"] = "StickerRegistry"
+    
     map["0x11110000000000000000000000000000000000c5"] = "NonExistentContractShim"
     map["0x22220000000000000000000000000000000000d6"] = "MigrationManager"
     
@@ -113,7 +115,20 @@ module PredeployManager
       abi: proxy_contract.abi,
       bin: proxy_contract.bin,
     }
+    
+    contract_names = Rails.root.join('contracts', 'src', 'facetnames').glob('*.sol').map { |file| File.basename(file, '.sol') }
 
+    contract_names.each do |name|
+      contract = EVMHelpers.compile_contract("facetnames/#{name}")
+      predeploy_info[name] = {
+        name: contract.name,
+        abi: contract.abi,
+        bin: contract.bin,
+      }
+      
+      puts "Bytecode size for #{name}: #{contract.bin.size}"
+    end
+    
     File.write(PREDEPLOY_INFO_PATH, JSON.pretty_generate(predeploy_info))
     puts "Generated predeploy_info.json"
   end

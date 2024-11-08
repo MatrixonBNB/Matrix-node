@@ -127,6 +127,9 @@ contract L2Resolver is
         registrarController = registrarController_;
         emit RegistrarControllerUpdated(registrarController_);
     }
+    function __getImplementationName__() public pure returns (string memory) {
+        return "L2Resolver";
+    }
 
     /// @notice Allows the `owner` to set the reverse registrar contract address.
     ///
