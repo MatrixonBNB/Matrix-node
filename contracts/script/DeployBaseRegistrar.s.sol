@@ -7,8 +7,34 @@ import {RegistrarController} from "src/facetnames/RegistrarController.sol";
 import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
 import "src/facetnames/Constants.sol";
 import {LibString} from "solady/utils/LibString.sol";
+import {ERC20} from "solady/tokens/ERC20.sol";
 
-contract DeployBaseRegistrarAll is Script {
+contract MockWETH is ERC20 {
+    constructor() {
+        // Maybe mint some initial supply to deployer
+        _mint(msg.sender, 1000000 ether);
+    }
+    
+    function name() public pure override returns (string memory) {
+        return "Wrapped Ether";
+    }
+    
+    function symbol() public pure override returns (string memory) {
+        return "WETH";
+    }
+
+    // Optional: Add deposit/withdraw functions to mimic real WETH
+    function deposit() public payable {
+        _mint(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) public {
+        _burn(msg.sender, amount);
+        payable(msg.sender).transfer(amount);
+    }
+}
+
+contract S is Script {
     using LibString for *;
 
     function _encodeName(string memory name) internal pure returns (string memory) {
@@ -30,35 +56,29 @@ contract DeployBaseRegistrarAll is Script {
         (bytes memory dnsName,) = NameEncoder.dnsEncodeName("facet.eth");
         console.log("FACET_ETH_NAME", dnsName.toHexStringNoPrefix());
 
-        // Set up price configuration (copied from DeployAll.s.sol)
-        // uint256[] memory prices = new uint256[](6);
-        // prices[0] = 316_808_781_402;
-        // prices[1] = 31_680_878_140;
-        // prices[2] = 3_168_087_814;
-        // prices[3] = 316_808_781;
-        // prices[4] = 31_680_878;
-        // prices[5] = 3_168_087;
-        // uint256 premiumStart = 500 ether;
-        // uint256 totalDays = 28 days;
+        uint256[] memory prices = new uint256[](6);
+        prices[0] = 316_808_781_402;
+        prices[1] = 31_680_878_140;
+        prices[2] = 3_168_087_814;
+        prices[3] = 316_808_781;
+        prices[4] = 31_680_878;
+        prices[5] = 3_168_087;
+        
+        ERC20 wethToken = new MockWETH();
+        
+        RegistrarController controller = new RegistrarController({
+            owner_: deployerAddress,
+            paymentReceiver_: deployerAddress,
+            baseDomainName_: "facet.eth",
+            prices_: prices,
+            premiumStart_: 500 ether,
+            totalDays_: 28 days,
+            wethToken_: wethToken
+        });
 
-        RegistrarController controller = new RegistrarController();
-
-        // Deploy the all-in-one contract
-        // BaseRegistrar registrar = new BaseRegistrar(
-        //     deployerAddress,
-        //     "facet.eth",
-        //     prices,
-        //     premiumStart,
-        //     totalDays,
-        //     "",
-        //     ""
-        // );
-
-        console.log("BaseRegistrarDeployAll deployed to:", address(controller));
-
-        // // Optional: Register a test name to verify everything works
-        vm.deal(deployerAddress, 10 ether);
         vm.warp(1735689600);
+        
+        wethToken.approve(address(controller), 8 ether);
         
         RegistrarController.RegisterRequest memory request = RegistrarController.RegisterRequest({
             name: "tester12345",
@@ -69,7 +89,7 @@ contract DeployBaseRegistrarAll is Script {
             reverseRecord: true
         });
         
-        controller.register{value: 8 ether}(request);
+        controller.register(request);
         
         vm.stopBroadcast();
     }

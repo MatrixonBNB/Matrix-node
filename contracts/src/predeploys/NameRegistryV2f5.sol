@@ -445,16 +445,6 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
         require(bytes(description).length <= s().bioMaxLength, "DTL");
         require(bytes(imageURI).length <= s().uriMaxLength, "ITL");
         require(grantingAddress != address(0), "Granting address must be non-zero");
-            
-        // stickerManager.controllerCreateSticker(
-        //     msg.sender,
-        //     name,
-        //     description,
-        //     imageURI,
-        //     stickerExpiry,
-        //     grantingAddress
-        // );
-            
         uint256 currentId = s().nextStickerId;
         s().nextStickerId += 1;
 
@@ -477,14 +467,6 @@ contract NameRegistryV2f5 is FacetERC721, FacetERC2981, Upgradeable, Initializab
             s().stickers[stickerId].expiry > block.timestamp,
             "Sticker expired"
         );
-        
-        // stickerManager.controllerClaimSticker(
-        //     msg.sender,
-        //     stickerId,
-        //     deadline,
-        //     signature
-        // );
-        
         bytes memory message = abi.encode(
             keccak256("StickerClaim(uint256 stickerId,address claimer,uint256 deadline)"),
             stickerId,

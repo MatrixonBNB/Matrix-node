@@ -25,6 +25,9 @@ import {LibString} from "solady/utils/LibString.sol";
 import {ENS} from "ens-contracts/registry/ENS.sol";
 import "forge-std/Script.sol";
 
+import {Pausable} from "src/libraries/Pausable.sol";
+import {console} from "forge-std/console.sol";
+import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";
 /// @title Registrar Controller
 ///
 /// @notice A permissioned controller for managing registering and renewing names against the `base` registrar.
@@ -36,7 +39,10 @@ import "forge-std/Script.sol";
 ///         https://github.com/ensdomains/ens-contracts/blob/staging/contracts/ethregistrar/ETHRegistrarController.sol
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
-contract RegistrarController is Ownable {
+
+import {ERC20} from "solady/tokens/ERC20.sol";
+import {StickerRegistry} from "src/facetnames/StickerRegistry.sol";
+contract RegistrarController is Ownable, Pausable {
     using LibString for *;
     using StringUtils for *;
     using SafeERC20 for IERC20;
@@ -44,6 +50,11 @@ contract RegistrarController is Ownable {
     
     ENS public immutable registry;
     L2Resolver public immutable resolver;
+    ERC20 public wethToken;
+    
+    function setWethToken(address wethToken_) public onlyOwner {
+        wethToken = ERC20(wethToken_);
+    }
 
     /// @notice The details of a registration request.
     struct RegisterRequest {
@@ -78,7 +89,7 @@ contract RegistrarController is Ownable {
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     /// @notice The implementation of the `BaseRegistrar`.
-    BaseRegistrar immutable base;
+    BaseRegistrar public immutable base;
 
     /// @notice The implementation of the pricing oracle.
     IPriceOracle public prices;
@@ -234,7 +245,7 @@ contract RegistrarController is Ownable {
     ///     3. That the registration `duration` is sufficiently long
     ///
     /// @param request The RegisterRequest that is being validated.
-    modifier validRegistration(RegisterRequest calldata request) {
+    modifier validRegistration(RegisterRequest memory request) {
         if (request.data.length > 0 && request.resolver == address(0)) {
             revert ResolverRequiredWhenDataSupplied();
         }
@@ -284,45 +295,39 @@ contract RegistrarController is Ownable {
     // / @param rootNode_ The node for which this registrar manages registrations.
     // / @param rootName_ The name of the root node which this registrar manages.
     constructor(
-        // BaseRegistrar base_,
-        // IPriceOracle prices_,
-        // IReverseRegistrar reverseRegistrar_,
-        // address owner_,
-        // bytes32 rootNode_,
-        // string memory rootName_,
-        // address paymentReceiver_
+        address owner_,
+        address paymentReceiver_,
+        string memory baseDomainName_,
+        uint256[] memory prices_,
+        uint256 premiumStart_,
+        uint256 totalDays_,
+        ERC20 wethToken_
     ) {
         // Set up dummy values
-        address _owner = address(0x1234);
-        address _paymentReceiver = address(0x1234);
-        string memory _baseDomainName = "test.eth";
-        uint256[] memory _prices = new uint256[](6);
-        _prices[0] = 316_808_781_402;
-        _prices[1] = 31_680_878_140;
-        _prices[2] = 3_168_087_814;
-        _prices[3] = 316_808_781;
-        _prices[4] = 31_680_878;
-        _prices[5] = 3_168_087;
-        uint256 _premiumStart = 500 ether;
-        uint256 _totalDays = 28 days;
+        // address _owner = address(0x1234);
+        // address _paymentReceiver = address(0x1234);
+        // string memory _baseDomainName = "test.eth";
+        // uint256[] memory _prices = new uint256[](6);
+        // _prices[0] = 316_808_781_402;
+        // _prices[1] = 31_680_878_140;
+        // _prices[2] = 3_168_087_814;
+        // _prices[3] = 316_808_781;
+        // _prices[4] = 31_680_878;
+        // _prices[5] = 3_168_087;
+        // uint256 _premiumStart = 500 ether;
+        // uint256 _totalDays = 28 days;
+        
+        wethToken = wethToken_;
         
         // Set up nodes and labels
-        string[] memory baseNameParts = _baseDomainName.split(".");
-        require(baseNameParts.length == 2, "Base domain name must contain exactly one dot");
-        require(baseNameParts[1].eq("eth"), "Base domain name must end with .eth");
+        bytes32 facetNameLabel = keccak256("facet");
+        bytes32 facetReverseLabel = keccak256("800face7");
         
-        string memory baseName = baseNameParts[0];
-        bytes32 baseNameLabel = keccak256(bytes(baseName));
+        rootNode = FACET_ETH_NODE;
+        rootName = ".facet.eth";
         
-        string memory l2ReverseLabelString = (0x80000000 | block.chainid).toHexStringNoPrefix();
-        bytes32 baseReverseLabel = keccak256(bytes(l2ReverseLabelString));
-        bytes32 baseReverseNode = _encodeName(l2ReverseLabelString.concat(".reverse"));
-        
-        rootNode = _encodeName(_baseDomainName);
-        rootName = string.concat(".", _baseDomainName);
-        
-        paymentReceiver = _paymentReceiver;
-        _initializeOwner(_owner);
+        paymentReceiver = paymentReceiver_;
+        _initializeOwner(owner_);
 
         registry = new Registry(address(this));
         
@@ -335,19 +340,19 @@ contract RegistrarController is Ownable {
         });
         // Deploy Price Oracle
         prices = new ExponentialPremiumPriceOracle({
-            rentPrices: _prices,
-            startPremium_: _premiumStart,
-            totalDays: _totalDays
+            rentPrices: prices_,
+            startPremium_: premiumStart_,
+            totalDays: totalDays_
         });
         
         reverseRegistrar = IReverseRegistrar(address(new ReverseRegistrar({
             registry_: registry,
             owner_: address(this),
-            reverseNode_: baseReverseNode
+            reverseNode_: FACET_REVERSE_NODE
         })));
         
         registry.setSubnodeOwner(0x0, keccak256("reverse"), address(this));
-        registry.setSubnodeOwner(REVERSE_NODE, baseReverseLabel, address(reverseRegistrar));
+        registry.setSubnodeOwner(REVERSE_NODE, facetReverseLabel, address(reverseRegistrar));
         registry.setSubnodeOwner(REVERSE_NODE, keccak256("addr"), address(reverseRegistrar));
         
         reverseRegistrar.claim(owner());
@@ -360,14 +365,14 @@ contract RegistrarController is Ownable {
         });
         
         registry.setSubnodeOwner(0x0, keccak256("eth"), address(this));
-        registry.setSubnodeOwner(ETH_NODE, baseNameLabel, address(this));
+        registry.setSubnodeOwner(ETH_NODE, facetNameLabel, address(this));
         base.addController(address(this));
         ReverseRegistrar(address(reverseRegistrar)).setControllerApproval(address(this), true);
         
         registry.setResolver(rootNode, address(resolver));
         registry.setResolver(REVERSE_NODE, address(resolver));
         
-        registry.setSubnodeOwner(ETH_NODE, baseNameLabel, address(base));
+        registry.setSubnodeOwner(ETH_NODE, facetNameLabel, address(base));
         
         registry.setSubnodeOwner(0x0, keccak256("eth"), owner());
         registry.setSubnodeOwner(0x0, keccak256("reverse"), owner());
@@ -375,9 +380,18 @@ contract RegistrarController is Ownable {
         
         ReverseRegistrar(address(reverseRegistrar)).transferOwnership(owner());
         base.transferOwnership(owner());
+        
+        address stickerRegistryImpl = address(new StickerRegistry());
+        ERC1967Proxy proxy = new ERC1967Proxy(stickerRegistryImpl, "");
+        
+        stickerRegistry = StickerRegistry(address(proxy));
+        stickerRegistry.initialize();
+        stickerRegistry.addController(address(this));
+        stickerRegistry.transferOwnership(owner());
+        stickerRegistry.setUpgradeAdmin(owner());
     }
     
-    function _encodeName(string memory name) internal pure returns (bytes32) {
+    function _encodeName(string memory name) public pure returns (bytes32) {
         (, bytes32 node) = NameEncoder.dnsEncodeName(name);
         return node;
     }
@@ -527,17 +541,14 @@ contract RegistrarController is Ownable {
     /// @notice Enables a caller to register a name.
     ///
     /// @dev Validates the registration details via the `validRegistration` modifier.
-    ///     This `payable` method must receive appropriate `msg.value` to pass `_validatePayment()`.
     ///
     /// @param request The `RegisterRequest` struct containing the details for the registration.
-    function register(RegisterRequest calldata request) public payable validRegistration(request) {
+    function register(RegisterRequest memory request) public validRegistration(request) {
         uint256 price = registerPrice(request.name, request.duration);
 
-        _validatePayment(price);
+        _transferPayment(price);
 
         _register(request);
-
-        _refundExcessEth(price);
     }
 
     /// @notice Enables a caller to register a name and apply a discount.
@@ -551,20 +562,17 @@ contract RegistrarController is Ownable {
     /// @param request The `RegisterRequest` struct containing the details for the registration.
     /// @param discountKey The uuid of the discount being accessed.
     /// @param validationData Data necessary to perform the associated discount validation.
-    function discountedRegister(RegisterRequest calldata request, bytes32 discountKey, bytes calldata validationData)
+    function discountedRegister(RegisterRequest memory request, bytes32 discountKey, bytes calldata validationData)
         public
-        payable
         validDiscount(discountKey, validationData)
         validRegistration(request)
     {
         uint256 price = discountedRegisterPrice(request.name, request.duration, discountKey);
 
-        _validatePayment(price);
+        _transferPayment(price);
 
         discountedRegistrants[msg.sender] = true;
         _register(request);
-
-        _refundExcessEth(price);
 
         emit DiscountApplied(msg.sender, discountKey);
     }
@@ -578,16 +586,14 @@ contract RegistrarController is Ownable {
     ///
     /// @param name The name that is being renewed.
     /// @param duration The duration to extend the expiry, in seconds.
-    function renew(string calldata name, uint256 duration) external payable {
+    function renew(string calldata name, uint256 duration) external {
         bytes32 labelhash = keccak256(bytes(name));
         uint256 tokenId = uint256(labelhash);
         IPriceOracle.Price memory price = rentPrice(name, duration);
 
-        _validatePayment(price.base);
+        _transferPayment(price.base);
 
         uint256 expires = base.renew(tokenId, duration);
-
-        _refundExcessEth(price.base);
 
         emit NameRenewed(name, labelhash, expires);
     }
@@ -597,10 +603,8 @@ contract RegistrarController is Ownable {
     /// @dev Emits `ETHPaymentProcessed` after validating the payment.
     ///
     /// @param price The expected value.
-    function _validatePayment(uint256 price) internal {
-        if (msg.value < price) {
-            revert InsufficientValue();
-        }
+    function _transferPayment(uint256 price) internal {
+        wethToken.transferFrom(msg.sender, address(this), price);
         emit ETHPaymentProcessed(msg.sender, price);
     }
 
@@ -619,6 +623,10 @@ contract RegistrarController is Ownable {
         }
         return expires + GRACE_PERIOD;
     }
+    
+    mapping(uint256 => uint256) public v1TokenIdToV2TokenId;
+    mapping(uint256 => uint256) public v2TokenIdToV1TokenId;
+    uint256 public nextV1TokenId;
 
     /// @notice Shared registartion logic for both `register()` and `discountedRegister()`.
     ///
@@ -627,9 +635,14 @@ contract RegistrarController is Ownable {
     ///     Emits `NameRegistered` upon successful registration.
     ///
     /// @param request The `RegisterRequest` struct containing the details for the registration.
-    function _register(RegisterRequest calldata request) internal {
+    function _register(RegisterRequest memory request) internal {
+        uint256 v2TokenId = uint256(keccak256(bytes(request.name)));
+        nextV1TokenId++;
+        v1TokenIdToV2TokenId[nextV1TokenId] = v2TokenId;
+        v2TokenIdToV1TokenId[v2TokenId] = nextV1TokenId;
+        
         uint256 expires = base.registerWithRecord(
-            uint256(keccak256(bytes(request.name))), request.owner, request.duration, request.resolver, 0
+            v2TokenId, request.owner, request.duration, request.resolver, 0
         );
 
         if (request.data.length > 0) {
@@ -643,19 +656,6 @@ contract RegistrarController is Ownable {
         emit NameRegistered(request.name, keccak256(bytes(request.name)), request.owner, expires);
     }
 
-    /// @notice Refunds any remaining `msg.value` after processing a registration or renewal given`price`.
-    ///
-    /// @dev It is necessary to allow "overpayment" because of premium price decay.  We don't want transactions to fail
-    ///     unnecessarily if the premium decreases between tx submission and inclusion.
-    ///
-    /// @param price The total value to be retained, denominated in wei.
-    function _refundExcessEth(uint256 price) internal {
-        if (msg.value > price) {
-            (bool sent,) = payable(msg.sender).call{value: (msg.value - price)}("");
-            if (!sent) revert TransferFailed();
-        }
-    }
-
     /// @notice Uses Multicallable to iteratively set records on a specified resolver.
     ///
     /// @dev `multicallWithNodeCheck` ensures that each record being set is for the specified `label`.
@@ -663,7 +663,7 @@ contract RegistrarController is Ownable {
     /// @param resolverAddress The address of the resolver to set records on.
     /// @param label The keccak256 namehash for the specified name.
     /// @param data  The abi encoded calldata records that will be used in the multicallable resolver.
-    function _setRecords(address resolverAddress, bytes32 label, bytes[] calldata data) internal {
+    function _setRecords(address resolverAddress, bytes32 label, bytes[] memory data) internal {
         bytes32 nodehash = keccak256(abi.encodePacked(rootNode, label));
         L2Resolver resolver = L2Resolver(resolverAddress);
         resolver.multicallWithNodeCheck(nodehash, data);
@@ -688,12 +688,6 @@ contract RegistrarController is Ownable {
         active ? activeDiscounts.add(key) : activeDiscounts.remove(key);
     }
 
-    /// @notice Allows anyone to withdraw the eth accumulated on this contract back to the `paymentReceiver`.
-    function withdrawETH() public {
-        (bool sent,) = payable(paymentReceiver).call{value: (address(this).balance)}("");
-        if (!sent) revert TransferFailed();
-    }
-
     /// @notice Allows the owner to recover ERC20 tokens sent to the contract by mistake.
     ///
     /// @param _to The address to send the tokens to.
@@ -701,5 +695,181 @@ contract RegistrarController is Ownable {
     /// @param _amount The amount of tokens to recover.
     function recoverFunds(address _token, address _to, uint256 _amount) external onlyOwner {
         IERC20(_token).safeTransfer(_to, _amount);
+    }
+    
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+    
+    bool public preregistrationComplete;
+    
+    function importFromPreregistration(
+        string[] memory names,
+        address[] memory owners,
+        uint256[] memory durations
+    ) public onlyOwner {
+        require(!preregistrationComplete, "Preregistration must not be complete");
+        require(names.length == owners.length, "Names and owners must be the same length");
+        require(names.length == durations.length, "Names and durations must be the same length");
+        
+        for (uint256 i = 0; i < names.length; i++) {
+            RegisterRequest memory request = RegisterRequest({
+                name: names[i],
+                owner: owners[i],
+                duration: durations[i],
+                resolver: address(resolver),
+                data: new bytes[](0),
+                reverseRecord: false
+            });
+            
+            _register(request);
+            
+            if (!hasReverseRecord(owners[i])) {
+                reverseRegistrar.setNameForAddr(
+                    owners[i],
+                    owners[i],
+                    address(resolver),
+                    string.concat(names[i], rootName)
+                );
+            }
+            
+            bytes32 node = _encodeName(names[i].concat(rootName));
+            resolver.setAddr(node, owners[i]);
+        }
+    }
+    
+    function ownerOfName(string memory name) public view returns (address) {
+        return base.ownerOf(uint256(keccak256(bytes(name))));
+    }
+    
+    function hasReverseRecord(address addr) public view returns (bool) {
+        address resolverAddress = registry.resolver(REVERSE_NODE);
+        bytes32 node = reverseRegistrar.node(addr);
+        
+        if (resolverAddress == address(0)) return false;
+        
+        // Check if there's a name set in the resolver
+        string memory name = L2Resolver(resolverAddress).name(node);
+        if (bytes(name).length == 0) return false;
+        
+        bytes32 forwardNode = _encodeName(name);
+        address resolvedAddress = L2Resolver(resolver).addr(forwardNode);
+        
+        return resolvedAddress == addr;
+    }
+    
+    function setPrimaryName(string memory name) public {
+        string memory fullName = string.concat(name, rootName);
+
+        bytes32 nameNode = _encodeName(fullName);
+        address owner = registry.owner(nameNode);
+        require(owner == msg.sender, "Not the owner");
+        
+        _setReverseRecord(name, address(resolver), msg.sender);
+    }
+    
+    function setUpgradeAdmin(address newUpgradeAdmin) public {
+
+    }
+    
+    function markPreregistrationComplete() public onlyOwner {
+        preregistrationComplete = true;
+    }
+    
+    function makeNode(bytes32 label) public view returns (bytes32) {
+        return keccak256(abi.encodePacked(label));
+    }
+    
+    function setCardDetails(
+        uint256 tokenId,
+        string memory name,
+        string memory displayName,
+        string memory bio,
+        string memory imageURI,
+        string[] memory links
+    ) public {
+        uint256 v2TokenId = v1TokenIdToV2TokenId[tokenId];
+        
+        bytes32 label = bytes32(v2TokenId);
+        bytes32 subnode = keccak256(abi.encodePacked(rootNode, label));
+        address owner = registry.owner(subnode);
+        
+        require(owner == msg.sender, "Not the owner");
+        
+        // Call resolver methods to set each text record
+        resolver.setText(subnode, "alias", displayName);
+        resolver.setText(subnode, "description", bio);
+        resolver.setText(subnode, "avatar", imageURI);
+        
+        // Set links using url, url2, url3, etc.
+        for (uint i = 0; i < links.length; i++) {
+            string memory key = i == 0 ? "url" : string.concat("url", (i + 1).toString());
+            resolver.setText(subnode, key, links[i]);
+        }
+
+        // emit CardDetailsSet(node, displayName, bio, imageURI, links);
+    }
+    
+    function registerNameWithPayment(address to, string memory name, uint256 durationInSeconds) public {
+        // Set reverse record only if:
+        // 1. User is registering for themselves (to == msg.sender)
+        // 2. They don't already have a reverse record
+        bool setReverseRecord = (to == msg.sender && !hasReverseRecord(msg.sender));
+        
+        RegisterRequest memory request = RegisterRequest({
+            name: name,
+            owner: to,
+            duration: durationInSeconds,
+            resolver: address(resolver),  // Need resolver for reverse record
+            data: new bytes[](0),
+            reverseRecord: setReverseRecord
+        });
+        
+        register(request);
+        bytes32 node = _encodeName(name.concat(rootName));
+        resolver.setAddr(node, to);
+    }
+    
+    StickerRegistry public stickerRegistry;
+    
+    function withdrawWETH() public onlyOwner {
+        uint256 amount = ERC20(wethToken).balanceOf(address(this));
+        wethToken.transfer(paymentReceiver, amount);
+    }
+
+    function placeSticker(uint256 stickerId, uint256 tokenId, uint256[2] memory position) public {
+        stickerRegistry.placeSticker(stickerId, tokenId, position);
+    }
+    
+    function repositionSticker(uint256 stickerIndex, uint256 tokenId, uint256[2] memory position) public {
+        stickerRegistry.repositionSticker(stickerIndex, tokenId, position);
+    }
+    
+    function claimSticker(uint256 stickerId, uint256 deadline, uint256 tokenId, uint256[2] memory position, bytes memory signature) public {
+        stickerRegistry.claimSticker(
+            msg.sender,
+            stickerId,
+            deadline,
+            tokenId,
+            position,
+            signature
+        );
+    }
+    
+    function createSticker(string memory name, string memory description, string memory imageURI, uint256 stickerExpiry, address grantingAddress) public {
+        stickerRegistry.createSticker(
+            name,
+            description,
+            imageURI,
+            stickerExpiry,
+            grantingAddress
+        );
+    }
+
+    function upgrade(bytes32 newHash, string calldata newSource) external {
     }
 }
