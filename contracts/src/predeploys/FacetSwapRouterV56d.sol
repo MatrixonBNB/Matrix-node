@@ -230,9 +230,18 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         }
     }
 
-    function _safeTransferFrom(address token, address from, address to, uint256 value) private {
-        bool result = ERC20(token).transferFrom(from, to, value);
-        require(result, "FacetSwapV1: TRANSFER_FAILED");
+    function _safeTransferFrom(
+        address token,
+        address from,
+        address to,
+        uint256 value
+    ) internal {
+        // bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, value));
+        require(
+            success && (data.length == 0 || abi.decode(data, (bool))),
+            'TransferHelper::transferFrom: transferFrom failed'
+        );
     }
 
     function getAmountsOut(address factory, uint256 amountIn, address[] memory path) public view returns (uint256[] memory amounts) {
