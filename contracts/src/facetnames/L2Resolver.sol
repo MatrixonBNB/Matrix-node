@@ -16,6 +16,7 @@ import {PubkeyResolver} from "ens-contracts/resolvers/profiles/PubkeyResolver.so
 import {TextResolver} from "ens-contracts/resolvers/profiles/TextResolver.sol";
 
 import {IReverseRegistrar} from "src/facetnames/interface/IReverseRegistrar.sol";
+import "solady/utils/Initializable.sol";
 
 /// @title L2 Resolver
 ///
@@ -37,14 +38,15 @@ contract L2Resolver is
     PubkeyResolver,
     TextResolver,
     ExtendedResolver,
-    Ownable
+    Ownable,
+    Initializable
 {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     /// @notice The ENS registry.
-    ENS public immutable ens;
+    ENS public ens;
 
     /// @notice The trusted registrar controller contract.
     address public registrarController;
@@ -104,13 +106,17 @@ contract L2Resolver is
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
+    constructor() {
+        _disableInitializers();
+    }
+    
     /// @notice L2 Resolver constructor used to establish the necessary contract configuration.
     ///
     /// @param ens_ The Registry contract.
     /// @param registrarController_ The address of the RegistrarController contract.
     /// @param reverseRegistrar_ The address of the ReverseRegistrar contract.
     /// @param owner_  The permissioned address initialized as the `owner` in the `Ownable` context.
-    constructor(ENS ens_, address registrarController_, address reverseRegistrar_, address owner_) {
+    function initialize(ENS ens_, address registrarController_, address reverseRegistrar_, address owner_) public initializer {
         ens = ens_;
         registrarController = registrarController_;
         reverseRegistrar = reverseRegistrar_;
@@ -126,9 +132,6 @@ contract L2Resolver is
     function setRegistrarController(address registrarController_) external onlyOwner {
         registrarController = registrarController_;
         emit RegistrarControllerUpdated(registrarController_);
-    }
-    function __getImplementationName__() public pure returns (string memory) {
-        return "L2Resolver";
     }
 
     /// @notice Allows the `owner` to set the reverse registrar contract address.

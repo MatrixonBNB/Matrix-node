@@ -13,7 +13,9 @@ private_key = "${PRIVATE_KEY}"
 
 ffi = true
 fs_permissions = [
-  { access='read-write', path='./predeploy-contracts.json' }
+  { access='read-write', path='./predeploy-contracts.json' },
+  { access='read', path='./src/predeploys' },
+  { access='read', path='./src/facetnames' }
 ]
 
 ignored_error_codes = ["transient-storage", "code-size", "init-code-size", 5159]

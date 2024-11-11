@@ -5,14 +5,18 @@ import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
 import {EDAPrice} from "./lib/EDAPrice.sol";
 import {StablePriceOracle} from "src/facetnames/StablePriceOracle.sol";
+import "solady/utils/Initializable.sol";
 
 contract ExponentialPremiumPriceOracle is StablePriceOracle {
-    uint256 public immutable startPremium;
-    uint256 public immutable endValue;
-    function __getImplementationName__() public pure returns (string memory) {
-        return "ExponentialPremiumPriceOracle";
+    uint256 public startPremium;
+    uint256 public endValue;
+    
+    constructor() {
+        _disableInitializers();
     }
-    constructor(uint256[] memory rentPrices, uint256 startPremium_, uint256 totalDays) StablePriceOracle(rentPrices) {
+    
+    function initialize(uint256[] memory rentPrices, uint256 startPremium_, uint256 totalDays) public initializer {
+        _initializeStablePriceOracle(rentPrices);
         startPremium = startPremium_;
         endValue = startPremium >> totalDays;
     }

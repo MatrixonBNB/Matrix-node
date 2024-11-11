@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {ENS} from "ens-contracts/registry/ENS.sol";
-
+import "solady/utils/Initializable.sol";
 /// @title Registry
 ///
 /// @notice Inspired by the ENS Registry contract.
@@ -11,7 +11,7 @@ import {ENS} from "ens-contracts/registry/ENS.sol";
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
 /// @author ENS (https://github.com/ensdomains/ens-contracts/tree/staging)
-contract Registry is ENS {
+contract Registry is ENS, Initializable {
     /// @notice Structure for storing records on a per-node basis.
     struct Record {
         /// @dev Tracks the owner of the node.
@@ -56,11 +56,11 @@ contract Registry is ENS {
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
-    /// @notice Constructs a new Registry with the `rootOwner` as the permissioned address for managing establishing
-    ///         TLD namespaces.
-    ///
-    /// @param rootOwner The address that can establish new TLDs.
-    constructor(address rootOwner) {
+    constructor() {
+        _disableInitializers();
+    }
+    
+    function initialize(address rootOwner) public initializer {
         _records[0x0].owner = rootOwner;
     }
 
@@ -121,10 +121,6 @@ contract Registry is ENS {
         _setOwner(subnode, owner_);
         emit NewOwner(node, label, owner_);
         return subnode;
-    }
-
-    function __getImplementationName__() public pure returns (string memory) {
-        return "Registry";
     }
 
     /// @notice Sets the resolver address for the specified node.

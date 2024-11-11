@@ -11,8 +11,8 @@ import {LibString} from "solady/utils/LibString.sol";
 import {GRACE_PERIOD} from "./Constants.sol";
 
 import "src/libraries/MigrationLib.sol";
-import {FacetERC721} from "src/libraries/FacetERC721.sol";
-
+import "src/libraries/FacetERC721.sol";
+import "solady/utils/Initializable.sol";
 /// @title Base Registrar
 ///
 /// @notice The base-level tokenization contract for an ens domain. The Base Registrar implements ERC721 and, as the owner
@@ -24,7 +24,7 @@ import {FacetERC721} from "src/libraries/FacetERC721.sol";
 ///         https://github.com/ensdomains/ens-contracts/blob/staging/contracts/ethregistrar/BaseRegistrarImplementation.sol
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
-contract BaseRegistrar is FacetERC721, Ownable {
+contract BaseRegistrar is FacetERC721, Ownable, Initializable {
     using LibString for uint256;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -35,10 +35,10 @@ contract BaseRegistrar is FacetERC721, Ownable {
     mapping(uint256 id => uint256 expiry) public nameExpires;
 
     /// @notice The Registry contract.
-    ENS public immutable registry;
+    ENS public registry;
 
     /// @notice The namehash of the TLD this registrar owns (eg, base.eth).
-    bytes32 public immutable baseNode;
+    bytes32 public baseNode;
 
     /// @notice The base URI for token metadata.
     string private _baseURI;
@@ -174,7 +174,9 @@ contract BaseRegistrar is FacetERC721, Ownable {
     ///
     /// @param id The id being checked for expiry.
     modifier onlyNonExpired(uint256 id) {
-        if (nameExpires[id] <= block.timestamp) revert Expired(id);
+        uint256 v2Id = v1TokenIdToV2TokenId[id];
+        
+        if (nameExpires[v2Id] <= block.timestamp && nameExpires[id] <= block.timestamp) revert Expired(id);
         _;
     }
 
@@ -189,13 +191,13 @@ contract BaseRegistrar is FacetERC721, Ownable {
     /// @param baseNode_ The node that this contract manages registrations for.
     /// @param baseURI_ The base token URI for NFT metadata.
     /// @param collectionURI_ The URI for the collection's metadata.
-    constructor(
+    function initialize(
         ENS registry_,
         address owner_,
         bytes32 baseNode_,
         string memory baseURI_,
         string memory collectionURI_
-    ) {
+    ) public initializer {
         _initializeOwner(owner_);
         registry = registry_;
         baseNode = baseNode_;
@@ -203,6 +205,10 @@ contract BaseRegistrar is FacetERC721, Ownable {
         _collectionURI = collectionURI_;
         
         _initializeERC721("Facet Names", "FACETNAME");
+    }
+    
+    constructor() {
+        _disableInitializers();
     }
 
     /// @notice Authorises a controller, who can register and renew domains.
@@ -253,9 +259,6 @@ contract BaseRegistrar is FacetERC721, Ownable {
     function registerOnly(uint256 id, address owner, uint256 duration) external returns (uint256) {
         return _register(id, owner, duration, false);
     }
-    function __getImplementationName__() public pure returns (string memory) {
-        return "BaseRegistrar";
-    }
     /// @notice Register a name and add details to the record in the Registry.
     ///
     /// @dev This method can only be called if:
@@ -291,6 +294,16 @@ contract BaseRegistrar is FacetERC721, Ownable {
     /// @return address The address currently marked as the owner of the given token ID.
     function ownerOf(uint256 tokenId) public view override onlyNonExpired(tokenId) returns (address) {
         return super.ownerOf(tokenId);
+    }
+    
+    function _ownerOf(uint256 tokenId) internal view virtual override returns (address) {
+        // First check if it's owned as-is
+        address directOwner = super._ownerOf(tokenId);
+        if (directOwner != address(0)) return directOwner;
+        
+        // If not found, check if it's a v1 ID and look up v2
+        uint256 v2TokenId = v1TokenIdToV2TokenId[tokenId];
+        return super._ownerOf(v2TokenId);
     }
 
     /// @notice Returns true if the specified name is available for registration.
@@ -431,6 +444,10 @@ contract BaseRegistrar is FacetERC721, Ownable {
     ///
     /// @return expiry The expiry date of the registered name.
     function _localRegister(uint256 id, address owner, uint256 duration) internal returns (uint256 expiry) {
+        nextV1TokenId++;
+        v1TokenIdToV2TokenId[nextV1TokenId] = id;
+        v2TokenIdToV1TokenId[id] = nextV1TokenId;
+        
         expiry = block.timestamp + duration;
         nameExpires[id] = expiry;
         if (_exists(id)) {
@@ -439,6 +456,10 @@ contract BaseRegistrar is FacetERC721, Ownable {
         }
         _mint(owner, id);
     }
+
+    mapping(uint256 => uint256) public v1TokenIdToV2TokenId;
+    mapping(uint256 => uint256) public v2TokenIdToV1TokenId;
+    uint256 public nextV1TokenId;
 
     /// @notice Returns whether the given spender can transfer a given token ID.abi
     ///

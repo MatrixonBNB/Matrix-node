@@ -18,8 +18,24 @@ module PredeployManager
         
         map[address] = filename
       end
-    end 
+    end
+
+    contract_names = [
+      "BaseRegistrar",
+      "ExponentialPremiumPriceOracle",
+      "L2Resolver",
+      "RegistrarController",
+      "Registry",
+      "ReverseRegistrar",
+      "StablePriceOracle"
+    ]
     
+    contract_names.each do |name|
+      address = Eth::Util.keccak256(name).last(20).bytes_to_hex
+      
+      map[address] = name
+    end
+      
     map["0xa83FDc18871Ae3595c6f801Af55bC699E1810974"] = "StickerRegistry"
     
     map["0x11110000000000000000000000000000000000c5"] = "NonExistentContractShim"
@@ -59,7 +75,12 @@ module PredeployManager
   
   def local_from_predeploy(address)
     name = predeploy_to_local_map.fetch(address)
-    "predeploys/#{name}"
+    path = "predeploys/#{name}"
+    if File.exists?(path)
+      path
+    else
+      "facetnames/#{name}"
+    end
   end
   memoize :local_from_predeploy
   
@@ -120,7 +141,8 @@ module PredeployManager
 
     contract_names.each do |name|
       contract = EVMHelpers.compile_contract("facetnames/#{name}")
-      predeploy_info[name] = {
+      address = Eth::Util.keccak256(name).last(20).bytes_to_hex
+      predeploy_info[address] = {
         name: contract.name,
         abi: contract.abi,
         bin: contract.bin,
@@ -258,7 +280,7 @@ module PredeployManager
       next if address == "0x11110000000000000000000000000000000000c5"
       contract_name = contract['name']
       
-      sol_file = LEGACY_DIR.join("#{contract_name}.sol")
+      sol_file = SOL_DIR.join('src', 'facetnames').join("#{contract_name}.sol")
       
       if sol_file.exist?
         command = [
@@ -272,7 +294,7 @@ module PredeployManager
           # "--watch",
           "--rpc-url #{rpc_url}",
           address,
-          "src/predeploys/#{contract_name}.sol:#{contract_name}",
+          "src/facetnames/#{contract_name}.sol:#{contract_name}",
         ].join(" ")
         puts command
         puts "Verifying #{contract_name} at #{address}..."

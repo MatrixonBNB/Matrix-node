@@ -4,7 +4,10 @@ pragma solidity 0.8.24;
 import "solady/tokens/ERC721.sol";
 import "src/libraries/FacetBuddyLib.sol";
 import "src/libraries/MigrationLib.sol";
-import "src/facetnames/BaseRegistrar.sol";
+
+interface IBaseRegistrar {
+    function controllers(address user) external view returns (bool);
+}
 
 abstract contract FacetERC721 is ERC721 {
     using FacetBuddyLib for address;
@@ -82,7 +85,7 @@ abstract contract FacetERC721 is ERC721 {
     }
     
     function isController(address user) public view returns (bool) {
-        try BaseRegistrar(address(this)).controllers(user) returns (bool result) {
+        try IBaseRegistrar(address(this)).controllers(user) returns (bool result) {
             return result;
         } catch {
             return false;

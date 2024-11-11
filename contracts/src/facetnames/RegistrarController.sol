@@ -1,34 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {StringUtils} from "ens-contracts/utils/StringUtils.sol";
 
-import {FACET_ETH_NODE, GRACE_PERIOD} from "./Constants.sol";
 import {BaseRegistrar} from "./BaseRegistrar.sol";
-import {IDiscountValidator} from "./interface/IDiscountValidator.sol";
-import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {L2Resolver} from "./L2Resolver.sol";
 import {IReverseRegistrar} from "./interface/IReverseRegistrar.sol";
-import {Registry} from "src/facetnames/Registry.sol";
+import {Registry} from "./Registry.sol";
 import {StablePriceOracle, IPriceOracle} from "src/facetnames/StablePriceOracle.sol";
 import {ExponentialPremiumPriceOracle} from "src/facetnames/ExponentialPremiumPriceOracle.sol";
 import {L2Resolver} from "src/facetnames/L2Resolver.sol";
 import {ReverseRegistrar} from "src/facetnames/ReverseRegistrar.sol";
-import {RegistrarController, IReverseRegistrar} from "src/facetnames/RegistrarController.sol";
 import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
 import "./Constants.sol";
 import {LibString} from "solady/utils/LibString.sol";
 import {ENS} from "ens-contracts/registry/ENS.sol";
-import "forge-std/Script.sol";
+// import "forge-std/Script.sol";
 
 import {Pausable} from "src/libraries/Pausable.sol";
-import {console} from "forge-std/console.sol";
+// import {console} from "forge-std/console.sol";
 import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/FacetEIP712.sol";
+import "solady/utils/Initializable.sol";
 
 /// @title Registrar Controller
 ///
@@ -46,19 +42,14 @@ import {ERC20} from "solady/tokens/ERC20.sol";
 import {StickerRegistry} from "src/predeploys/StickerRegistry.sol";
 import "src/libraries/MigrationLib.sol";
 
-contract RegistrarController is Ownable, Pausable, FacetEIP712 {
+contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable {
     using LibString for *;
     using StringUtils for *;
     using SafeERC20 for IERC20;
-    using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     
-    ENS public immutable registry;
-    L2Resolver public immutable resolver;
+    ENS public registry;
+    L2Resolver public resolver;
     ERC20 public wethToken;
-    
-    function __getImplementationName__() public pure returns (string memory) {
-        return "RegistrarController";
-    }
     
     function setWethToken(address wethToken_) public onlyOwner {
         wethToken = ERC20(wethToken_);
@@ -80,24 +71,12 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         bool reverseRecord;
     }
 
-    /// @notice The details of a discount tier.
-    struct DiscountDetails {
-        /// @dev Bool which declares whether the discount is active or not.
-        bool active;
-        /// @dev The address of the associated validator. It must implement `IDiscountValidator`.
-        address discountValidator;
-        /// @dev The unique key that identifies this discount.
-        bytes32 key;
-        /// @dev The discount value denominated in wei.
-        uint256 discount;
-    }
-
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     /// @notice The implementation of the `BaseRegistrar`.
-    BaseRegistrar public immutable base;
+    BaseRegistrar public base;
 
     /// @notice The implementation of the pricing oracle.
     IPriceOracle public prices;
@@ -105,26 +84,14 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     /// @notice The implementation of the Reverse Registrar contract.
     IReverseRegistrar public reverseRegistrar;
 
-    /// @notice An enumerable set for tracking which discounts are currently active.
-    EnumerableSetLib.Bytes32Set internal activeDiscounts;
-
     /// @notice The node for which this name enables registration. It must match the `rootNode` of `base`.
-    bytes32 public immutable rootNode;
+    bytes32 public rootNode;
 
     /// @notice The name for which this registration adds subdomains for, i.e. ".base.eth".
     string public rootName;
 
     /// @notice The address that will receive ETH funds upon `withdraw()` being called.
     address public paymentReceiver;
-
-    /// @notice The timestamp of "go-live". Used for setting at-launch pricing premium.
-    uint256 public launchTime;
-
-    /// @notice Each discount is stored against a unique 32-byte identifier, i.e. keccak256("test.discount.validator").
-    mapping(bytes32 key => DiscountDetails details) public discounts;
-
-    /// @notice Storage for which addresses have already registered with a discount.
-    mapping(address registrant => bool hasRegisteredWithDiscount) public discountedRegistrants;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          CONSTANTS                         */
@@ -134,16 +101,11 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     uint256 public constant MIN_REGISTRATION_DURATION = 365 days;
 
     /// @notice The minimum name length.
-    uint256 public constant MIN_NAME_LENGTH = 3;
+    uint256 public constant MIN_NAME_LENGTH = 1;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          ERRORS                            */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice Thrown when the sender has already registered with a discount.
-    ///
-    /// @param sender The address of the sender.
-    error AlreadyRegisteredWithDiscount(address sender);
 
     /// @notice Thrown when a name is not available.
     ///
@@ -158,33 +120,11 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     /// @notice Thrown when Multicallable resolver data was specified but not resolver address was provided.
     error ResolverRequiredWhenDataSupplied();
 
-    /// @notice Thrown when a `discountedRegister` claim tries to access an inactive discount.
-    ///
-    /// @param key The discount key that is inactive.
-    error InactiveDiscount(bytes32 key);
-
     /// @notice Thrown when the payment received is less than the price.
     error InsufficientValue();
 
-    /// @notice Thrown when the specified discount's validator does not accept the discount for the sender.
-    ///
-    /// @param key The discount being accessed.
-    /// @param data The associated `validationData`.
-    error InvalidDiscount(bytes32 key, bytes data);
-
-    /// @notice Thrown when the discount amount is 0.
-    ///
-    /// @param key The discount being set.
-    error InvalidDiscountAmount(bytes32 key);
-
     /// @notice Thrown when the payment receiver is being set to address(0).
     error InvalidPaymentReceiver();
-
-    /// @notice Thrown when the discount validator is being set to address(0).
-    ///
-    /// @param key The discount being set.
-    /// @param validator The address of the validator being set.
-    error InvalidValidator(bytes32 key, address validator);
 
     /// @notice Thrown when a refund transfer is unsuccessful.
     error TransferFailed();
@@ -192,12 +132,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          EVENTS                            */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice Emitted when a discount is set or updated.
-    ///
-    /// @param discountKey The unique identifier key for the discount.
-    /// @param details The DiscountDetails struct stored for this key.
-    event DiscountUpdated(bytes32 indexed discountKey, DiscountDetails details);
 
     /// @notice Emitted when an ETH payment was processed successfully.
     ///
@@ -230,12 +164,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     /// @param newPrices The address of the new price oracle.
     event PriceOracleUpdated(address newPrices);
 
-    /// @notice Emitted when a name is registered with a discount.
-    ///
-    /// @param registrant The address of the registrant.
-    /// @param discountKey The discount key that was used to register.
-    event DiscountApplied(address indexed registrant, bytes32 indexed discountKey);
-
     /// @notice Emitted when the reverse registrar is updated.
     ///
     /// @param newReverseRegistrar The address of the new reverse registrar.
@@ -266,43 +194,15 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         _;
     }
 
-    /// @notice Decorator for validating discounted registrations.
-    ///
-    /// @dev Validates that:
-    ///     1. That the registrant has not already registered with a discount
-    ///     2. That the discount is `active`
-    ///     3. That the associated `discountValidator` returns true when `isValidDiscountRegistration` is called.
-    ///
-    /// @param discountKey The uuid of the discount.
-    /// @param validationData The associated validation data for this discount registration.
-    modifier validDiscount(bytes32 discountKey, bytes calldata validationData) {
-        if (discountedRegistrants[msg.sender]) revert AlreadyRegisteredWithDiscount(msg.sender);
-        DiscountDetails memory details = discounts[discountKey];
-
-        if (!details.active) revert InactiveDiscount(discountKey);
-
-        IDiscountValidator validator = IDiscountValidator(details.discountValidator);
-        if (!validator.isValidDiscountRegistration(msg.sender, validationData)) {
-            revert InvalidDiscount(discountKey, validationData);
-        }
-        _;
-    }
-
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
-    // / @notice Registrar Controller construction sets all of the requisite external contracts.
-    // /
-    // / @dev Assigns ownership of this contract's reverse record to the `owner_`.
-    // /
-    // / @param base_ The base registrar contract.
-    // / @param prices_ The pricing oracle contract.
-    // / @param reverseRegistrar_ The reverse registrar contract.
-    // / @param owner_ The permissioned address initialized as the `owner` in the `Ownable` context.
-    // / @param rootNode_ The node for which this registrar manages registrations.
-    // / @param rootName_ The name of the root node which this registrar manages.
-    constructor(
+    constructor() EIP712() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address owner_,
         address paymentReceiver_,
         string memory baseDomainName_,
@@ -310,7 +210,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         uint256 premiumStart_,
         uint256 totalDays_,
         ERC20 wethToken_
-    ) EIP712() {
+    ) public initializer {
         // Set up dummy values
         // address _owner = address(0x1234);
         // address _paymentReceiver = address(0x1234);
@@ -337,27 +237,53 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         paymentReceiver = paymentReceiver_;
         _initializeOwner(owner_);
 
-        registry = new Registry(address(this));
+        address registryImplementation = address(uint160(uint256(keccak256("Registry"))));
         
-        base = new BaseRegistrar({
-            registry_: registry,
-            owner_: address(this),
-            baseNode_: rootNode,
-            baseURI_: "https://api.test.eth/",
-            collectionURI_: "https://test.eth/"
-        });
-        // Deploy Price Oracle
-        prices = new ExponentialPremiumPriceOracle({
-            rentPrices: prices_,
-            startPremium_: premiumStart_,
-            totalDays: totalDays_
-        });
+        registry = Registry(address(new ERC1967Proxy(
+            registryImplementation,
+            abi.encodeWithSelector(
+                Registry.initialize.selector,
+                address(this)
+            )
+        )));
         
-        reverseRegistrar = IReverseRegistrar(address(new ReverseRegistrar({
-            registry_: registry,
-            owner_: address(this),
-            reverseNode_: FACET_REVERSE_NODE
-        })));
+        address baseImplementation = address(uint160(uint256(keccak256("BaseRegistrar"))));
+        
+        base = BaseRegistrar(address(new ERC1967Proxy(
+            baseImplementation,
+            abi.encodeWithSelector(
+                BaseRegistrar.initialize.selector,
+                registry,
+                address(this),
+                rootNode,
+                "https://api.test.eth/",
+                "https://test.eth/"
+            )
+        )));
+        
+        address priceOracleImplementation = address(uint160(uint256(keccak256("ExponentialPremiumPriceOracle"))));
+        
+        prices = ExponentialPremiumPriceOracle(address(new ERC1967Proxy(
+            priceOracleImplementation,
+            abi.encodeWithSelector(
+                ExponentialPremiumPriceOracle.initialize.selector,
+                prices_,
+                premiumStart_,
+                totalDays_
+            )
+        )));
+        
+        address reverseRegistrarImplementation = address(uint160(uint256(keccak256("ReverseRegistrar"))));
+        
+        reverseRegistrar = IReverseRegistrar(address(new ERC1967Proxy(
+            reverseRegistrarImplementation,
+            abi.encodeWithSelector(
+                ReverseRegistrar.initialize.selector,
+                registry,
+                address(this),
+                FACET_REVERSE_NODE
+            )
+        )));
         
         registry.setSubnodeOwner(0x0, keccak256("reverse"), address(this));
         registry.setSubnodeOwner(REVERSE_NODE, facetReverseLabel, address(reverseRegistrar));
@@ -365,12 +291,17 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         
         reverseRegistrar.claim(owner());
         
-        resolver = new L2Resolver({
-            ens_: registry,
-            registrarController_: address(this),
-            reverseRegistrar_: address(reverseRegistrar),
-            owner_: owner()
-        });
+        address resolverImplementation = address(uint160(uint256(keccak256("L2Resolver"))));
+        
+        bytes memory initData = abi.encodeWithSelector(
+            L2Resolver.initialize.selector,
+            address(registry),
+            address(this),
+            address(reverseRegistrar),
+            owner()
+        );
+        
+        resolver = L2Resolver(address(new ERC1967Proxy(resolverImplementation, initData)));
         
         registry.setSubnodeOwner(0x0, keccak256("eth"), address(this));
         registry.setSubnodeOwner(ETH_NODE, facetNameLabel, address(this));
@@ -412,26 +343,25 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         base.controllerSetApprovalForAll(msg.sender, operator, approved);
     }
     
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        return base.ownerOf(tokenId);
+    }
+    
+    function balanceOf(address owner) public view returns (uint256) {
+        return base.balanceOf(owner);
+    }
+    
+    function isApprovedForAll(address owner, address operator) public view returns (bool) {
+        return base.isApprovedForAll(owner, operator);
+    }
+    
+    function isApprovedOrOwner(address spender, uint256 id) public view returns (bool) {
+        return base.isApprovedOrOwner(spender, id);
+    }
+    
     function _encodeName(string memory name) public pure returns (bytes32) {
         (, bytes32 node) = NameEncoder.dnsEncodeName(name);
         return node;
-    }
-
-    /// @notice Allows the `owner` to set discount details for a specified `key`.
-    ///
-    /// @dev Validates that:
-    ///     1. The discount `amount` is nonzero
-    ///     2. The uuid `key` matches the one set in the details
-    ///     3. That the address of the `discountValidator` is not the zero address
-    ///     Updates the `ActiveDiscounts` enumerable set then emits `DiscountUpdated` event.
-    ///
-    /// @param details The DiscountDetails for this discount key.
-    function setDiscountDetails(DiscountDetails memory details) external onlyOwner {
-        if (details.discount == 0) revert InvalidDiscountAmount(details.key);
-        if (details.discountValidator == address(0)) revert InvalidValidator(details.key, details.discountValidator);
-        discounts[details.key] = details;
-        _updateActiveDiscounts(details.key, details.active);
-        emit DiscountUpdated(details.key, details);
     }
 
     /// @notice Allows the `owner` to set the pricing oracle contract.
@@ -454,13 +384,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         emit ReverseRegistrarUpdated(address(reverse_));
     }
 
-    /// @notice Allows the `owner` to set the stored `launchTime`.
-    ///
-    /// @param launchTime_ The new launch time timestamp.
-    function setLaunchTime(uint256 launchTime_) external onlyOwner {
-        launchTime = launchTime_;
-    }
-
     /// @notice Allows the `owner` to set the reverse registrar contract.
     ///
     /// @dev Emits `PaymentReceiverUpdated` after setting the `paymentReceiver` address.
@@ -470,20 +393,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         if (paymentReceiver_ == address(0)) revert InvalidPaymentReceiver();
         paymentReceiver = paymentReceiver_;
         emit PaymentReceiverUpdated(paymentReceiver_);
-    }
-
-    /// @notice Checks whether any of the provided addresses have registered with a discount.
-    ///
-    /// @param addresses The array of addresses to check for discount registration.
-    ///
-    /// @return `true` if any of the addresses have already registered with a discount, else `false`.
-    function hasRegisteredWithDiscount(address[] memory addresses) external view returns (bool) {
-        for (uint256 i; i < addresses.length; i++) {
-            if (discountedRegistrants[addresses[i]]) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /// @notice Checks whether the provided `name` is long enough.
@@ -524,39 +433,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     /// @return The all-in price for the name registration, denominated in wei.
     function registerPrice(string memory name, uint256 duration) public view returns (uint256) {
         IPriceOracle.Price memory price = rentPrice(name, duration);
-        return price.base + price.premium;
-    }
-
-    /// @notice Checks the discounted register price for a provided `name`, `duration` and `discountKey`.
-    ///
-    /// @dev The associated `DiscountDetails.discount` is subtracted from the price returned by calling `registerPrice()`.
-    ///
-    /// @param name The name to check the discounted register price of.
-    /// @param duration The time that the name would be registered.
-    /// @param discountKey The uuid of the discount to apply.
-    ///
-    /// @return price The all-ing price for the discounted name registration, denominated in wei. Returns 0
-    ///         if the price of the discount exceeds the nominal registration fee.
-    function discountedRegisterPrice(string memory name, uint256 duration, bytes32 discountKey)
-        public
-        view
-        returns (uint256 price)
-    {
-        DiscountDetails memory discount = discounts[discountKey];
-        price = registerPrice(name, duration);
-        price = (price >= discount.discount) ? price - discount.discount : 0;
-    }
-
-    /// @notice Check which discounts are currently set to `active`.
-    ///
-    /// @return An array of `DiscountDetails` that are all currently marked as `active`.
-    function getActiveDiscounts() external view returns (DiscountDetails[] memory) {
-        bytes32[] memory activeDiscountKeys = activeDiscounts.values();
-        DiscountDetails[] memory activeDiscountDetails = new DiscountDetails[](activeDiscountKeys.length);
-        for (uint256 i; i < activeDiscountKeys.length; i++) {
-            activeDiscountDetails[i] = discounts[activeDiscountKeys[i]];
-        }
-        return activeDiscountDetails;
+        return price.base; // + price.premium;
     }
 
     /// @notice Enables a caller to register a name.
@@ -570,32 +447,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         _transferPayment(price);
 
         _register(request);
-    }
-
-    /// @notice Enables a caller to register a name and apply a discount.
-    ///
-    /// @dev In addition to the validation performed for in a `register` request, this method additionally validates
-    ///     that msg.sender is eligible for the specified `discountKey` given the provided `validationData`.
-    ///     The specific encoding of `validationData` is specified in the implementation of the `discountValidator`
-    ///     that is being called.
-    ///     Emits `RegisteredWithDiscount` upon successful registration.
-    ///
-    /// @param request The `RegisterRequest` struct containing the details for the registration.
-    /// @param discountKey The uuid of the discount being accessed.
-    /// @param validationData Data necessary to perform the associated discount validation.
-    function discountedRegister(RegisterRequest memory request, bytes32 discountKey, bytes calldata validationData)
-        public
-        validDiscount(discountKey, validationData)
-        validRegistration(request)
-    {
-        uint256 price = discountedRegisterPrice(request.name, request.duration, discountKey);
-
-        _transferPayment(price);
-
-        discountedRegistrants[msg.sender] = true;
-        _register(request);
-
-        emit DiscountApplied(msg.sender, discountKey);
     }
 
     /// @notice Allows a caller to renew a name for a specified duration.
@@ -639,9 +490,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     /// @return expires Returns the expiry + GRACE_PERIOD for previously registered names, else `launchTime`.
     function _getExpiry(uint256 tokenId) internal view returns (uint256 expires) {
         expires = base.nameExpires(tokenId);
-        if (expires == 0) {
-            return launchTime;
-        }
         return expires + GRACE_PERIOD;
     }
     
@@ -699,16 +547,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
         reverseRegistrar.setNameForAddr(msg.sender, owner, resolver, string.concat(name, rootName));
     }
 
-    /// @notice Helper method for updating the `activeDiscounts` enumerable set.
-    ///
-    /// @dev Adds the discount `key` to the set if it is active or removes if it is inactive.
-    ///
-    /// @param key The uuid of the discount.
-    /// @param active Whether the specified discount is active or not.
-    function _updateActiveDiscounts(bytes32 key, bool active) internal {
-        active ? activeDiscounts.add(key) : activeDiscounts.remove(key);
-    }
-
     /// @notice Allows the owner to recover ERC20 tokens sent to the contract by mistake.
     ///
     /// @param _to The address to send the tokens to.
@@ -764,7 +602,13 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     }
     
     function ownerOfName(string memory name) public view returns (address) {
-        return base.ownerOf(uint256(keccak256(bytes(name))));
+        uint256 tokenId = uint256(keccak256(bytes(name)));
+        
+        if (MigrationLib.isInMigration()) {
+            tokenId = v2TokenIdToV1TokenId[tokenId];
+        }
+        
+        return base.ownerOf(tokenId);
     }
     
     function hasReverseRecord(address addr) public view returns (bool) {
@@ -788,7 +632,10 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
 
         bytes32 nameNode = _encodeName(fullName);
         address owner = registry.owner(nameNode);
-        require(owner == msg.sender, "Not the owner");
+        
+        address tokenOwner = ownerOfName(name);
+        
+        require(owner == msg.sender || tokenOwner == msg.sender, "Not the owner");
         
         _setReverseRecord(name, address(resolver), msg.sender);
     }
@@ -812,19 +659,22 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712 {
     
     function setCardDetails(
         uint256 tokenId,
-        string memory name,
         string memory displayName,
         string memory bio,
         string memory imageURI,
         string[] memory links
     ) public {
-        uint256 v2TokenId = v1TokenIdToV2TokenId[tokenId];
+        if (MigrationLib.isInMigration()) {
+            tokenId = v1TokenIdToV2TokenId[tokenId];
+        }
         
-        bytes32 label = bytes32(v2TokenId);
+        bytes32 label = bytes32(tokenId);
         bytes32 subnode = keccak256(abi.encodePacked(rootNode, label));
         address owner = registry.owner(subnode);
         
-        require(owner == msg.sender, "Not the owner");
+        address tokenOwner = base.ownerOf(tokenId);
+        
+        require(owner == msg.sender || tokenOwner == msg.sender, "Not the owner");
         
         // Call resolver methods to set each text record
         resolver.setText(subnode, "alias", displayName);

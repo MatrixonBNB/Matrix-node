@@ -6,7 +6,7 @@ import {NameResolver} from "ens-contracts/resolvers/profiles/NameResolver.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 
 import {Sha3} from "./lib/Sha3.sol";
-
+import "solady/utils/Initializable.sol";
 /// @title Reverse Registrar
 ///
 /// @notice Registrar which allows registrants to establish a name as their "primary" record for reverse resolution.
@@ -17,21 +17,17 @@ import {Sha3} from "./lib/Sha3.sol";
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
 /// @author ENS (https://github.com/ensdomains/ens-contracts)
-contract ReverseRegistrar is Ownable {
-    
-    function __getImplementationName__() public pure returns (string memory) {
-        return "ReverseRegistrar";
-    }
+contract ReverseRegistrar is Ownable, Initializable {
     
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     /// @notice The Registry contract.
-    ENS public immutable registry;
+    ENS public registry;
 
     /// @notice The reverse node this registrar manages.
-    bytes32 public immutable reverseNode;
+    bytes32 public reverseNode;
 
     /// @notice Permissioned controller contracts.
     mapping(address controller => bool approved) public controllers;
@@ -100,11 +96,18 @@ contract ReverseRegistrar is Ownable {
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
+
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice ReverseRegistrar construction.
     ///
     /// @param registry_ The ENS registry, will be stored as `registry`.
     /// @param owner_ The permissioned address initialized as the `owner` in the `Ownable` context.
-    constructor(ENS registry_, address owner_, bytes32 reverseNode_) {
+    
+    
+    function initialize(ENS registry_, address owner_, bytes32 reverseNode_) public initializer {
         _initializeOwner(owner_);
         registry = registry_;
         reverseNode = reverseNode_;

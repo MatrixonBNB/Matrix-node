@@ -4,45 +4,50 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import {RegistrarController} from "src/facetnames/RegistrarController.sol";
 import {MockWETH} from "test/MockWETH.sol";
-
+import { L2Genesis } from "../script/L2Genesis.s.sol";
+import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";
+import {LibString} from "solady/utils/LibString.sol";
 contract RegistrarControllerTest is Test {
+    using LibString for *;
     RegistrarController controller;
     MockWETH weth;
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
     
     function setUp() public {
+        L2Genesis genesis = new L2Genesis();
+        genesis.setUp();
+        genesis.runWithoutDump();
+        
         // Deploy WETH
         weth = new MockWETH();
         
-        // Set up price array
-        uint256 usdWeiCentsInOneEth = 200000000000000000000000;  // Original value
-        
         uint256[] memory prices = new uint256[](6);
-        // Convert each USD cent price to ETH: (priceInUsdCents * 1 ether) / usdWeiCentsInOneEth
-        prices[0] = (31709791983764584 * 1 ether) / usdWeiCentsInOneEth;  // 1 letter
-        prices[1] = (3170979198376458 * 1 ether) / usdWeiCentsInOneEth;   // 2 letter
-        prices[2] = (1585489599188229 * 1 ether) / usdWeiCentsInOneEth;   // 3 letter
-        prices[3] = (317097919837645 * 1 ether) / usdWeiCentsInOneEth;    // 4 letter
-        prices[4] = (31709791983764 * 1 ether) / usdWeiCentsInOneEth;     // 5-9 letter
-        prices[5] = (31709791983764 * 1 ether) / usdWeiCentsInOneEth;     // 10+ letter (same as 5-9)
-        
-        for (uint256 i = 0; i < prices.length; i++) {
-            console.log("Price for %d letters: %d ETH", i + 1, prices[i]);
-        }
-        
-        
+
+        prices[0] = 31709791983764584;
+        prices[1] = 3170979198376458;
+        prices[2] = 1585489599188229;
+        prices[3] = 317097919837645;
+        prices[4] = 31709791983764;
+        prices[5] = 31709791983764;
         // Deploy controller
-        controller = new RegistrarController({
-            owner_: address(this),
-            paymentReceiver_: address(this),
-            baseDomainName_: "facet.eth",
-            prices_: prices,
-            premiumStart_: 500 ether,
-            totalDays_: 28 days,
-            wethToken_: weth
-        });
+        bytes memory initData = abi.encodeWithSelector(
+            RegistrarController.initialize.selector,
+            address(this),
+            address(this),
+            "facet.eth",
+            prices,
+            500 ether,
+            28 days,
+            weth
+        );
         
+        address impl = address(uint160(uint256(keccak256("RegistrarController"))));
+        
+        controller = RegistrarController(
+            address(new ERC1967Proxy(impl, initData))
+        );
+                
         // Give some WETH to test accounts
         weth.transfer(alice, 100 ether);
         weth.transfer(bob, 100 ether);
@@ -201,7 +206,6 @@ contract RegistrarControllerTest is Test {
         
         controller.setCardDetails(
             v1TokenId,
-            "test",
             "Alice in Wonderland",
             "Crypto enthusiast & developer",
             "ipfs://Qm...",
@@ -265,7 +269,6 @@ contract RegistrarControllerTest is Test {
         
         controller.setCardDetails(
             v1TokenId,
-            "test",
             "Alice",
             "Bio",
             "avatar",
@@ -293,7 +296,6 @@ contract RegistrarControllerTest is Test {
         initialLinks[0] = "https://initial.com";
         controller.setCardDetails(
             v1TokenId,
-            "test",
             "Initial Name",
             "Initial Bio",
             "initial-avatar",
@@ -306,7 +308,6 @@ contract RegistrarControllerTest is Test {
         newLinks[1] = "https://another.com";
         controller.setCardDetails(
             v1TokenId,
-            "test",
             "Updated Name",
             "Updated Bio",
             "new-avatar",
@@ -452,5 +453,76 @@ contract RegistrarControllerTest is Test {
         assertEq(resolvedName, "alice1.facet.eth", "Reverse record should still point to first name");
         
         vm.stopPrank();
+    }
+
+    struct PriceTestCase {
+        string name;
+        uint256 duration;
+        uint256 expectedPrice;
+    }
+
+    function test_SpecificNamePrices() public {
+        PriceTestCase[] memory cases = new PriceTestCase[](5);
+        
+        cases[0] = PriceTestCase({
+            name: "eigen",
+            duration: 365 days,  // 31536000 seconds
+            expectedPrice: 4999999999999907
+        });
+        
+        cases[1] = PriceTestCase({
+            name: "paul",
+            duration: 94608000, // 94608000 seconds (3 years)
+            expectedPrice: 149999999999999590
+        });
+        
+        cases[2] = PriceTestCase({
+            name: "renshawdev",
+            duration: 157680000, // 94608000 seconds (3 years)
+            expectedPrice: 24999999999999537
+        });
+        
+        cases[3] = PriceTestCase({
+            name: "cz",
+            duration: 31536000, // 94608000 seconds (3 years)
+            expectedPrice: 499999999999999897
+        });
+        
+        cases[4] = PriceTestCase({
+            name: "facetlaunch",
+            duration: 31536000, // 94608000 seconds (3 years)
+            expectedPrice: 4999999999999907
+        });
+
+        for (uint i = 0; i < cases.length; i++) {
+            PriceTestCase memory testCase = cases[i];
+            
+            // Test price calculation
+            uint256 price = controller.registerPrice(testCase.name, testCase.duration);
+            assertEq(
+                price,
+                testCase.expectedPrice,
+                string.concat(
+                    "Price mismatch for name: ",
+                    testCase.name,
+                    " with duration: ",
+                    LibString.toString(testCase.duration)
+                )
+            );
+
+            // Test actual registration
+            vm.startPrank(alice);
+            weth.approve(address(controller), price);
+            uint256 startBalance = weth.balanceOf(alice);
+            controller.registerNameWithPayment(alice, testCase.name, testCase.duration);
+            assertEq(
+                controller.ownerOfName(testCase.name),
+                alice,
+                string.concat("Registration failed for ", testCase.name)
+            );
+            uint256 endBalance = weth.balanceOf(alice);
+            assertEq(endBalance, startBalance - price, "Incorrect payment amount");
+            vm.stopPrank();
+        }
     }
 }

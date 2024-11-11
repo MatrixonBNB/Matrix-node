@@ -94,10 +94,6 @@ contract StickerRegistry is Upgradeable, Initializable, FacetOwnable, FacetEIP71
         _disableInitializers();
     }
     
-    function __getImplementationName__() public pure returns (string memory) {
-        return "StickerRegistry";
-    }
-
     function initialize() public initializer {
         _initializeOwner(msg.sender);
         _initializeUpgradeAdmin(msg.sender);
