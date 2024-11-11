@@ -13,6 +13,7 @@ import {GRACE_PERIOD} from "./Constants.sol";
 import "src/libraries/MigrationLib.sol";
 import "src/libraries/FacetERC721.sol";
 import "solady/utils/Initializable.sol";
+import {EventReplayable} from "src/libraries/EventReplayable.sol";
 /// @title Base Registrar
 ///
 /// @notice The base-level tokenization contract for an ens domain. The Base Registrar implements ERC721 and, as the owner
@@ -24,7 +25,7 @@ import "solady/utils/Initializable.sol";
 ///         https://github.com/ensdomains/ens-contracts/blob/staging/contracts/ethregistrar/BaseRegistrarImplementation.sol
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
-contract BaseRegistrar is FacetERC721, Ownable, Initializable {
+contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     using LibString for uint256;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -430,7 +431,12 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable {
         if (updateRegistry) {
             registry.setSubnodeOwner(baseNode, bytes32(id), owner);
         }
-        emit NameRegistered(id, owner, expiry);
+            
+        recordAndEmitEvent(
+            "NameRegistered(uint256,address,uint256)",
+            abi.encode(id, owner),
+            abi.encode(expiry)
+        );
         return expiry;
     }
 

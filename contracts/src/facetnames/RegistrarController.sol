@@ -42,7 +42,9 @@ import {ERC20} from "solady/tokens/ERC20.sol";
 import {StickerRegistry} from "src/predeploys/StickerRegistry.sol";
 import "src/libraries/MigrationLib.sol";
 
-contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable {
+import {EventReplayable} from "src/libraries/EventReplayable.sol";
+
+contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, EventReplayable {
     using LibString for *;
     using StringUtils for *;
     using SafeERC20 for IERC20;
@@ -521,8 +523,12 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable {
         if (request.reverseRecord) {
             _setReverseRecord(request.name, request.resolver, msg.sender);
         }
-
-        emit NameRegistered(request.name, keccak256(bytes(request.name)), request.owner, expires);
+        
+        recordAndEmitEvent(
+            "NameRegistered(string,bytes32,address,uint256)",
+            abi.encode(keccak256(bytes(request.name)), request.owner),
+            abi.encode(request.name, expires)
+        );
     }
 
     /// @notice Uses Multicallable to iteratively set records on a specified resolver.

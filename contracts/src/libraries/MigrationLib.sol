@@ -2,9 +2,16 @@
 pragma solidity 0.8.24;
 
 interface IMigrationManager {
+    struct StoredEvent {
+        bytes32 eventHash;
+        bytes32[] topics;
+        bytes data;
+    }
+    
     function recordERC20Holder(address holder) external;
     function recordERC721TokenId(uint256 id) external;
     function recordPairCreation(address pair) external;
+    function recordEvent(IMigrationManager.StoredEvent memory storedEvent) external;
 }
 
 library MigrationLib {

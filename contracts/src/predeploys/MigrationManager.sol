@@ -6,6 +6,7 @@ import "src/libraries/FacetERC721.sol";
 import "lib/solady/utils/EnumerableSetLib.sol";
 import "lib/solady/utils/LibString.sol";
 import "src/libraries/MigrationLib.sol";
+import "src/libraries/EventReplayable.sol";
 
 interface FacetSwapFactory {
     function allPairs(uint256 index) external view returns (address);
@@ -19,12 +20,32 @@ interface FacetSwapPair {
     function sync() external;
 }
 
-contract MigrationManager {
+contract MigrationManager is EventReplayable, IMigrationManager {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     using EnumerableSetLib for EnumerableSetLib.Uint256Set;
     
     bool public migrationExecuted;
+    
+    EnumerableSetLib.Uint256Set private eventIdsToReplay;
+
+    uint256 public nextEventId;
+    
+    mapping(uint256 => IMigrationManager.StoredEvent) public storedEvents;
+    
+    function recordEvent(
+        IMigrationManager.StoredEvent memory storedEvent
+    ) external whileInV1 {
+        nextEventId++;
+        
+        // Store the event data
+        storedEvents[nextEventId] = storedEvent;
+        eventIdsToReplay.add(nextEventId);
+    }
+    
+    function storedEventsLength() public view returns (uint256) {
+        return eventIdsToReplay.length();
+    }
     
     EnumerableSetLib.AddressSet factories;
     function getFactories() public view returns (address[] memory) {
@@ -118,7 +139,9 @@ contract MigrationManager {
                 totalFactoriesEvents += pairCount * 2;
             }
             
-            return totalERC20Events + totalERC721Events + totalFactoriesEvents;
+            uint256 storedEventsLength = eventIdsToReplay.length();
+            
+            return totalERC20Events + totalERC721Events + totalFactoriesEvents + storedEventsLength;
         }
     }
     
@@ -138,6 +161,8 @@ contract MigrationManager {
         }
         
         currentBatchEmittedEvents = 0;
+        
+        processStoredEvents();
         
         processFactories();
         
@@ -167,6 +192,23 @@ contract MigrationManager {
     
     function batchFinished() public view returns (bool) {
         return currentBatchEmittedEvents >= MAX_EVENTS_PER_BATCH;
+    }
+    
+    function processStoredEvents() internal whileInV2 {
+        uint256 length = eventIdsToReplay.length();
+        for (uint256 i = length; i > 0 && !batchFinished(); --i) {
+            uint256 eventId = eventIdsToReplay.at(i - 1);
+            
+            IMigrationManager.StoredEvent memory storedEvent = storedEvents[eventId];
+            
+            // Replay the event
+            emitStoredEvent(storedEvent);
+            currentBatchEmittedEvents++;
+            
+            // Remove from the replay queue
+            eventIdsToReplay.remove(eventId);
+            delete storedEvents[eventId];
+        }
     }
     
     function processERC20Tokens() internal whileInV2 {

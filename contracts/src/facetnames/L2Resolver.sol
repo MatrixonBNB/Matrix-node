@@ -17,7 +17,7 @@ import {TextResolver} from "ens-contracts/resolvers/profiles/TextResolver.sol";
 
 import {IReverseRegistrar} from "src/facetnames/interface/IReverseRegistrar.sol";
 import "solady/utils/Initializable.sol";
-
+import { EventReplayable } from "src/libraries/EventReplayable.sol";
 /// @title L2 Resolver
 ///
 /// @notice The default resolver for the Base Usernames project. This contract implements the functionality of the ENS
@@ -39,7 +39,8 @@ contract L2Resolver is
     TextResolver,
     ExtendedResolver,
     Ownable,
-    Initializable
+    Initializable,
+    EventReplayable
 {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
@@ -122,6 +123,40 @@ contract L2Resolver is
         reverseRegistrar = reverseRegistrar_;
         _initializeOwner(owner_);
         IReverseRegistrar(reverseRegistrar_).claim(owner_);
+    }
+    
+    uint256 private constant COIN_TYPE_ETH = 60;
+    function setAddr(
+        bytes32 node,
+        uint256 coinType,
+        bytes memory a
+    ) public virtual override authorised(node) {
+        recordAndEmitEvent(
+            "AddressChanged(bytes32,uint256,bytes)",
+            abi.encode(node),  // indexed params
+            abi.encode(coinType, a)         // non-indexed params
+        );
+        
+        if (coinType == COIN_TYPE_ETH) {
+            recordAndEmitEvent(
+                "AddrChanged(bytes32,address)",
+                abi.encode(node),  // indexed params
+                abi.encode(bytesToAddress(a))         // non-indexed params
+            );
+        }
+        versionable_addresses[recordVersions[node]][node][coinType] = a;
+    }
+    
+    function setName(
+        bytes32 node,
+        string calldata newName
+    ) external virtual override authorised(node) {
+        versionable_names[recordVersions[node]][node] = newName;
+        recordAndEmitEvent(
+            "NameChanged(bytes32,string)",
+            abi.encode(node),  // indexed params
+            abi.encode(newName)         // non-indexed params
+        );
     }
 
     /// @notice Allows the `owner` to set the registrar controller contract address.

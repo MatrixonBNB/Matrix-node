@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import {ENS} from "ens-contracts/registry/ENS.sol";
 import "solady/utils/Initializable.sol";
+import { EventReplayable } from "src/libraries/EventReplayable.sol";
 /// @title Registry
 ///
 /// @notice Inspired by the ENS Registry contract.
@@ -11,7 +12,7 @@ import "solady/utils/Initializable.sol";
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
 /// @author ENS (https://github.com/ensdomains/ens-contracts/tree/staging)
-contract Registry is ENS, Initializable {
+contract Registry is ENS, Initializable, EventReplayable {
     /// @notice Structure for storing records on a per-node basis.
     struct Record {
         /// @dev Tracks the owner of the node.
@@ -119,7 +120,12 @@ contract Registry is ENS, Initializable {
     {
         bytes32 subnode = keccak256(abi.encodePacked(node, label));
         _setOwner(subnode, owner_);
-        emit NewOwner(node, label, owner_);
+        
+        recordAndEmitEvent(
+            "NewOwner(bytes32,bytes32,address)",
+            abi.encode(node, label),  // indexed params
+            abi.encode(owner_)         // non-indexed params
+        );
         return subnode;
     }
 
@@ -131,7 +137,12 @@ contract Registry is ENS, Initializable {
     /// @param resolver_ The address of the resolver.
     function setResolver(bytes32 node, address resolver_) public virtual override authorized(node) {
         _records[node].resolver = resolver_;
-        emit NewResolver(node, resolver_);
+        
+        recordAndEmitEvent(
+            "NewResolver(bytes32,address)",
+            abi.encode(node),  // indexed params
+            abi.encode(resolver_)         // non-indexed params
+        );
     }
 
     /// @notice Sets the TTL for the specified node.
@@ -223,7 +234,12 @@ contract Registry is ENS, Initializable {
     function _setResolverAndTTL(bytes32 node, address resolver_, uint64 ttl_) internal {
         if (resolver_ != _records[node].resolver) {
             _records[node].resolver = resolver_;
-            emit NewResolver(node, resolver_);
+            
+            recordAndEmitEvent(
+                "NewResolver(bytes32,address)",
+                abi.encode(node),  // indexed params
+                abi.encode(resolver_)         // non-indexed params
+            );
         }
 
         if (ttl_ != _records[node].ttl) {
