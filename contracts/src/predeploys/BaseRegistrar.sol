@@ -10,8 +10,9 @@ import {LibString} from "solady/utils/LibString.sol";
 
 import {GRACE_PERIOD} from "./Constants.sol";
 
-import "src/libraries/MigrationLib.sol";
+import "../libraries/MigrationLib.sol";
 import "src/libraries/FacetERC721.sol";
+import "src/libraries/Upgradeable.sol";
 import "solady/utils/Initializable.sol";
 import {EventReplayable} from "src/libraries/EventReplayable.sol";
 /// @title Base Registrar
@@ -25,30 +26,34 @@ import {EventReplayable} from "src/libraries/EventReplayable.sol";
 ///         https://github.com/ensdomains/ens-contracts/blob/staging/contracts/ethregistrar/BaseRegistrarImplementation.sol
 ///
 /// @author Coinbase (https://github.com/base-org/usernames)
-contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
+contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, Upgradeable {
     using LibString for uint256;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
-    /// @notice A map of expiry times to name ids.
-    mapping(uint256 id => uint256 expiry) public nameExpires;
-
-    /// @notice The Registry contract.
-    ENS public registry;
-
-    /// @notice The namehash of the TLD this registrar owns (eg, base.eth).
-    bytes32 public baseNode;
-
-    /// @notice The base URI for token metadata.
-    string private _baseURI;
-
-    /// @notice The URI for collection metadata.
-    string private _collectionURI;
-
-    /// @notice A map of addresses that are authorised to register and renew names.
-    mapping(address controller => bool isApproved) public controllers;
+    struct BaseRegistrarStorage {
+        // Original state variables
+        mapping(uint256 => uint256) nameExpires;
+        ENS registry;
+        bytes32 baseNode;
+        string _baseURI;
+        string _collectionURI;
+        mapping(address => bool) controllers;
+        
+        // Migration-related state
+        mapping(uint256 => uint256) v1TokenIdToV2TokenId;
+        mapping(uint256 => uint256) v2TokenIdToV1TokenId;
+        uint256 nextV1TokenId;
+    }
+    
+    function s() internal pure returns (BaseRegistrarStorage storage bs) {
+        bytes32 position = keccak256("BaseRegistrar.storage.v1");
+        assembly {
+            bs.slot := position
+        }
+    }
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          CONSTANTS                         */
@@ -153,13 +158,13 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
 
     /// @notice Decorator for determining if the contract is actively managing registrations for its `baseNode`.
     modifier live() {
-        if (registry.owner(baseNode) != address(this)) revert RegistrarNotLive();
+        if (s().registry.owner(s().baseNode) != address(this)) revert RegistrarNotLive();
         _;
     }
 
     /// @notice Decorator for restricting methods to only approved Controller callers.
     modifier onlyController() {
-        if (!controllers[msg.sender]) revert OnlyController();
+        if (!s().controllers[msg.sender]) revert OnlyController();
         _;
     }
 
@@ -175,15 +180,19 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     ///
     /// @param id The id being checked for expiry.
     modifier onlyNonExpired(uint256 id) {
-        uint256 v2Id = v1TokenIdToV2TokenId[id];
+        uint256 v2Id = s().v1TokenIdToV2TokenId[id];
         
-        if (nameExpires[v2Id] <= block.timestamp && nameExpires[id] <= block.timestamp) revert Expired(id);
+        if (s().nameExpires[v2Id] <= block.timestamp && s().nameExpires[id] <= block.timestamp) revert Expired(id);
         _;
     }
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+
+    function nameExpires(uint256 tokenId) public view returns (uint256) {
+        return s().nameExpires[tokenId];
+    }
 
     /// @notice BaseRegistrar constructor used to initialize the configuration of the implementation.
     ///
@@ -200,10 +209,11 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
         string memory collectionURI_
     ) public initializer {
         _initializeOwner(owner_);
-        registry = registry_;
-        baseNode = baseNode_;
-        _baseURI = baseURI_;
-        _collectionURI = collectionURI_;
+        _initializeUpgradeAdmin(owner_);
+        s().registry = registry_;
+        s().baseNode = baseNode_;
+        s()._baseURI = baseURI_;
+        s()._collectionURI = collectionURI_;
         
         _initializeERC721("Facet Names", "FACETNAME");
     }
@@ -218,7 +228,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     ///
     /// @param controller The address of the new controller.
     function addController(address controller) external onlyOwner {
-        controllers[controller] = true;
+        s().controllers[controller] = true;
         emit ControllerAdded(controller);
     }
 
@@ -228,7 +238,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     ///
     /// @param controller The address of the controller to remove.
     function removeController(address controller) external onlyOwner {
-        controllers[controller] = false;
+        s().controllers[controller] = false;
         emit ControllerRemoved(controller);
     }
 
@@ -236,7 +246,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     ///
     /// @param resolver The address of the new resolver contract.
     function setResolver(address resolver) external onlyOwner {
-        registry.setResolver(baseNode, resolver);
+        s().registry.setResolver(s().baseNode, resolver);
     }
 
     /// @notice Register a name.
@@ -281,7 +291,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
         returns (uint256)
     {
         uint256 expiry = _localRegister(id, owner, duration);
-        registry.setSubnodeRecord(baseNode, bytes32(id), owner, resolver, ttl);
+        s().registry.setSubnodeRecord(s().baseNode, bytes32(id), owner, resolver, ttl);
         emit NameRegisteredWithRecord(id, owner, expiry, resolver, ttl);
         return expiry;
     }
@@ -303,7 +313,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
         if (directOwner != address(0)) return directOwner;
         
         // If not found, check if it's a v1 ID and look up v2
-        uint256 v2TokenId = v1TokenIdToV2TokenId[tokenId];
+        uint256 v2TokenId = s().v1TokenIdToV2TokenId[tokenId];
         return super._ownerOf(v2TokenId);
     }
 
@@ -314,7 +324,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     /// @return `true` if the name is available, else `false`.
     function isAvailable(uint256 id) public view returns (bool) {
         // Not available if it's registered here or in its grace period.
-        return nameExpires[id] + GRACE_PERIOD < block.timestamp;
+        return s().nameExpires[id] + GRACE_PERIOD < block.timestamp;
     }
 
     /// @notice Allows holders of names to renew their ownerhsip and extend their expiry.
@@ -328,11 +338,11 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     ///
     /// @return The new expiry date.
     function renew(uint256 id, uint256 duration) external live onlyController returns (uint256) {
-        uint256 expires = nameExpires[id];
+        uint256 expires = s().nameExpires[id];
         if (expires + GRACE_PERIOD < block.timestamp) revert NotRegisteredOrInGrace(id);
 
         expires += duration;
-        nameExpires[id] = expires;
+        s().nameExpires[id] = expires;
         emit NameRenewed(id, expires);
         return expires;
     }
@@ -347,7 +357,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     /// @param owner The address of the owner that will be set in the Registry.
     function reclaim(uint256 id, address owner) external live {
         if (!_isApprovedOrOwner(msg.sender, id)) revert NotApprovedOwner(id, owner);
-        registry.setSubnodeOwner(baseNode, bytes32(id), owner);
+        s().registry.setSubnodeOwner(s().baseNode, bytes32(id), owner);
     }
 
     /// @notice ERC165 compliant signal for interface support.
@@ -375,20 +385,20 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         if (_ownerOf(tokenId) == address(0)) revert NonexistentToken(tokenId);
 
-        return bytes(_baseURI).length > 0 ? string.concat(_baseURI, tokenId.toString()) : "";
+        return bytes(s()._baseURI).length > 0 ? string.concat(s()._baseURI, tokenId.toString()) : "";
     }
 
     /// @notice Returns the Uniform Resource Identifier (URI) for the contract.
     ///
     /// @dev ERC-7572: https://eips.ethereum.org/EIPS/eip-7572
     function contractURI() public view returns (string memory) {
-        return _collectionURI;
+        return s()._collectionURI;
     }
 
     /// @dev Allows the owner to set the the base Uniform Resource Identifier (URI)`.
     ///     Emits the `BatchMetadataUpdate` event for the full range of valid `tokenIds`.
     function setBaseTokenURI(string memory baseURI_) public onlyOwner {
-        _baseURI = baseURI_;
+        s()._baseURI = baseURI_;
         /// @dev minimum valid tokenId is `1` because uint256(nodehash) will never be called against `nodehash == 0x0`.
         uint256 minTokenId = 1;
         uint256 maxTokenId = type(uint256).max;
@@ -398,7 +408,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     /// @dev Allows the owner to set the the contract Uniform Resource Identifier (URI)`.
     ///     Emits the `ContractURIUpdated` event.
     function setContractURI(string memory collectionURI_) public onlyOwner {
-        _collectionURI = collectionURI_;
+        s()._collectionURI = collectionURI_;
         emit ContractURIUpdated();
     }
 
@@ -429,7 +439,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     {
         uint256 expiry = _localRegister(id, owner, duration);
         if (updateRegistry) {
-            registry.setSubnodeOwner(baseNode, bytes32(id), owner);
+            s().registry.setSubnodeOwner(s().baseNode, bytes32(id), owner);
         }
             
         recordAndEmitEvent(
@@ -450,22 +460,18 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable {
     ///
     /// @return expiry The expiry date of the registered name.
     function _localRegister(uint256 id, address owner, uint256 duration) internal returns (uint256 expiry) {
-        nextV1TokenId++;
-        v1TokenIdToV2TokenId[nextV1TokenId] = id;
-        v2TokenIdToV1TokenId[id] = nextV1TokenId;
+        s().nextV1TokenId++;
+        s().v1TokenIdToV2TokenId[s().nextV1TokenId] = id;
+        s().v2TokenIdToV1TokenId[id] = s().nextV1TokenId;
         
         expiry = block.timestamp + duration;
-        nameExpires[id] = expiry;
+        s().nameExpires[id] = expiry;
         if (_exists(id)) {
             // Name was previously owned, and expired
             _burn(id);
         }
         _mint(owner, id);
     }
-
-    mapping(uint256 => uint256) public v1TokenIdToV2TokenId;
-    mapping(uint256 => uint256) public v2TokenIdToV1TokenId;
-    uint256 public nextV1TokenId;
 
     /// @notice Returns whether the given spender can transfer a given token ID.abi
     ///
