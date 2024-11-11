@@ -184,17 +184,24 @@ contract MigrationManager is EventReplayable, IMigrationManager {
         return currentBatchEmittedEvents >= MAX_EVENTS_PER_BATCH;
     }
     
+    uint256 public processedCount;
+    
     function processStoredEvents() internal whileInV2 {
-        while (storedEvents.length > 0 && !batchFinished()) {
-            // Pop from the end of the array (more gas efficient)
-            IMigrationManager.StoredEvent memory storedEvent = storedEvents[storedEvents.length - 1];
-            storedEvents.pop();
-            
-            address emitter = storedEvent.emitter;
+        while (processedCount < storedEvents.length && !batchFinished()) {
+            // Process from the beginning of the array
+            IMigrationManager.StoredEvent memory storedEvent = storedEvents[processedCount];
             
             // Replay the event
-            EventReplayable(emitter).emitStoredEvent(storedEvent);
+            EventReplayable(storedEvent.emitter).emitStoredEvent(storedEvent);
             currentBatchEmittedEvents++;
+            processedCount++;
+        }
+        
+        // After processing, remove the processed events
+        if (processedCount == storedEvents.length) {
+            for (uint256 i = 0; i < processedCount; i++) {
+                storedEvents.pop();
+            }
         }
     }
     
