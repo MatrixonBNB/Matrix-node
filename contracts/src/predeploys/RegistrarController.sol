@@ -8,12 +8,11 @@ import {StringUtils} from "ens-contracts/utils/StringUtils.sol";
 
 import {BaseRegistrar} from "./BaseRegistrar.sol";
 import {L2Resolver} from "./L2Resolver.sol";
-import {IReverseRegistrar} from "./interface/IReverseRegistrar.sol";
+import {IReverseRegistrar} from "src/facetnames/interface/IReverseRegistrar.sol";
 import {Registry} from "./Registry.sol";
 import {StablePriceOracle, IPriceOracle} from "src/facetnames/StablePriceOracle.sol";
-import {ExponentialPremiumPriceOracle} from "src/facetnames/ExponentialPremiumPriceOracle.sol";
-import {L2Resolver} from "src/facetnames/L2Resolver.sol";
-import {ReverseRegistrar} from "src/facetnames/ReverseRegistrar.sol";
+import {ExponentialPremiumPriceOracle} from "./ExponentialPremiumPriceOracle.sol";
+import {ReverseRegistrar} from "./ReverseRegistrar.sol";
 import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
 import "./Constants.sol";
 import {LibString} from "solady/utils/LibString.sol";
@@ -258,8 +257,8 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
                 registry,
                 address(this),
                 rootNode,
-                "https://api.test.eth/",
-                "https://test.eth/"
+                "",
+                ""
             )
         )));
         
@@ -322,7 +321,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
         ReverseRegistrar(address(reverseRegistrar)).transferOwnership(owner());
         base.transferOwnership(owner());
         
-        address stickerRegistryImpl = 0xA83fDc18871Ae3595c6f801aF55Bc699e1810974;
+        address stickerRegistryImpl = address(uint160(uint256(keccak256("StickerRegistry"))));
         ERC1967Proxy proxy = new ERC1967Proxy(stickerRegistryImpl, "");
         
         stickerRegistry = StickerRegistry(address(proxy));

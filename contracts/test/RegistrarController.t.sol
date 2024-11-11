@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import {RegistrarController} from "src/facetnames/RegistrarController.sol";
+import {RegistrarController} from "src/predeploys/RegistrarController.sol";
 import {MockWETH} from "test/MockWETH.sol";
 import { L2Genesis } from "../script/L2Genesis.s.sol";
 import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";

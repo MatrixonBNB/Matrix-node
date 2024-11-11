@@ -3,7 +3,7 @@ pragma solidity ~0.8.17;
 
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
-import {EDAPrice} from "./lib/EDAPrice.sol";
+import {EDAPrice} from "src/facetnames/lib/EDAPrice.sol";
 import {StablePriceOracle} from "src/facetnames/StablePriceOracle.sol";
 import "solady/utils/Initializable.sol";
 

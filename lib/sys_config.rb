@@ -7,7 +7,7 @@ module SysConfig
   
   def block_gas_limit(block)
     if in_migration_mode?
-      1_000_000_000
+      5_000_000_000
     elsif is_first_v2_block?(block)
       # TODO
       L2_BLOCK_GAS_LIMIT * 20

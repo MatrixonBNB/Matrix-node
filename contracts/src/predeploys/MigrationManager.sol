@@ -27,24 +27,16 @@ contract MigrationManager is EventReplayable, IMigrationManager {
     
     bool public migrationExecuted;
     
-    EnumerableSetLib.Uint256Set private eventIdsToReplay;
-
-    uint256 public nextEventId;
-    
-    mapping(uint256 => IMigrationManager.StoredEvent) public storedEvents;
+    IMigrationManager.StoredEvent[] public storedEvents;
     
     function recordEvent(
         IMigrationManager.StoredEvent memory storedEvent
     ) external whileInV1 {
-        nextEventId++;
-        
-        // Store the event data
-        storedEvents[nextEventId] = storedEvent;
-        eventIdsToReplay.add(nextEventId);
+        storedEvents.push(storedEvent);
     }
     
     function storedEventsLength() public view returns (uint256) {
-        return eventIdsToReplay.length();
+        return storedEvents.length;
     }
     
     EnumerableSetLib.AddressSet factories;
@@ -139,9 +131,7 @@ contract MigrationManager is EventReplayable, IMigrationManager {
                 totalFactoriesEvents += pairCount * 2;
             }
             
-            uint256 storedEventsLength = eventIdsToReplay.length();
-            
-            return totalERC20Events + totalERC721Events + totalFactoriesEvents + storedEventsLength;
+            return totalERC20Events + totalERC721Events + totalFactoriesEvents + storedEventsLength();
         }
     }
     
@@ -195,19 +185,16 @@ contract MigrationManager is EventReplayable, IMigrationManager {
     }
     
     function processStoredEvents() internal whileInV2 {
-        uint256 length = eventIdsToReplay.length();
-        for (uint256 i = length; i > 0 && !batchFinished(); --i) {
-            uint256 eventId = eventIdsToReplay.at(i - 1);
+        while (storedEvents.length > 0 && !batchFinished()) {
+            // Pop from the end of the array (more gas efficient)
+            IMigrationManager.StoredEvent memory storedEvent = storedEvents[storedEvents.length - 1];
+            storedEvents.pop();
             
-            IMigrationManager.StoredEvent memory storedEvent = storedEvents[eventId];
+            address emitter = storedEvent.emitter;
             
             // Replay the event
-            emitStoredEvent(storedEvent);
+            EventReplayable(emitter).emitStoredEvent(storedEvent);
             currentBatchEmittedEvents++;
-            
-            // Remove from the replay queue
-            eventIdsToReplay.remove(eventId);
-            delete storedEvents[eventId];
         }
     }
     

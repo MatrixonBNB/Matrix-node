@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import "./MigrationLib.sol";
-import "forge-std/Test.sol";
 
 abstract contract EventReplayable {
     function recordAndEmitEvent(
@@ -16,6 +15,7 @@ abstract contract EventReplayable {
         bytes32[] memory topics = _bytesToTopics(indexedParamsEncoded);
         
         IMigrationManager.StoredEvent memory storedEvent = IMigrationManager.StoredEvent({
+            emitter: address(this),
             eventHash: eventHash,
             topics: topics,
             data: nonIndexedData
@@ -25,10 +25,10 @@ abstract contract EventReplayable {
             MigrationLib.manager().recordEvent(storedEvent);
         }
         
-        emitStoredEvent(storedEvent);
+        _emitStoredEvent(storedEvent);
     }
     
-    function emitStoredEvent(IMigrationManager.StoredEvent memory storedEvent) internal {
+    function _emitStoredEvent(IMigrationManager.StoredEvent memory storedEvent) internal {
         bytes32 eventHash = storedEvent.eventHash;
         bytes32[] memory topics = storedEvent.topics;
         bytes memory nonIndexedData = storedEvent.data;
@@ -49,6 +49,11 @@ abstract contract EventReplayable {
             case 2 { log3(dataPtr, dataLength, eventHash, mload(add(topics, 0x20)), mload(add(topics, 0x40))) }
             case 3 { log4(dataPtr, dataLength, eventHash, mload(add(topics, 0x20)), mload(add(topics, 0x40)), mload(add(topics, 0x60))) }
         }
+    }
+    
+    function emitStoredEvent(IMigrationManager.StoredEvent memory storedEvent) external {
+        require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only MigrationManager can emit events");
+        _emitStoredEvent(storedEvent);
     }
     
     function _bytesToTopics(bytes memory indexedParams) internal pure returns (bytes32[] memory) {

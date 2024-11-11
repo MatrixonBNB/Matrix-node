@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 interface IMigrationManager {
     struct StoredEvent {
+        address emitter;
         bytes32 eventHash;
         bytes32[] topics;
         bytes data;

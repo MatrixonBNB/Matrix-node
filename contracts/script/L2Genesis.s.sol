@@ -70,10 +70,6 @@ contract L2Genesis is Script {
 
     function etchContract(string memory contractName, address addr) internal {
         string memory artifactPath = string(abi.encodePacked("src/predeploys/", contractName, ".sol"));
-        if (!vm.isFile(artifactPath)) {
-            artifactPath = string(abi.encodePacked("src/facetnames/", contractName, ".sol"));
-        }
-        
         artifactPath = string(abi.encodePacked(artifactPath, ":", contractName));
         
         bytes memory bytecode = vm.getDeployedCode(artifactPath);
