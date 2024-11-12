@@ -14,19 +14,10 @@ import {Ownable} from "solady/auth/Ownable.sol";
 import {NameResolver} from "ens-contracts/resolvers/profiles/NameResolver.sol";
 import {PubkeyResolver} from "ens-contracts/resolvers/profiles/PubkeyResolver.sol";
 import {TextResolver} from "ens-contracts/resolvers/profiles/TextResolver.sol";
-
 import {IReverseRegistrar} from "src/facetnames/interface/IReverseRegistrar.sol";
 import "solady/utils/Initializable.sol";
-import { EventReplayable } from "src/libraries/EventReplayable.sol";
-/// @title L2 Resolver
-///
-/// @notice The default resolver for the Base Usernames project. This contract implements the functionality of the ENS
-///         PublicResolver while also inheriting ExtendedResolver for compatibility with CCIP-read.
-///         Public Resolver: https://github.com/ensdomains/ens-contracts/blob/staging/contracts/resolvers/PublicResolver.sol
-///         Extended Resolver: https://github.com/ensdomains/ens-contracts/blob/staging/contracts/resolvers/profiles/ExtendedResolver.sol
-///
-/// @author Coinbase (https://github.com/base-org/usernames)
-/// @author ENS (https://github.com/ensdomains/ens-contracts/tree/staging)
+import {EventReplayable} from "src/libraries/EventReplayable.sol";
+
 contract L2Resolver is
     Multicallable,
     ABIResolver,
@@ -42,81 +33,24 @@ contract L2Resolver is
     Initializable,
     EventReplayable
 {
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          STORAGE                           */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice The ENS registry.
     ENS public ens;
-
-    /// @notice The trusted registrar controller contract.
     address public registrarController;
-
-    /// @notice The reverse registrar contract.
     address public reverseRegistrar;
-
-    /// @notice A mapping of operators per owner address. An operator is authorized to make changes to
-    ///         all names owned by the `owner`.
     mapping(address owner => mapping(address operator => bool isApproved)) private _operatorApprovals;
+    mapping(address owner => mapping(bytes32 node => mapping(address delegate => bool isApproved))) private _tokenApprovals;
 
-    /// @notice A mapping of delegates per owner per name (stored as a node). A delegate that is authorised
-    ///         by an owner for a name may make changes to the name's resolver.
-    mapping(address owner => mapping(bytes32 node => mapping(address delegate => bool isApproved))) private
-        _tokenApprovals;
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          ERRORS                            */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice Thown when msg.sender tries to set itself as an operator.
     error CantSetSelfAsOperator();
-
-    /// @notice Thrown when msg.sender tries to set itself as a delegate for one of its names.
     error CantSetSelfAsDelegate();
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          EVENTS                            */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice Emitted when an operator is added or removed.
-    ///
-    /// @param owner The address of the owner of names.
-    /// @param operator The address of the approved operator for the `owner`.
-    /// @param approved Whether the `operator` is approved or not.
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
-
-    /// @notice Emitted when a delegate is approved or an approval is revoked.
-    ///
-    /// @param owner The address of the owner of the name.
-    /// @param node The namehash of the name.
-    /// @param delegate The address of the operator for the specified `node`.
-    /// @param approved Whether the `delegate` is approved for the specified `node`.
     event Approved(address owner, bytes32 indexed node, address indexed delegate, bool indexed approved);
-
-    /// @notice Emitted when the owner of this contract updates the Registrar Controller addrress.
-    ///
-    /// @param newRegistrarController The address of the new RegistrarController contract.
     event RegistrarControllerUpdated(address indexed newRegistrarController);
-
-    /// @notice Emitted when the owner of this contract updates the Reverse Registrar address.
-    ///
-    /// @param newReverseRegistrar The address of the new ReverseRegistrar contract.
     event ReverseRegistrarUpdated(address indexed newReverseRegistrar);
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                        IMPLEMENTATION                      */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     constructor() {
         _disableInitializers();
     }
-    
-    /// @notice L2 Resolver constructor used to establish the necessary contract configuration.
-    ///
-    /// @param ens_ The Registry contract.
-    /// @param registrarController_ The address of the RegistrarController contract.
-    /// @param reverseRegistrar_ The address of the ReverseRegistrar contract.
-    /// @param owner_  The permissioned address initialized as the `owner` in the `Ownable` context.
+
     function initialize(ENS ens_, address registrarController_, address reverseRegistrar_, address owner_) public initializer {
         ens = ens_;
         registrarController = registrarController_;
@@ -125,129 +59,74 @@ contract L2Resolver is
         IReverseRegistrar(reverseRegistrar_).claim(owner_);
     }
 
-    function setText(
-        bytes32 node,
-        string calldata key,
-        string calldata value
-    ) external virtual override authorised(node) {
+    function setText(bytes32 node, string calldata key, string calldata value) external virtual override authorised(node) {
         versionable_texts[recordVersions[node]][node][key] = value;
         
         recordAndEmitEvent(
             "TextChanged(bytes32,string,string,string)",
-            abi.encode(
-                node,                       // indexed node (bytes32)
-                keccak256(bytes(key))      // indexed indexedKey (string gets hashed)
-            ),
-            abi.encode(key, value)    // non-indexed params
+            abi.encode(node, keccak256(bytes(key))),
+            abi.encode(key, value)
         );
     }
     
     uint256 private constant COIN_TYPE_ETH = 60;
-    function setAddr(
-        bytes32 node,
-        uint256 coinType,
-        bytes memory a
-    ) public virtual override authorised(node) {
+    
+    function setAddr(bytes32 node, uint256 coinType, bytes memory a) public virtual override authorised(node) {
         recordAndEmitEvent(
             "AddressChanged(bytes32,uint256,bytes)",
-            abi.encode(node),  // indexed params
-            abi.encode(coinType, a)         // non-indexed params
+            abi.encode(node),
+            abi.encode(coinType, a)
         );
         
         if (coinType == COIN_TYPE_ETH) {
             recordAndEmitEvent(
                 "AddrChanged(bytes32,address)",
-                abi.encode(node),  // indexed params
-                abi.encode(bytesToAddress(a))         // non-indexed params
+                abi.encode(node),
+                abi.encode(bytesToAddress(a))
             );
         }
         versionable_addresses[recordVersions[node]][node][coinType] = a;
     }
     
-    function setName(
-        bytes32 node,
-        string calldata newName
-    ) external virtual override authorised(node) {
+    function setName(bytes32 node, string calldata newName) external virtual override authorised(node) {
         versionable_names[recordVersions[node]][node] = newName;
         recordAndEmitEvent(
             "NameChanged(bytes32,string)",
-            abi.encode(node),  // indexed params
-            abi.encode(newName)         // non-indexed params
+            abi.encode(node),
+            abi.encode(newName)
         );
     }
 
-    /// @notice Allows the `owner` to set the registrar controller contract address.
-    ///
-    /// @dev Emits `RegistrarControllerUpdated` after setting the `registrarController` address.
-    ///
-    /// @param registrarController_ The address of the new RegistrarController contract.
     function setRegistrarController(address registrarController_) external onlyOwner {
         registrarController = registrarController_;
         emit RegistrarControllerUpdated(registrarController_);
     }
 
-    /// @notice Allows the `owner` to set the reverse registrar contract address.
-    ///
-    /// @dev Emits `ReverseRegistrarUpdated` after setting the `reverseRegistrar` address.
-    ///
-    /// @param reverseRegistrar_ The address of the new ReverseRegistrar contract.
     function setReverseRegistrar(address reverseRegistrar_) external onlyOwner {
         reverseRegistrar = reverseRegistrar_;
         emit ReverseRegistrarUpdated(reverseRegistrar_);
     }
 
-    /// @dev See {IERC1155-setApprovalForAll}.
     function setApprovalForAll(address operator, bool approved) external {
         if (msg.sender == operator) revert CantSetSelfAsOperator();
-
         _operatorApprovals[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
     }
 
-    /// @dev See {IERC1155-isApprovedForAll}.
     function isApprovedForAll(address account, address operator) public view returns (bool) {
         return _operatorApprovals[account][operator];
     }
 
-    /// @notice Modify the permissions for a specified `delegate` for the specified `node`.
-    ///
-    /// @dev This method only sets the approval status for msg.sender's nodes. This is performed without checking
-    ///     the ownership of the specified `node`.
-    ///
-    /// @param node The namehash `node` whose permissions are being updated.
-    /// @param delegate The address of the `delegate`
-    /// @param approved Whether the `delegate` has approval to modify records for `msg.sender`'s `node`.
     function approve(bytes32 node, address delegate, bool approved) external {
         if (msg.sender == delegate) revert CantSetSelfAsDelegate();
-
         _tokenApprovals[msg.sender][node][delegate] = approved;
         emit Approved(msg.sender, node, delegate, approved);
     }
 
-    /// @notice Check to see if the `delegate` has been approved by the `owner` for the `node`.
-    ///
-    /// @param owner The address of the name owner.
-    /// @param node The namehash `node` whose permissions are being checked.
-    /// @param delegate The address of the `delegate` whose permissions are being checked.
-    ///
-    /// @return `true` if `delegate` is approved to modify `msg.sender`'s `node`, else `false`.
     function isApprovedFor(address owner, bytes32 node, address delegate) public view returns (bool) {
         return _tokenApprovals[owner][node][delegate];
     }
 
-    /// @notice Check to see whether `msg.sender` is authorized to modify records for the specified `node`.
-    ///
-    /// @dev Override for `ResolverBase:isAuthorised()`. Used in the context of each inherited resolver "profile".
-    ///     Validates that `msg.sender` is one of:
-    ///     1. The stored registrarController (for setting records upon registration)
-    ///     2  The stored reverseRegistrar (for setting reverse records)
-    ///     3. The owner of the node in the Registry
-    ///     4. An approved operator for owner
-    ///     5. An approved delegate for owner of the specified `node`
-    ///
-    /// @param node The namehashed `node` being authorized.
-    ///
-    /// @return `true` if `msg.sender` is authorized to modify records for the specified `node`, else `false`.
     function isAuthorised(bytes32 node) internal view override returns (bool) {
         if (msg.sender == registrarController || msg.sender == reverseRegistrar) {
             return true;
@@ -256,14 +135,6 @@ contract L2Resolver is
         return owner == msg.sender || isApprovedForAll(owner, msg.sender) || isApprovedFor(owner, node, msg.sender);
     }
 
-    /// @notice ERC165 compliant signal for interface support.
-    ///
-    /// @dev Checks interface support for each inherited resolver profile
-    ///     https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[EIP section]
-    ///
-    /// @param interfaceID the ERC165 iface id being checked for compliance
-    ///
-    /// @return bool Whether this contract supports the provided interfaceID
     function supportsInterface(bytes4 interfaceID)
         public
         view

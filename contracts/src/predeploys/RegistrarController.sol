@@ -17,24 +17,10 @@ import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
 import "./Constants.sol";
 import {LibString} from "solady/utils/LibString.sol";
 import {ENS} from "ens-contracts/registry/ENS.sol";
-// import "forge-std/Script.sol";
 
 import {Pausable} from "src/libraries/Pausable.sol";
-// import {console} from "forge-std/console.sol";
 import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";
 import "solady/utils/Initializable.sol";
-
-/// @title Registrar Controller
-///
-/// @notice A permissioned controller for managing registering and renewing names against the `base` registrar.
-///         This contract enables a `discountedRegister` flow which is validated by calling external implementations
-///         of the `IDiscountValidator` interface. Pricing, denominated in wei, is determined by calling out to a
-///         contract that implements `IPriceOracle`.
-///
-///         Inspired by the ENS ETHRegistrarController:
-///         https://github.com/ensdomains/ens-contracts/blob/staging/contracts/ethregistrar/ETHRegistrarController.sol
-///
-/// @author Coinbase (https://github.com/base-org/usernames)
 
 import {ERC20} from "solady/tokens/ERC20.sol";
 import {StickerRegistry} from "src/predeploys/StickerRegistry.sol";
@@ -55,82 +41,38 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         wethToken = ERC20(wethToken_);
     }
 
-    /// @notice The details of a registration request.
     struct RegisterRequest {
-        /// @dev The name being registered.
         string name;
-        /// @dev The address of the owner for the name.
         address owner;
-        /// @dev The duration of the registration in seconds.
         uint256 duration;
-        /// @dev The address of the resolver to set for this name.
         address resolver;
-        /// @dev Multicallable data bytes for setting records in the associated resolver upon reigstration.
         bytes[] data;
-        /// @dev Bool to decide whether to set this name as the "primary" name for the `owner`.
         bool reverseRecord;
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          STORAGE                           */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice The implementation of the `BaseRegistrar`.
     BaseRegistrar public base;
-
-    /// @notice The implementation of the pricing oracle.
     IPriceOracle public prices;
-
-    /// @notice The implementation of the Reverse Registrar contract.
     IReverseRegistrar public reverseRegistrar;
 
-    /// @notice The node for which this name enables registration. It must match the `rootNode` of `base`.
     bytes32 public rootNode;
-
-    /// @notice The name for which this registration adds subdomains for, i.e. ".base.eth".
     string public rootName;
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          CONSTANTS                         */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice The minimum registration duration, specified in seconds.
+    
+    mapping(uint256 => uint256) public v1TokenIdToV2TokenId;
+    mapping(uint256 => uint256) public v2TokenIdToV1TokenId;
+    uint256 public nextV1TokenId;
+    
+    bool public preregistrationComplete;
+    StickerRegistry public stickerRegistry;
+    
     uint256 public constant MIN_REGISTRATION_DURATION = 365 days;
-
-    /// @notice The minimum name length.
     uint256 public constant MIN_NAME_LENGTH = 1;
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          ERRORS                            */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice Thrown when a name is not available.
-    ///
-    /// @param name The name that is not available.
     error NameNotAvailable(string name);
-
-    /// @notice Thrown when a name's duration is not longer than `MIN_REGISTRATION_DURATION`.
-    ///
-    /// @param duration The duration that was too short.
     error DurationTooShort(uint256 duration);
-
-    /// @notice Thrown when Multicallable resolver data was specified but not resolver address was provided.
     error ResolverRequiredWhenDataSupplied();
-
-    /// @notice Thrown when the payment received is less than the price.
     error InsufficientValue();
-
-    /// @notice Thrown when a refund transfer is unsuccessful.
     error TransferFailed();
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          EVENTS                            */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice Emitted when an ETH payment was processed successfully.
-    ///
-    /// @param payee Address that sent the ETH.
-    /// @param price Value that was paid.
     event ETHPaymentProcessed(address indexed payee, uint256 price);
 
     event NameRegistered(
@@ -149,28 +91,10 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         uint256 expires
     );
 
-    /// @notice Emitted when the price oracle is updated.
-    ///
-    /// @param newPrices The address of the new price oracle.
     event PriceOracleUpdated(address newPrices);
 
-    /// @notice Emitted when the reverse registrar is updated.
-    ///
-    /// @param newReverseRegistrar The address of the new reverse registrar.
     event ReverseRegistrarUpdated(address newReverseRegistrar);
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          MODIFIERS                         */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @notice Decorator for validating registration requests.
-    ///
-    /// @dev Validates that:
-    ///     1. There is a `resolver` specified` when `data` is set
-    ///     2. That the name is `available()`
-    ///     3. That the registration `duration` is sufficiently long
-    ///
-    /// @param request The RegisterRequest that is being validated.
+    
     modifier validRegistration(RegisterRequest memory request) {
         if (request.data.length > 0 && request.resolver == address(0)) {
             revert ResolverRequiredWhenDataSupplied();
@@ -338,73 +262,35 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         (, bytes32 node) = NameEncoder.dnsEncodeName(name);
         return node;
     }
-
-    /// @notice Allows the `owner` to set the pricing oracle contract.
-    ///
-    /// @dev Emits `PriceOracleUpdated` after setting the `prices` contract.
-    ///
-    /// @param prices_ The new pricing oracle.
     function setPriceOracle(IPriceOracle prices_) external onlyOwner {
         prices = prices_;
         emit PriceOracleUpdated(address(prices_));
     }
 
-    /// @notice Allows the `owner` to set the reverse registrar contract.
-    ///
-    /// @dev Emits `ReverseRegistrarUpdated` after setting the `reverseRegistrar` contract.
-    ///
-    /// @param reverse_ The new reverse registrar contract.
     function setReverseRegistrar(IReverseRegistrar reverse_) external onlyOwner {
         reverseRegistrar = reverse_;
         emit ReverseRegistrarUpdated(address(reverse_));
     }
 
-    /// @notice Checks whether the provided `name` is long enough.
-    ///
-    /// @param name The name to check the length of.
-    ///
-    /// @return `true` if the name is equal to or longer than MIN_NAME_LENGTH, else `false`.
     function valid(string memory name) public pure returns (bool) {
         return name.strlen() >= MIN_NAME_LENGTH;
     }
 
-    /// @notice Checks whether the provided `name` is available.
-    ///
-    /// @param name The name to check the availability of.
-    ///
-    /// @return `true` if the name is `valid` and available on the `base` registrar, else `false`.
     function available(string memory name) public view returns (bool) {
         bytes32 label = keccak256(bytes(name));
         return valid(name) && base.isAvailable(uint256(label));
     }
 
-    /// @notice Checks the rent price for a provided `name` and `duration`.
-    ///
-    /// @param name The name to check the rent price of.
-    /// @param duration The time that the name would be rented.
-    ///
-    /// @return price The `Price` tuple containing the base and premium prices respectively, denominated in wei.
     function rentPrice(string memory name, uint256 duration) public view returns (IPriceOracle.Price memory price) {
         bytes32 label = keccak256(bytes(name));
         price = prices.price(name, _getExpiry(uint256(label)), duration);
     }
 
-    /// @notice Checks the register price for a provided `name` and `duration`.
-    ///
-    /// @param name The name to check the register price of.
-    /// @param duration The time that the name would be registered.
-    ///
-    /// @return The all-in price for the name registration, denominated in wei.
     function registerPrice(string memory name, uint256 duration) public view returns (uint256) {
         IPriceOracle.Price memory price = rentPrice(name, duration);
-        return price.base; // + price.premium;
+        return price.base + price.premium;
     }
 
-    /// @notice Enables a caller to register a name.
-    ///
-    /// @dev Validates the registration details via the `validRegistration` modifier.
-    ///
-    /// @param request The `RegisterRequest` struct containing the details for the registration.
     function register(RegisterRequest memory request) public validRegistration(request) {
         uint256 price = registerPrice(request.name, request.duration);
 
@@ -417,15 +303,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         _register(request, price);
     }
 
-    /// @notice Allows a caller to renew a name for a specified duration.
-    ///
-    /// @dev This `payable` method must receive appropriate `msg.value` to pass `_validatePayment()`.
-    ///     The price for renewal never incorporates pricing `premium`. This is because we only expect
-    ///     renewal on names that are not expired or are in the grace period. Use the `base` price returned
-    ///     by the `rentPrice` tuple to determine the price for calling this method.
-    ///
-    /// @param name The name that is being renewed.
-    /// @param duration The duration to extend the expiry, in seconds.
     function renew(string calldata name, uint256 duration) external {
         bytes32 labelhash = keccak256(bytes(name));
         uint256 tokenId = uint256(labelhash);
@@ -438,40 +315,16 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         emit NameRenewed(name, labelhash, price.base, expires);
     }
 
-    /// @notice Internal helper for validating ETH payments
-    ///
-    /// @dev Emits `ETHPaymentProcessed` after validating the payment.
-    ///
-    /// @param price The expected value.
     function _transferPayment(uint256 price) internal {
         wethToken.transferFrom(msg.sender, address(this), price);
         emit ETHPaymentProcessed(msg.sender, price);
     }
 
-    /// @notice Helper for deciding whether to include a launch-premium.
-    ///
-    /// @dev If the token returns a `0` expiry time, it hasn't been registered before. On launch, this will be true for all
-    ///     names. Use the `launchTime` to establish a premium price around the actual launch time.
-    ///
-    /// @param tokenId The ID of the token to check for expiry.
-    ///
-    /// @return expires Returns the expiry + GRACE_PERIOD for previously registered names, else `launchTime`.
     function _getExpiry(uint256 tokenId) internal view returns (uint256 expires) {
         expires = base.nameExpires(tokenId);
         return expires + GRACE_PERIOD;
     }
-    
-    mapping(uint256 => uint256) public v1TokenIdToV2TokenId;
-    mapping(uint256 => uint256) public v2TokenIdToV1TokenId;
-    uint256 public nextV1TokenId;
 
-    /// @notice Shared registartion logic for both `register()` and `discountedRegister()`.
-    ///
-    /// @dev Will set records in the specified resolver if the resolver address is non zero and there is `data` in the `request`.
-    ///     Will set the reverse record's owner as msg.sender if `reverseRecord` is `true`.
-    ///     Emits `NameRegistered` upon successful registration.
-    ///
-    /// @param request The `RegisterRequest` struct containing the details for the registration.
     function _register(RegisterRequest memory request, uint256 baseCost) internal {
         uint256 v2TokenId = uint256(keccak256(bytes(request.name)));
         nextV1TokenId++;
@@ -492,38 +345,21 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         
         recordAndEmitEvent(
             "NameRegistered(string,bytes32,address,uint256,uint256,uint256)",
-            abi.encode(keccak256(bytes(request.name)), request.owner), // indexed params
-            abi.encode(request.name, baseCost, 0, expires)       // non-indexed params
+            abi.encode(keccak256(bytes(request.name)), request.owner),
+            abi.encode(request.name, baseCost, 0, expires)
         );
     }
 
-    /// @notice Uses Multicallable to iteratively set records on a specified resolver.
-    ///
-    /// @dev `multicallWithNodeCheck` ensures that each record being set is for the specified `label`.
-    ///
-    /// @param resolverAddress The address of the resolver to set records on.
-    /// @param label The keccak256 namehash for the specified name.
-    /// @param data  The abi encoded calldata records that will be used in the multicallable resolver.
     function _setRecords(address resolverAddress, bytes32 label, bytes[] memory data) internal {
         bytes32 nodehash = keccak256(abi.encodePacked(rootNode, label));
         L2Resolver resolver = L2Resolver(resolverAddress);
         resolver.multicallWithNodeCheck(nodehash, data);
     }
 
-    /// @notice Sets the reverse record to `owner` for a specified `name` on the specified `resolver.
-    ///
-    /// @param name The specified name.
-    /// @param resolver The resolver to set the reverse record on.
-    /// @param owner  The owner of the reverse record.
     function _setReverseRecord(string memory name, address resolver, address owner) internal {
         reverseRegistrar.setNameForAddr(msg.sender, owner, resolver, string.concat(name, rootName));
     }
 
-    /// @notice Allows the owner to recover ERC20 tokens sent to the contract by mistake.
-    ///
-    /// @param _to The address to send the tokens to.
-    /// @param _token The address of the ERC20 token to recover
-    /// @param _amount The amount of tokens to recover.
     function recoverFunds(address _token, address _to, uint256 _amount) external onlyOwner {
         IERC20(_token).safeTransfer(_to, _amount);
     }
@@ -535,8 +371,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
     function unpause() public onlyOwner {
         _unpause();
     }
-    
-    bool public preregistrationComplete;
     
     function importFromPreregistration(
         string[] memory names,
@@ -625,10 +459,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         preregistrationComplete = true;
     }
     
-    function makeNode(bytes32 label) public view returns (bytes32) {
-        return keccak256(abi.encodePacked(label));
-    }
-    
     function setCardDetails(
         uint256 tokenId,
         string memory displayName,
@@ -658,8 +488,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
             string memory key = i == 0 ? "url" : string.concat("url", (i + 1).toString());
             resolver.setText(subnode, key, links[i]);
         }
-
-        // emit CardDetailsSet(node, displayName, bio, imageURI, links);
     }
     
     function registerNameWithPayment(address to, string memory name, uint256 durationInSeconds) public {
@@ -681,9 +509,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         bytes32 node = _encodeName(name.concat(rootName));
         resolver.setAddr(node, to);
     }
-    
-    StickerRegistry public stickerRegistry;
-    
+       
     function withdrawWETH() public onlyOwner {
         uint256 amount = ERC20(wethToken).balanceOf(address(this));
         wethToken.transfer(owner(), amount);
