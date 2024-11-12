@@ -30,6 +30,9 @@ abstract contract EventReplayable {
     
     function _emitStoredEvent(IMigrationManager.StoredEvent memory storedEvent) internal {
         bytes32 eventHash = storedEvent.eventHash;
+        
+        require(eventHash != bytes32(0), "Event hash cannot be zero");
+        
         bytes32[] memory topics = storedEvent.topics;
         bytes memory nonIndexedData = storedEvent.data;
         

@@ -54,7 +54,7 @@ contract EventReplayableTest is Test {
         emitter.emitTestEvent(eventSig, indexedParams, nonIndexedData);
         
         // Verify event was stored
-        assertEq(migrationManager.storedEventsLength(), 1);
+        assertEq(migrationManager.storedEventsCount(), 1);
         
         // Test in V2 mode - should not store
         vm.etch(MigrationLib.DUMMY_ADDRESS, "");
@@ -62,7 +62,7 @@ contract EventReplayableTest is Test {
         emitter.emitTestEvent(eventSig, indexedParams, nonIndexedData);
         
         // Verify no new event was stored
-        assertEq(migrationManager.storedEventsLength(), 1);
+        assertEq(migrationManager.storedEventsCount(), 1);
     }
 
     function testEmitEventWithOneIndexedParam() public {

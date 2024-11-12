@@ -25,56 +25,66 @@ contract MigrationManager is EventReplayable, IMigrationManager {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     using EnumerableSetLib for EnumerableSetLib.Uint256Set;
     
+    uint256 public constant MAX_EVENTS_PER_BATCH = 100;
+    
     bool public migrationExecuted;
     
-    IMigrationManager.StoredEvent[] public storedEvents;
+    uint32 public lastStoredEventIndex;
+    uint32 public storedEventProcessedCount;
+    uint32 public currentBatchEmittedEvents;
+    uint32 public totalEmittedEvents;
+    uint32 public totalEventsToEmit;
     
-    function recordEvent(
-        IMigrationManager.StoredEvent memory storedEvent
-    ) external whileInV1 {
-        storedEvents.push(storedEvent);
-    }
-    
-    function storedEventsLength() public view returns (uint256) {
-        return storedEvents.length;
-    }
+    mapping(uint256 => StoredEvent) public storedEvents;
     
     EnumerableSetLib.AddressSet factories;
+    mapping(address => EnumerableSetLib.AddressSet) factoryToPairs;
+    EnumerableSetLib.AddressSet pairCreateEventEmitted;
+    
+    EnumerableSetLib.AddressSet allERC20Tokens;
+    mapping(address => EnumerableSetLib.AddressSet) erc20TokenToHolders;
+    
+    EnumerableSetLib.AddressSet allERC721Tokens;
+    mapping(address => EnumerableSetLib.Uint256Set) erc721TokenToTokenIds;
+    
+    
+    function recordEvent(
+        StoredEvent memory storedEvent
+    ) external whileInV1 {
+        require(storedEvent.eventHash != bytes32(0), "Event hash cannot be zero");
+        
+        storedEvents[lastStoredEventIndex] = storedEvent;
+        lastStoredEventIndex++;
+    }
+    
+    function storedEventsCount() public view returns (uint256) {
+        return lastStoredEventIndex - storedEventProcessedCount;
+    }
+    
     function getFactories() public view returns (address[] memory) {
         return factories.values();
     }
     
-    mapping(address => EnumerableSetLib.AddressSet) factoryToPairs;
     function getFactoryToPairs(address factory) public view returns (address[] memory) {
         return factoryToPairs[factory].values();
     }
     
-    EnumerableSetLib.AddressSet allERC20Tokens;
     function getAllERC20Tokens() public view returns (address[] memory) {
         return allERC20Tokens.values();
     }
     
-    mapping(address => EnumerableSetLib.AddressSet) erc20TokenToHolders;
     function getERC20TokenToHolders(address token) public view returns (address[] memory) {
         return erc20TokenToHolders[token].values();
     }
     
-    EnumerableSetLib.AddressSet allERC721Tokens;
     function getAllERC721Tokens() public view returns (address[] memory) {
         return allERC721Tokens.values();
     }
     
-    mapping(address => EnumerableSetLib.Uint256Set) erc721TokenToTokenIds;
     function getERC721TokenToTokenIds(address token) public view returns (uint256[] memory) {
         return erc721TokenToTokenIds[token].values();
     }
     
-    uint256 public currentBatchEmittedEvents;
-    uint256 public totalEmittedEvents;
-    uint256 public totalEventsToEmit;
-    uint256 public constant MAX_EVENTS_PER_BATCH = 100;
-    
-    EnumerableSetLib.AddressSet pairCreateEventEmitted;
     function getPairCreateEventEmitted() public view returns (address[] memory) {
         return pairCreateEventEmitted.values();
     }
@@ -131,7 +141,7 @@ contract MigrationManager is EventReplayable, IMigrationManager {
                 totalFactoriesEvents += pairCount * 2;
             }
             
-            return totalERC20Events + totalERC721Events + totalFactoriesEvents + storedEventsLength();
+            return totalERC20Events + totalERC721Events + totalFactoriesEvents + storedEventsCount();
         }
     }
     
@@ -147,7 +157,7 @@ contract MigrationManager is EventReplayable, IMigrationManager {
         require(!migrationExecuted, "Migration already executed");
         
         if (totalEventsToEmit == 0) {
-            totalEventsToEmit = calculateTotalEventsToEmit();
+            totalEventsToEmit = uint32(calculateTotalEventsToEmit());
         }
         
         currentBatchEmittedEvents = 0;
@@ -184,25 +194,21 @@ contract MigrationManager is EventReplayable, IMigrationManager {
         return currentBatchEmittedEvents >= MAX_EVENTS_PER_BATCH;
     }
     
-    uint256 public processedCount;
-    
     function processStoredEvents() internal whileInV2 {
-        while (processedCount < storedEvents.length && !batchFinished()) {
-            // Process from the beginning of the array
-            IMigrationManager.StoredEvent memory storedEvent = storedEvents[processedCount];
+        uint32 currentIndex = storedEventProcessedCount;
+        uint32 endIndex = lastStoredEventIndex;
+        
+        while (currentIndex < endIndex && !batchFinished()) {
+            StoredEvent storage storedEvent = storedEvents[currentIndex];
             
-            // Replay the event
             EventReplayable(storedEvent.emitter).emitStoredEvent(storedEvent);
+            delete storedEvents[currentIndex];
+            
+            currentIndex++;
             currentBatchEmittedEvents++;
-            processedCount++;
         }
         
-        // After processing, remove the processed events
-        if (processedCount == storedEvents.length) {
-            for (uint256 i = 0; i < processedCount; i++) {
-                storedEvents.pop();
-            }
-        }
+        storedEventProcessedCount = currentIndex;
     }
     
     function processERC20Tokens() internal whileInV2 {
