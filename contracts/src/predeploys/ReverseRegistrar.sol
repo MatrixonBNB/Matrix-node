@@ -56,7 +56,7 @@ contract ReverseRegistrar is Ownable, Initializable {
     ///
     /// @param addr The address for which the the record was set.
     /// @param node  The namehashed node that was set as the base reverse record.
-    event BaseReverseClaimed(address indexed addr, bytes32 indexed node);
+    event FacetReverseClaimed(address indexed addr, bytes32 indexed node);
 
     /// @notice Emitted when the default Resolver is changed by the `owner`.
     ///
@@ -162,7 +162,7 @@ contract ReverseRegistrar is Ownable, Initializable {
     {
         bytes32 labelHash = Sha3.hexAddress(addr);
         bytes32 baseReverseNode = keccak256(abi.encodePacked(reverseNode, labelHash));
-        emit BaseReverseClaimed(addr, baseReverseNode);
+        emit FacetReverseClaimed(addr, baseReverseNode);
         registry.setSubnodeRecord(reverseNode, labelHash, owner, resolver, 0);
         return baseReverseNode;
     }

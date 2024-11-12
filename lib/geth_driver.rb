@@ -43,9 +43,7 @@ module GethDriver
     puts command
   end
   
-  def get_state_dump
-    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
-
+  def get_state_dump(geth_dir = ENV.fetch('LOCAL_GETH_DIR'))
     command = [
       "#{geth_dir}/build/bin/geth",
       'dump',

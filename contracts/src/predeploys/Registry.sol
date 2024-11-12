@@ -100,7 +100,12 @@ contract Registry is ENS, Initializable, EventReplayable {
     /// @param owner_ The address of the new owner.
     function setOwner(bytes32 node, address owner_) public virtual override authorized(node) {
         _setOwner(node, owner_);
-        emit Transfer(node, owner_);
+
+        recordAndEmitEvent(
+            "Transfer(bytes32,address)",
+            abi.encode(node),
+            abi.encode(owner_)
+        );
     }
 
     /// @notice Transfers ownership of a subnode to a new address.

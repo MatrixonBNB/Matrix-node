@@ -124,6 +124,23 @@ contract L2Resolver is
         _initializeOwner(owner_);
         IReverseRegistrar(reverseRegistrar_).claim(owner_);
     }
+
+    function setText(
+        bytes32 node,
+        string calldata key,
+        string calldata value
+    ) external virtual override authorised(node) {
+        versionable_texts[recordVersions[node]][node][key] = value;
+        
+        recordAndEmitEvent(
+            "TextChanged(bytes32,string,string,string)",
+            abi.encode(
+                node,                       // indexed node (bytes32)
+                keccak256(bytes(key))      // indexed indexedKey (string gets hashed)
+            ),
+            abi.encode(key, value)    // non-indexed params
+        );
+    }
     
     uint256 private constant COIN_TYPE_ETH = 60;
     function setAddr(
