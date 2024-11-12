@@ -161,17 +161,6 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, 
     /// @param expires The new expiry for the name.
     event NameRenewed(uint256 indexed id, uint256 expires);
 
-    /// @notice Emitted when a name is registered with ENS Records.
-    ///
-    /// @param id The id of the newly registered name.
-    /// @param owner The owner of the registered name.
-    /// @param expires The expiry of the new ownership record.
-    /// @param resolver The address of the resolver for the name.
-    /// @param ttl The time-to-live for the name.
-    event NameRegisteredWithRecord(
-        uint256 indexed id, address indexed owner, uint256 expires, address resolver, uint64 ttl
-    );
-
     /// @notice Emitted when metadata for a token range is updated.
     ///
     /// @dev Useful for third-party platforms such as NFT marketplaces who can update
@@ -324,7 +313,13 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, 
     {
         uint256 expiry = _localRegister(id, owner, duration);
         s().registry.setSubnodeRecord(s().baseNode, bytes32(id), owner, resolver, ttl);
-        emit NameRegisteredWithRecord(id, owner, expiry, resolver, ttl);
+        
+        recordAndEmitEvent(
+            "NameRegistered(uint256,address,uint256)",
+            abi.encode(id, owner),
+            abi.encode(expiry)
+        );
+        
         return expiry;
     }
 
