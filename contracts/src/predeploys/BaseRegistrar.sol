@@ -48,6 +48,42 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, 
         uint256 nextV1TokenId;
     }
     
+    function nameExpires(uint256 tokenId) public view returns (uint256) {
+        return s().nameExpires[tokenId];
+    }
+    
+    function controllers(address user) public view returns (bool) {
+        return s().controllers[user];
+    }
+    
+    function registry() public view returns (ENS) {
+        return s().registry;
+    }
+    
+    function baseNode() public view returns (bytes32) {
+        return s().baseNode;
+    }
+    
+    function _baseURI() public view returns (string memory) {
+        return s()._baseURI;
+    }
+    
+    function _collectionURI() public view returns (string memory) {
+        return s()._collectionURI;
+    }
+    
+    function v1TokenIdToV2TokenId(uint256 tokenId) public view returns (uint256) {
+        return s().v1TokenIdToV2TokenId[tokenId];
+    }
+    
+    function v2TokenIdToV1TokenId(uint256 tokenId) public view returns (uint256) {
+        return s().v2TokenIdToV1TokenId[tokenId];
+    }
+    
+    function nextV1TokenId() public view returns (uint256) {
+        return s().nextV1TokenId;
+    }
+    
     function s() internal pure returns (BaseRegistrarStorage storage bs) {
         bytes32 position = keccak256("BaseRegistrar.storage.v1");
         assembly {
@@ -189,10 +225,6 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    function nameExpires(uint256 tokenId) public view returns (uint256) {
-        return s().nameExpires[tokenId];
-    }
 
     /// @notice BaseRegistrar constructor used to initialize the configuration of the implementation.
     ///
