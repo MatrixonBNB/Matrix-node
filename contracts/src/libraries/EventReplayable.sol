@@ -14,32 +14,32 @@ abstract contract EventReplayable {
         // Convert indexed params to topics using shared helper
         bytes32[] memory topics = _bytesToTopics(indexedParamsEncoded);
         
-        IMigrationManager.StoredEvent memory storedEvent = IMigrationManager.StoredEvent({
-            emitter: address(this),
+        if (MigrationLib.isInMigration()) {
+            MigrationLib.manager().recordEvent({
+                eventHash: eventHash,
+                topics: topics,
+                data: nonIndexedData
+            });
+        }
+        
+        _emitStoredEvent({
             eventHash: eventHash,
             topics: topics,
             data: nonIndexedData
         });
-        
-        if (MigrationLib.isInMigration()) {
-            MigrationLib.manager().recordEvent(storedEvent);
-        }
-        
-        _emitStoredEvent(storedEvent);
     }
     
-    function _emitStoredEvent(IMigrationManager.StoredEvent memory storedEvent) internal {
-        bytes32 eventHash = storedEvent.eventHash;
-        
+    function _emitStoredEvent(
+        bytes32 eventHash,
+        bytes32[] memory topics,
+        bytes memory data
+    ) internal {
         require(eventHash != bytes32(0), "Event hash cannot be zero");
         
-        bytes32[] memory topics = storedEvent.topics;
-        bytes memory nonIndexedData = storedEvent.data;
-        
-        uint256 dataLength = nonIndexedData.length;
+        uint256 dataLength = data.length;
         uint256 dataPtr;
         assembly {
-            dataPtr := add(nonIndexedData, 0x20)
+            dataPtr := add(data, 0x20)
         }
         
         uint256 indexedCount = topics.length;
@@ -54,7 +54,11 @@ abstract contract EventReplayable {
         }
     }
     
-    function emitStoredEvent(IMigrationManager.StoredEvent memory storedEvent) external {
+    function emitStoredEvent(
+        bytes32 eventHash,
+        bytes32[] memory topics,
+        bytes memory data
+    ) external {
         address manager = MigrationLib.MIGRATION_MANAGER;
         assembly {
             if xor(caller(), manager) {
@@ -63,7 +67,7 @@ abstract contract EventReplayable {
             }
         }
         
-        _emitStoredEvent(storedEvent);
+        _emitStoredEvent(eventHash, topics, data);
     }
     
     function _bytesToTopics(bytes memory indexedParams) internal pure returns (bytes32[] memory) {

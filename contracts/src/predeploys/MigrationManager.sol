@@ -48,9 +48,18 @@ contract MigrationManager is EventReplayable, IMigrationManager {
     mapping(address => EnumerableSetLib.Uint256Set) erc721TokenToTokenIds;
     
     function recordEvent(
-        StoredEvent memory storedEvent
+        bytes32 eventHash,
+        bytes32[] memory topics,
+        bytes memory data
     ) external whileInV1 {
-        require(storedEvent.eventHash != bytes32(0), "Event hash cannot be zero");
+        require(eventHash != bytes32(0), "Event hash cannot be zero");
+        
+        StoredEvent memory storedEvent = StoredEvent({
+            emitter: msg.sender,
+            eventHash: eventHash,
+            topics: topics,
+            data: data
+        });
         
         storedEvents[lastStoredEventIndex] = storedEvent;
         
@@ -188,7 +197,11 @@ contract MigrationManager is EventReplayable, IMigrationManager {
             while (currentIndex < endIndex && !batchFinished()) {
                 StoredEvent storage storedEvent = storedEvents[currentIndex];
                 
-                EventReplayable(storedEvent.emitter).emitStoredEvent(storedEvent);
+                EventReplayable(storedEvent.emitter).emitStoredEvent(
+                    storedEvent.eventHash,
+                    storedEvent.topics,
+                    storedEvent.data
+                );
                 delete storedEvents[currentIndex];
                 
                 currentIndex++;

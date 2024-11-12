@@ -12,7 +12,11 @@ interface IMigrationManager {
     function recordERC20Holder(address holder) external;
     function recordERC721TokenId(uint256 id) external;
     function recordPairCreation(address pair) external;
-    function recordEvent(StoredEvent memory storedEvent) external;
+    function recordEvent(
+        bytes32 eventHash,
+        bytes32[] memory topics,
+        bytes memory data
+    ) external;
 }
 
 library MigrationLib {
