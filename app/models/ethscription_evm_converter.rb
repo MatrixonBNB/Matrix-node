@@ -48,6 +48,8 @@ module EthscriptionEVMConverter
           
           predeploy_address = Eth::Util.keccak256("RegistrarController").last(20).bytes_to_hex
           
+          data['args']['charCountToUsdWeiCentsPrice'] << data['args']['charCountToUsdWeiCentsPrice'].last
+          
           initialize_calldata = TransactionHelper.get_function_calldata(
             contract: contract,
             function: 'initialize',
