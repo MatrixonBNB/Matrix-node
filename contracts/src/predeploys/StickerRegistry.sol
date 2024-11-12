@@ -99,6 +99,14 @@ contract StickerRegistry is Upgradeable, Initializable, FacetOwnable, FacetEIP71
         _initializeUpgradeAdmin(msg.sender);
         s().nextStickerId = 1;
     }
+    
+    function _verifyingAddress() internal view returns (address) {
+        if (MigrationLib.isInMigration()) {
+            return 0xde11257Ac24e96B8e39dF45dBd4D3cF32237D63D;
+        }
+        
+        return address(this);
+    }
 
     function createSticker(
         string memory name, 
@@ -139,14 +147,19 @@ contract StickerRegistry is Upgradeable, Initializable, FacetOwnable, FacetEIP71
             "Sticker expired"
         );
         
-        // bytes memory message = abi.encode(
-        //     keccak256("StickerClaim(uint256 stickerId,address claimer,uint256 deadline)"),
-        //     stickerId,
-        //     originalSender,
-        //     deadline
-        // );
+        bytes memory message = abi.encode(
+            keccak256("StickerClaim(uint256 stickerId,address claimer,uint256 deadline)"),
+            stickerId,
+            originalSender,
+            deadline
+        );
         
-        // verifySignatureAgainstNewAndOldChainId(message, signature, s().stickers[stickerId].signer);
+        verifySignatureAgainstNewAndOldChainId(
+            message,
+            signature,
+            s().stickers[stickerId].signer,
+            _verifyingAddress()
+        );
         
         user.stickerIdsAwardedMap[stickerId] = true;
         user.stickerAry.push(stickerId);

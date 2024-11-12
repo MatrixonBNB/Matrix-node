@@ -22,7 +22,6 @@ import {ENS} from "ens-contracts/registry/ENS.sol";
 import {Pausable} from "src/libraries/Pausable.sol";
 // import {console} from "forge-std/console.sol";
 import {ERC1967Proxy} from "src/libraries/ERC1967Proxy.sol";
-import "src/libraries/FacetEIP712.sol";
 import "solady/utils/Initializable.sol";
 
 /// @title Registrar Controller
@@ -43,7 +42,7 @@ import "src/libraries/MigrationLib.sol";
 
 import {EventReplayable} from "src/libraries/EventReplayable.sol";
 
-contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, EventReplayable {
+contract RegistrarController is Ownable, Pausable, Initializable, EventReplayable {
     using LibString for *;
     using StringUtils for *;
     using SafeERC20 for IERC20;
@@ -200,7 +199,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
     /*                        IMPLEMENTATION                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
-    constructor() EIP712() {
+    constructor() {
         _disableInitializers();
     }
 
@@ -736,17 +735,6 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
     }
     
     function claimSticker(uint256 stickerId, uint256 deadline, uint256 tokenId, uint256[2] memory position, bytes memory signature) public {
-        bytes memory message = abi.encode(
-            keccak256("StickerClaim(uint256 stickerId,address claimer,uint256 deadline)"),
-            stickerId,
-            msg.sender,
-            deadline
-        );
-        
-        StickerRegistry.Sticker memory sticker = stickerRegistry.getSticker(stickerId);
-        
-        verifySignatureAgainstNewAndOldChainId(message, signature, sticker.signer);
-        
         stickerRegistry.claimSticker(
             msg.sender,
             stickerId,
@@ -770,15 +758,5 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
     event ContractUpgraded(address indexed newImplementation);
     function upgrade(bytes32 newHash, string calldata newSource) external {
         emit ContractUpgraded(address(0));
-    }
-    
-    function _domainNameAndVersion() 
-        internal
-        view
-        override
-        returns (string memory name, string memory version)
-    {
-        name = "Facet Cards";
-        version = "1";
     }
 }

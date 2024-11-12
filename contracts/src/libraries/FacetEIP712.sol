@@ -11,6 +11,15 @@ abstract contract FacetEIP712 is EIP712 {
     using LibString for *;
     
     function verifySignatureAgainstNewAndOldChainId(bytes memory message, bytes memory signature, address signer) internal view {
+        verifySignatureAgainstNewAndOldChainId(message, signature, signer, address(this));
+    }
+    
+    function verifySignatureAgainstNewAndOldChainId(
+        bytes memory message, 
+        bytes memory signature, 
+        address signer,
+        address verifyingAddress
+    ) internal view {
         uint256 newChainId = block.chainid;
         uint256 oldChainId;
         
@@ -20,29 +29,31 @@ abstract contract FacetEIP712 is EIP712 {
             oldChainId = 11155111;
         }
         
-        bytes32 oldTypedDataHash = _hashTypedData(keccak256(message), oldChainId);
-        bytes32 newTypedDataHash = _hashTypedData(keccak256(message), newChainId);
+        bytes32 oldTypedDataHash = _hashTypedData(keccak256(message), oldChainId, verifyingAddress);
+        bytes32 newTypedDataHash = _hashTypedData(keccak256(message), newChainId, verifyingAddress);
         
-        bool valid = oldTypedDataHash.recover(signature) == signer || newTypedDataHash.recover(signature) == signer;
+        bool valid = oldTypedDataHash.recover(signature) == signer || 
+                    newTypedDataHash.recover(signature) == signer;
         
         require(valid, "FacetEIP712: signature does not match any valid chain id");
     }
   
     /// @dev Returns the EIP-712 domain separator.
-    function _buildDomainSeparator(uint256 chainId) private view returns (bytes32 separator) {
-        // We will use `separator` to store the name hash to save a bit of gas.
+    function _buildDomainSeparator(
+        uint256 chainId, 
+        address verifyingAddress
+    ) private view returns (bytes32 separator) {
         bytes32 versionHash;
-        
-        address verifyingAddress = address(this);
         
         (string memory name, string memory version) = _domainNameAndVersion();
         separator = keccak256(bytes(name));
         versionHash = keccak256(bytes(version));
+        
         /// @solidity memory-safe-assembly
         assembly {
-            let m := mload(0x40) // Load the free memory pointer.
+            let m := mload(0x40)
             mstore(m, _DOMAIN_TYPEHASH)
-            mstore(add(m, 0x20), separator) // Name hash.
+            mstore(add(m, 0x20), separator)
             mstore(add(m, 0x40), versionHash)
             mstore(add(m, 0x60), chainId)
             mstore(add(m, 0x80), verifyingAddress)
@@ -54,17 +65,22 @@ abstract contract FacetEIP712 is EIP712 {
         revert("Pass in chainId");
      }
 
-    function _hashTypedData(bytes32 structHash, uint256 chainId) internal view virtual returns (bytes32 digest) {
-        // We will use `digest` to store the domain separator to save a bit of gas.
-        digest = _buildDomainSeparator(chainId);
+    function _hashTypedData(bytes32 structHash, uint256 chainId) internal view virtual returns (bytes32) {
+        return _hashTypedData(structHash, chainId, address(this));
+    }
+
+    function _hashTypedData(
+        bytes32 structHash, 
+        uint256 chainId,
+        address verifyingAddress
+    ) internal view virtual returns (bytes32 digest) {
+        digest = _buildDomainSeparator(chainId, verifyingAddress);
         /// @solidity memory-safe-assembly
         assembly {
-            // Compute the digest.
             mstore(0x00, 0x1901000000000000) // Store "\x19\x01".
             mstore(0x1a, digest) // Store the domain separator.
             mstore(0x3a, structHash) // Store the struct hash.
             digest := keccak256(0x18, 0x42)
-            // Restore the part of the free memory slot that was overwritten.
             mstore(0x3a, 0)
         }
     }
