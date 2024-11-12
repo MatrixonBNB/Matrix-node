@@ -413,8 +413,7 @@ class LegacyMigrationDataGenerator
         'PresaleBuy',
         'PresaleSell',
         'TokensClaimed',
-        'MetadataRendererUpdated',
-        # 'Transfer'
+        'MetadataRendererUpdated'
       ])
     end
   end
@@ -497,34 +496,15 @@ class LegacyMigrationDataGenerator
           elsif compare_addresses(legacy_value, facet_value)
             # Addresses match, do nothing
           else
-            if facet_event['event'] == 'Transfer' && (facet_event['data'].include?("id") || legacy_event['data'].include?("id"))
-              return
-            end
-            
-            return if legacy_receipt.id == 341807
-            
             binding.irb
             raise "#{event_name} attribute mismatch: Legacy #{legacy_attribute} #{legacy_value} does not match Facet #{facet_attribute} #{facet_value}"
           end
         end
       end
     elsif (legacy_event || facet_event) && !global_special_cases.include?(legacy_receipt.transaction_hash)
-      return if legacy_receipt.status == 'failure'
-      
-      if facet_event['event'] == "Transfer" && facet_event['data'].length == 2
-        return
-      end
-      
-      if facet_event['event'] == 'Transfer' && facet_event['data'].include?("id")
-        return
-      end
-      
       binding.irb
       raise "#{event_name} event presence mismatch: Legacy event present? #{!!legacy_event}, Facet event present? #{!!facet_event}"
     end
-  rescue => e
-    binding.irb
-    raise
   end
 
   def compare_addresses(legacy_addr, facet_addr)
