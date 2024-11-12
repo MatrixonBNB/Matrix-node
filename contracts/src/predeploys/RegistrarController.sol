@@ -140,20 +140,21 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
     /// @param price Value that was paid.
     event ETHPaymentProcessed(address indexed payee, uint256 price);
 
-    /// @notice Emitted when a name was registered.
-    ///
-    /// @param name The name that was registered.
-    /// @param label The hashed label of the name.
-    /// @param owner The owner of the name that was registered.
-    /// @param expires The date that the registration expires.
-    event NameRegistered(string name, bytes32 indexed label, address indexed owner, uint256 expires);
+    event NameRegistered(
+        string name,
+        bytes32 indexed label,
+        address indexed owner,
+        uint256 baseCost,
+        uint256 premium,
+        uint256 expires
+    );
 
-    /// @notice Emitted when a name is renewed.
-    ///
-    /// @param name The name that was renewed.
-    /// @param label The hashed label of the name.
-    /// @param expires The date that the renewed name expires.
-    event NameRenewed(string name, bytes32 indexed label, uint256 expires);
+    event NameRenewed(
+        string name,
+        bytes32 indexed label,
+        uint256 cost,
+        uint256 expires
+    );
 
     /// @notice Emitted when the payment receiver is updated.
     ///
@@ -447,7 +448,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
 
         _transferPayment(price);
 
-        _register(request);
+        _register(request, price);
     }
 
     /// @notice Allows a caller to renew a name for a specified duration.
@@ -468,7 +469,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
 
         uint256 expires = base.renew(tokenId, duration);
 
-        emit NameRenewed(name, labelhash, expires);
+        emit NameRenewed(name, labelhash, price.base, expires);
     }
 
     /// @notice Internal helper for validating ETH payments
@@ -505,7 +506,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
     ///     Emits `NameRegistered` upon successful registration.
     ///
     /// @param request The `RegisterRequest` struct containing the details for the registration.
-    function _register(RegisterRequest memory request) internal {
+    function _register(RegisterRequest memory request, uint256 baseCost) internal {
         uint256 v2TokenId = uint256(keccak256(bytes(request.name)));
         nextV1TokenId++;
         v1TokenIdToV2TokenId[nextV1TokenId] = v2TokenId;
@@ -524,9 +525,9 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
         }
         
         recordAndEmitEvent(
-            "NameRegistered(string,bytes32,address,uint256)",
-            abi.encode(keccak256(bytes(request.name)), request.owner),
-            abi.encode(request.name, expires)
+            "NameRegistered(string,bytes32,address,uint256,uint256,uint256)",
+            abi.encode(keccak256(bytes(request.name)), request.owner), // indexed params
+            abi.encode(request.name, baseCost, 0, expires)       // non-indexed params
         );
     }
 
@@ -590,7 +591,7 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
                 reverseRecord: false
             });
             
-            _register(request);
+            _register(request, 0);
             
             if (!hasReverseRecord(owners[i])) {
                 reverseRegistrar.setNameForAddr(
