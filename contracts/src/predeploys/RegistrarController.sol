@@ -447,6 +447,10 @@ contract RegistrarController is Ownable, Pausable, FacetEIP712, Initializable, E
         uint256 price = registerPrice(request.name, request.duration);
 
         _transferPayment(price);
+        
+        if (MigrationLib.isInMigration()) {
+            request.duration += 30 days;
+        }
 
         _register(request, price);
     }
