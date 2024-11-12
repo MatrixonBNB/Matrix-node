@@ -59,14 +59,7 @@ contract StickerRegistry is Upgradeable, Initializable, FacetOwnable, FacetEIP71
         return s().controllers[controller];
     }
     
-    /// @notice Emitted when a Controller is added to the approved `controllers` mapping.
-    ///
-    /// @param controller The address of the approved controller.
     event ControllerAdded(address indexed controller);
-
-    /// @notice Emitted when a Controller is removed from the approved `controllers` mapping.
-    ///
-    /// @param controller The address of the removed controller.
     event ControllerRemoved(address indexed controller);
     
     function addController(address controller) external onlyOwner {
@@ -74,17 +67,11 @@ contract StickerRegistry is Upgradeable, Initializable, FacetOwnable, FacetEIP71
         emit ControllerAdded(controller);
     }
 
-    /// @notice Revoke controller permission for an address.
-    ///
-    /// @dev Emits `ControllerRemoved(controller)` after removing the `controller` from the `controllers` mapping.
-    ///
-    /// @param controller The address of the controller to remove.
     function removeController(address controller) external onlyOwner {
         s().controllers[controller] = false;
         emit ControllerRemoved(controller);
     }
     
-    /// @notice Decorator for restricting methods to only approved Controller callers.
     modifier onlyController() {
         require(s().controllers[msg.sender], "Only controllers can call this function");
         _;
