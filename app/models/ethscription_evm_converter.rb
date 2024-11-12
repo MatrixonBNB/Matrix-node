@@ -43,12 +43,31 @@ module EthscriptionEVMConverter
       predeploy_address = "0x" + data['init_code_hash'].last(40)
       
       if predeploy_address == "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139"
-        if data['args']['name'] == "Facet Cards"
-          data['args']['name'] = "Facet Names"
-          data['args']['symbol'] = "FACETNAME"
+        if data['args']['name'] == "Facet Cards" && creator == '0xc2172a6315c1d7f6855768f843c420ebb36eda97'
+          contract = get_contract_from_predeploy_info(name: "RegistrarController")
+          
+          predeploy_address = Eth::Util.keccak256("RegistrarController").last(20).bytes_to_hex
+          
+          data['args']['charCountToUsdWeiCentsPrice'] << data['args']['charCountToUsdWeiCentsPrice'].last
+          
+          initialize_calldata = TransactionHelper.get_function_calldata(
+            contract: contract,
+            function: 'initialize',
+            args: [
+              "Facet Names",
+              "FACETNAME",
+              data['args']['owner'],
+              data['args']['charCountToUsdWeiCentsPrice'],
+              data['args']['_WETH'],
+            ]
+          )
+          
+          proxy_contract = get_contract_from_predeploy_info(name: "ERC1967Proxy")
+      
+          return EVMHelpers.get_deploy_data(
+            proxy_contract, [predeploy_address, initialize_calldata]
+          )
         end
-        
-        predeploy_address = "0x5844bea96e5ac147cd9ddc7daa22a0899659d2f5"
       elsif predeploy_address == "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d"
         predeploy_address = "0x89cfcf16d1fffb3937b47f1d1a22850c0ad80f6e"
       end

@@ -18,7 +18,23 @@ module PredeployManager
         
         map[address] = filename
       end
-    end 
+    end
+
+    contract_names = [
+      "BaseRegistrar",
+      "ExponentialPremiumPriceOracle",
+      "L2Resolver",
+      "RegistrarController",
+      "Registry",
+      "ReverseRegistrar",
+      "StickerRegistry"
+    ]
+    
+    contract_names.each do |name|
+      address = Eth::Util.keccak256(name).last(20).bytes_to_hex
+      
+      map[address] = name
+    end
     
     map["0x11110000000000000000000000000000000000c5"] = "NonExistentContractShim"
     map["0x22220000000000000000000000000000000000d6"] = "MigrationManager"
@@ -76,6 +92,8 @@ module PredeployManager
     merged = optimism_allocs.merge(our_allocs)
     
     if use_dump
+      merged.delete('0x22220000000000000000000000000000000000d6')
+      merged.delete('0x11110000000000000000000000000000000000c5')
       merged = processed_geth_dump.merge(merged)
     end
     
@@ -113,7 +131,7 @@ module PredeployManager
       abi: proxy_contract.abi,
       bin: proxy_contract.bin,
     }
-
+    
     File.write(PREDEPLOY_INFO_PATH, JSON.pretty_generate(predeploy_info))
     puts "Generated predeploy_info.json"
   end
@@ -243,7 +261,7 @@ module PredeployManager
       next if address == "0x11110000000000000000000000000000000000c5"
       contract_name = contract['name']
       
-      sol_file = LEGACY_DIR.join("#{contract_name}.sol")
+      sol_file = SOL_DIR.join('src', 'predeploys').join("#{contract_name}.sol")
       
       if sol_file.exist?
         command = [

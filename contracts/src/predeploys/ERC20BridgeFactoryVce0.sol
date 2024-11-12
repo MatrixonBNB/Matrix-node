@@ -6,8 +6,8 @@ import "src/libraries/Pausable.sol";
 import "src/libraries/Upgradeable.sol";
 import "src/libraries/FacetERC20.sol";
 import "./ERC20BridgeV1aa.sol";
-import "solady/src/utils/LibString.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/LibString.sol";
+import "solady/utils/Initializable.sol";
 import "src/libraries/ERC1967Proxy.sol";
 
 contract ERC20BridgeFactoryVce0 is Ownable, Pausable, Upgradeable, Initializable {

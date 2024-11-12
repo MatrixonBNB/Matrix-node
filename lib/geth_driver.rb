@@ -43,9 +43,7 @@ module GethDriver
     puts command
   end
   
-  def get_state_dump
-    geth_dir = ENV.fetch('LOCAL_GETH_DIR')
-
+  def get_state_dump(geth_dir = ENV.fetch('LOCAL_GETH_DIR'))
     command = [
       "#{geth_dir}/build/bin/geth",
       'dump',
@@ -154,6 +152,10 @@ module GethDriver
       
       abi_decoded = Eth::Abi.decode(['uint256'], result)
       num_transactions = abi_decoded.first
+      
+      if num_transactions.zero? && !Rails.env.test?
+        raise "First v2 block has no migration transactions"
+      end
       
       num_transactions.times do |i|
         system_txs << FacetTransaction.v1_to_v2_migration_tx_from_block(new_facet_block, batch_number: i + 1)

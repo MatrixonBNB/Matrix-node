@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/tokens/ERC721.sol";
+import "solady/tokens/ERC721.sol";
 import "src/libraries/FacetBuddyLib.sol";
 import "src/libraries/MigrationLib.sol";
+
+interface IBaseRegistrar {
+    function controllers(address user) external view returns (bool);
+}
 
 abstract contract FacetERC721 is ERC721 {
     using FacetBuddyLib for address;
@@ -38,7 +42,17 @@ abstract contract FacetERC721 is ERC721 {
             setApprovalForAll(msg.sender, true);
         }
         
+        if (MigrationLib.isInMigration() && isController(msg.sender)) {
+            _approve(from, msg.sender, id);
+        }
+        
         return super.transferFrom(from, to, id);
+    }
+    
+    function controllerSetApprovalForAll(address by, address operator, bool isApproved) public virtual {
+        if (MigrationLib.isInMigration() && isController(msg.sender)) {
+            _setApprovalForAll(by, operator, isApproved);
+        }
     }
     
     function setApprovalForAll(address operator, bool approved) public virtual override {
@@ -56,7 +70,8 @@ abstract contract FacetERC721 is ERC721 {
         
         address owner = ownerOf(id);
         
-        return MigrationLib.isInMigration() && spender.isBuddyOfUser(owner);
+        return MigrationLib.isInMigration() &&
+        (spender.isBuddyOfUser(owner) || isController(spender));
     }
     
     function _afterTokenTransfer(address, address, uint256 id) internal virtual override {
@@ -67,6 +82,14 @@ abstract contract FacetERC721 is ERC721 {
     
     function safeOwnerOf(uint256 id) external view returns (address) {
         return _ownerOf(id);
+    }
+    
+    function isController(address user) public view returns (bool) {
+        try IBaseRegistrar(address(this)).controllers(user) returns (bool result) {
+            return result;
+        } catch {
+            return false;
+        }
     }
     
     error NotMigrationManager();

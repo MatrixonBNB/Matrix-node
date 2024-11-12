@@ -5,8 +5,8 @@ import "src/libraries/FacetERC20.sol";
 import "src/libraries/Upgradeable.sol";
 import "src/predeploys/FacetSwapFactoryVac5.sol";
 import "src/interfaces/IFacetSwapV1Callee.sol";
-import "solady/src/utils/Initializable.sol";
-import "solady/src/utils/LibString.sol";
+import "solady/utils/Initializable.sol";
+import "solady/utils/LibString.sol";
 import "src/libraries/UQ112x112.sol";
 
 contract FacetSwapPairVdfd is FacetERC20, Initializable, Upgradeable {

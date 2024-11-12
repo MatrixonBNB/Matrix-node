@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
-import "solady/src/utils/LibString.sol";
+import "solady/utils/LibString.sol";
 import { stdJson } from "forge-std/StdJson.sol";
 
 contract L2Genesis is Script {
@@ -29,24 +29,26 @@ contract L2Genesis is Script {
         populatePredeployContracts();
     }
 
-    function run() public {
+    function runWithoutDump() public {
         vm.startPrank(deployer);
-        
         etchContracts();
         vm.stopPrank();
         
+        // Only clear genesis deployer state, not msg.sender
+        vm.deal(deployer, 0);
+        vm.resetNonce(deployer);
+    }
+
+    function run() public {
+        runWithoutDump();
+        
+        // Only do this cleanup in actual deployment, not tests
         vm.etch(msg.sender, "");
         vm.resetNonce(msg.sender);
         vm.deal(msg.sender, 0);
 
-        vm.deal(deployer, 0);
-        vm.resetNonce(deployer);
-
         console.log("Writing state dump to: genesis-test.json");
-        
         vm.dumpState("facet-local-genesis-allocs.json");
-        
-        // Write predeployContracts to JSON
         writePredeployContractsToJson();
     }
     
@@ -67,7 +69,9 @@ contract L2Genesis is Script {
     }
 
     function etchContract(string memory contractName, address addr) internal {
-        string memory artifactPath = string(abi.encodePacked("predeploys/", contractName, ".sol:", contractName));
+        string memory artifactPath = string(abi.encodePacked("src/predeploys/", contractName, ".sol"));
+        artifactPath = string(abi.encodePacked(artifactPath, ":", contractName));
+        
         bytes memory bytecode = vm.getDeployedCode(artifactPath);
         vm.etch(addr, bytecode);
         

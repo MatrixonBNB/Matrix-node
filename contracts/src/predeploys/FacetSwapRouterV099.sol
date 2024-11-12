@@ -5,7 +5,7 @@ import "src/libraries/Upgradeable.sol";
 import "./FacetSwapPairV2b2.sol";
 import "./FacetSwapFactoryVe7f.sol";
 import "src/libraries/FacetERC20.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 
 contract FacetSwapRouterV099 is Initializable, Upgradeable {
     struct FacetSwapRouterStorage {

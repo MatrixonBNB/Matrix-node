@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/Upgradeable.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Initializable.sol";
 
 contract ERC20BridgeV1aa is FacetERC20, Upgradeable, Initializable {
     event BridgedIn(address indexed to, uint256 amount);

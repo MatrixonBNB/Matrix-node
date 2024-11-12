@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/tokens/ERC20.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/tokens/ERC20.sol";
+import "solady/utils/Initializable.sol";
 import "src/libraries/MigrationLib.sol";
 
 contract FacetBuddyVe5c is Initializable {

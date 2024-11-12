@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "solady/src/auth/Ownable.sol";
+import "solady/auth/Ownable.sol";
 import "src/libraries/MigrationLib.sol";
 
 abstract contract FacetOwnable is Ownable {

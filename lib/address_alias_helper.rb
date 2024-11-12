@@ -5,6 +5,7 @@ module AddressAliasHelper
   OFFSET = 0x1111000000000000000000000000000000001111
   
   def apply_l1_to_l2_alias(l1_address)
+    l1_address = l1_address.downcase
     unless l1_address.match?(/\A0x[0-9a-f]{40}\z/)
       raise InvalidAddress, "Invalid address: #{l1_address.inspect}!"
     end
@@ -22,6 +23,7 @@ module AddressAliasHelper
   end
   
   def undo_l1_to_l2_alias(l2_address)
+    l2_address = l2_address.downcase
     unless l2_address.match?(/\A0x[0-9a-f]{40}\z/)
       raise InvalidAddress, "Invalid address: #{l2_address.inspect}!"
     end

@@ -8,9 +8,9 @@ import "src/libraries/FacetERC721.sol";
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/FacetERC2981.sol";
 import "src/libraries/FacetEIP712.sol";
-import "solady/src/utils/Initializable.sol";
-import "solady/src/utils/ECDSA.sol";
-import "solady/src/utils/SafeTransferLib.sol";
+import "solady/utils/Initializable.sol";
+import "solady/utils/ECDSA.sol";
+import "solady/utils/SafeTransferLib.sol";
 
 contract FacetPortV670 is Upgradeable, FacetOwnable, Pausable, Initializable, FacetEIP712 {
     using SafeTransferLib for address;

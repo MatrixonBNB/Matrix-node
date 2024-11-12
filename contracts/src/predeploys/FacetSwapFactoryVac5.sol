@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 
 import "src/libraries/Upgradeable.sol";
-import "solady/src/utils/Initializable.sol";
-import "solady/src/utils/LibString.sol";
+import "solady/utils/Initializable.sol";
+import "solady/utils/LibString.sol";
 import "./FacetSwapPairVdfd.sol";
 import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/MigrationLib.sol";

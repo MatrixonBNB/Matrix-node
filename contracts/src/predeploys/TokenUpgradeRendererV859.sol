@@ -5,9 +5,9 @@ import "src/libraries/Upgradeable.sol";
 import "src/predeploys/NFTCollectionVa11.sol";
 import "src/libraries/FacetERC721.sol";
 import "src/libraries/FacetERC20.sol";
-import "solady/src/utils/Base64.sol";
-import "solady/src/utils/LibString.sol";
-import "solady/src/utils/Initializable.sol";
+import "solady/utils/Base64.sol";
+import "solady/utils/LibString.sol";
+import "solady/utils/Initializable.sol";
 
 contract TokenUpgradeRendererV859 is Upgradeable, Initializable {
     using LibString for *;

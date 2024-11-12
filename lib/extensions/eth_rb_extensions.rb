@@ -177,10 +177,14 @@ module EthRbExtensions
       # Decode indexed data from topics
       decoded_event = {}
       indexed_inputs.each_with_index do |input, index|
-        value = Eth::Abi.decode([input["type"]], topics[index + 1]).first
-        value = value.bytes_to_hex if input["type"].starts_with?("bytes")
-        value = value.force_encoding("utf-8") if input["type"] == "string"
-        decoded_event[input["name"]] = value
+        if input["type"] == "string"
+          # For indexed strings, just keep the topic (hash) as-is
+          decoded_event[input["name"]] = topics[index + 1]
+        else
+          value = Eth::Abi.decode([input["type"]], topics[index + 1]).first rescue binding.irb
+          value = value.bytes_to_hex if input["type"].starts_with?("bytes")
+          decoded_event[input["name"]] = value
+        end
       end
       
       # Decode non-indexed data from data field

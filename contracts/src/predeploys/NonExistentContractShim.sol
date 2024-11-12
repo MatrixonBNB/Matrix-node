@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import "solady/src/utils/LibString.sol";
+import "solady/utils/LibString.sol";
 
 contract NonExistentContractShim {
     using LibString for *;

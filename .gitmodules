@@ -10,3 +10,15 @@
 [submodule "contracts/lib/openzeppelin-contracts"]
 	path = contracts/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts/lib/ens-contracts"]
+	path = contracts/lib/ens-contracts
+	url = https://github.com/ensdomains/ens-contracts
+[submodule "contracts/lib/buffer"]
+	path = contracts/lib/buffer
+	url = https://github.com/ensdomains/buffer
+[submodule "contracts/lib/verifications"]
+	path = contracts/lib/verifications
+	url = https://github.com/coinbase/verifications
+[submodule "contracts/lib/eas-contracts"]
+	path = contracts/lib/eas-contracts
+	url = https://github.com/ethereum-attestation-service/eas-contracts

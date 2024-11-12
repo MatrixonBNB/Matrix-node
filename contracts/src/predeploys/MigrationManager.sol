@@ -3,9 +3,10 @@ pragma solidity 0.8.24;
 
 import "src/libraries/FacetERC20.sol";
 import "src/libraries/FacetERC721.sol";
-import "lib/solady/src/utils/EnumerableSetLib.sol";
-import "lib/solady/src/utils/LibString.sol";
+import "lib/solady/utils/EnumerableSetLib.sol";
+import "lib/solady/utils/LibString.sol";
 import "src/libraries/MigrationLib.sol";
+import "src/libraries/EventReplayable.sol";
 
 interface FacetSwapFactory {
     function allPairs(uint256 index) external view returns (address);
@@ -19,49 +20,80 @@ interface FacetSwapPair {
     function sync() external;
 }
 
-contract MigrationManager {
+contract MigrationManager is EventReplayable, IMigrationManager {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     using EnumerableSetLib for EnumerableSetLib.Uint256Set;
     
+    uint256 public constant MAX_EVENTS_PER_BATCH = 100;
+    
     bool public migrationExecuted;
     
+    uint32 public lastStoredEventIndex;
+    uint32 public storedEventProcessedCount;
+    uint32 public currentBatchEmittedEvents;
+    uint32 public totalEmittedEvents;
+    uint32 public totalEventsToEmit;
+    
+    mapping(uint256 => StoredEvent) public storedEvents;
+    
     EnumerableSetLib.AddressSet factories;
+    mapping(address => EnumerableSetLib.AddressSet) factoryToPairs;
+    EnumerableSetLib.AddressSet pairCreateEventEmitted;
+    
+    EnumerableSetLib.AddressSet allERC20Tokens;
+    mapping(address => EnumerableSetLib.AddressSet) erc20TokenToHolders;
+    
+    EnumerableSetLib.AddressSet allERC721Tokens;
+    mapping(address => EnumerableSetLib.Uint256Set) erc721TokenToTokenIds;
+    
+    function recordEvent(
+        bytes32 eventHash,
+        bytes32[] memory topics,
+        bytes memory data
+    ) external whileInV1 {
+        require(eventHash != bytes32(0), "Event hash cannot be zero");
+        
+        StoredEvent memory storedEvent = StoredEvent({
+            emitter: msg.sender,
+            eventHash: eventHash,
+            topics: topics,
+            data: data
+        });
+        
+        storedEvents[lastStoredEventIndex] = storedEvent;
+        
+        unchecked { ++lastStoredEventIndex; }
+    }
+    
+    function storedEventsCount() public view returns (uint256) {
+        return lastStoredEventIndex - storedEventProcessedCount;
+    }
+    
     function getFactories() public view returns (address[] memory) {
         return factories.values();
     }
     
-    mapping(address => EnumerableSetLib.AddressSet) factoryToPairs;
     function getFactoryToPairs(address factory) public view returns (address[] memory) {
         return factoryToPairs[factory].values();
     }
     
-    EnumerableSetLib.AddressSet allERC20Tokens;
     function getAllERC20Tokens() public view returns (address[] memory) {
         return allERC20Tokens.values();
     }
     
-    mapping(address => EnumerableSetLib.AddressSet) erc20TokenToHolders;
     function getERC20TokenToHolders(address token) public view returns (address[] memory) {
         return erc20TokenToHolders[token].values();
     }
     
-    EnumerableSetLib.AddressSet allERC721Tokens;
     function getAllERC721Tokens() public view returns (address[] memory) {
         return allERC721Tokens.values();
     }
     
-    mapping(address => EnumerableSetLib.Uint256Set) erc721TokenToTokenIds;
     function getERC721TokenToTokenIds(address token) public view returns (uint256[] memory) {
         return erc721TokenToTokenIds[token].values();
     }
     
-    uint256 public currentBatchEmittedEvents;
-    uint256 public totalEmittedEvents;
-    uint256 public totalEventsToEmit;
-    uint256 public constant MAX_EVENTS_PER_BATCH = 100;
-    
-    EnumerableSetLib.AddressSet pairCreateEventEmitted;
     function getPairCreateEventEmitted() public view returns (address[] memory) {
         return pairCreateEventEmitted.values();
     }
@@ -118,26 +150,21 @@ contract MigrationManager {
                 totalFactoriesEvents += pairCount * 2;
             }
             
-            return totalERC20Events + totalERC721Events + totalFactoriesEvents;
+            return totalERC20Events + totalERC721Events + totalFactoriesEvents + storedEventsCount();
         }
     }
-    
-    event BatchComplete(
-        uint256 eventsEmittedInBatch,
-        uint256 remainingEventsCounted,
-        uint256 remainingEventsComputed,
-        uint256 remainingTransactions
-    );
     
     function executeMigration() external whileInV2 returns (uint256 remainingEvents) {
         require(msg.sender == MigrationLib.SYSTEM_ADDRESS, "Only system address can call");
         require(!migrationExecuted, "Migration already executed");
         
         if (totalEventsToEmit == 0) {
-            totalEventsToEmit = calculateTotalEventsToEmit();
+            totalEventsToEmit = uint32(calculateTotalEventsToEmit());
         }
         
         currentBatchEmittedEvents = 0;
+        
+        processStoredEvents();
         
         processFactories();
         
@@ -156,17 +183,33 @@ contract MigrationManager {
             
             require(calculateTotalEventsToEmit() == 0 , "Remaining events should match total events to emit");
         }
-        
-        emit BatchComplete(
-            currentBatchEmittedEvents,
-            remainingEvents,
-            calculateTotalEventsToEmit(),
-            transactionsRequired()
-        );
     }
     
     function batchFinished() public view returns (bool) {
         return currentBatchEmittedEvents >= MAX_EVENTS_PER_BATCH;
+    }
+    
+    function processStoredEvents() internal whileInV2 {
+        uint32 currentIndex = storedEventProcessedCount;
+        uint32 endIndex = lastStoredEventIndex;
+        
+        unchecked {
+            while (currentIndex < endIndex && !batchFinished()) {
+                StoredEvent storage storedEvent = storedEvents[currentIndex];
+                
+                EventReplayable(storedEvent.emitter).emitStoredEvent(
+                    storedEvent.eventHash,
+                    storedEvent.topics,
+                    storedEvent.data
+                );
+                delete storedEvents[currentIndex];
+                
+                currentIndex++;
+                currentBatchEmittedEvents++;
+            }
+        }
+        
+        storedEventProcessedCount = currentIndex;
     }
     
     function processERC20Tokens() internal whileInV2 {
