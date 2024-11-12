@@ -90,9 +90,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
     /// @notice The name for which this registration adds subdomains for, i.e. ".base.eth".
     string public rootName;
 
-    /// @notice The address that will receive ETH funds upon `withdraw()` being called.
-    address public paymentReceiver;
-
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          CONSTANTS                         */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
@@ -123,9 +120,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
     /// @notice Thrown when the payment received is less than the price.
     error InsufficientValue();
 
-    /// @notice Thrown when the payment receiver is being set to address(0).
-    error InvalidPaymentReceiver();
-
     /// @notice Thrown when a refund transfer is unsuccessful.
     error TransferFailed();
 
@@ -154,11 +148,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         uint256 cost,
         uint256 expires
     );
-
-    /// @notice Emitted when the payment receiver is updated.
-    ///
-    /// @param newPaymentReceiver The address of the new payment receiver.
-    event PaymentReceiverUpdated(address newPaymentReceiver);
 
     /// @notice Emitted when the price oracle is updated.
     ///
@@ -204,28 +193,12 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
     }
 
     function initialize(
+        string memory tokenName,
+        string memory tokenSymbol,
         address owner_,
-        address paymentReceiver_,
-        string memory baseDomainName_,
         uint256[] memory prices_,
-        uint256 premiumStart_,
-        uint256 totalDays_,
         ERC20 wethToken_
     ) public initializer {
-        // Set up dummy values
-        // address _owner = address(0x1234);
-        // address _paymentReceiver = address(0x1234);
-        // string memory _baseDomainName = "test.eth";
-        // uint256[] memory _prices = new uint256[](6);
-        // _prices[0] = 316_808_781_402;
-        // _prices[1] = 31_680_878_140;
-        // _prices[2] = 3_168_087_814;
-        // _prices[3] = 316_808_781;
-        // _prices[4] = 31_680_878;
-        // _prices[5] = 3_168_087;
-        // uint256 _premiumStart = 500 ether;
-        // uint256 _totalDays = 28 days;
-        
         wethToken = wethToken_;
         
         // Set up nodes and labels
@@ -235,7 +208,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         rootNode = FACET_ETH_NODE;
         rootName = ".facet.eth";
         
-        paymentReceiver = paymentReceiver_;
         _initializeOwner(owner_);
 
         address registryImplementation = address(uint160(uint256(keccak256("Registry"))));
@@ -254,6 +226,8 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
             baseImplementation,
             abi.encodeWithSelector(
                 BaseRegistrar.initialize.selector,
+                tokenName,
+                tokenSymbol,
                 registry,
                 address(this),
                 rootNode,
@@ -269,8 +243,8 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
             abi.encodeWithSelector(
                 ExponentialPremiumPriceOracle.initialize.selector,
                 prices_,
-                premiumStart_,
-                totalDays_
+                500 ether,
+                20 days
             )
         )));
         
@@ -383,17 +357,6 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
     function setReverseRegistrar(IReverseRegistrar reverse_) external onlyOwner {
         reverseRegistrar = reverse_;
         emit ReverseRegistrarUpdated(address(reverse_));
-    }
-
-    /// @notice Allows the `owner` to set the reverse registrar contract.
-    ///
-    /// @dev Emits `PaymentReceiverUpdated` after setting the `paymentReceiver` address.
-    ///
-    /// @param paymentReceiver_ The new payment receiver address.
-    function setPaymentReceiver(address paymentReceiver_) external onlyOwner {
-        if (paymentReceiver_ == address(0)) revert InvalidPaymentReceiver();
-        paymentReceiver = paymentReceiver_;
-        emit PaymentReceiverUpdated(paymentReceiver_);
     }
 
     /// @notice Checks whether the provided `name` is long enough.
@@ -723,7 +686,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
     
     function withdrawWETH() public onlyOwner {
         uint256 amount = ERC20(wethToken).balanceOf(address(this));
-        wethToken.transfer(paymentReceiver, amount);
+        wethToken.transfer(owner(), amount);
     }
 
     function placeSticker(uint256 stickerId, uint256 tokenId, uint256[2] memory position) public {

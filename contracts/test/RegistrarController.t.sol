@@ -33,12 +33,10 @@ contract RegistrarControllerTest is Test {
         // Deploy controller
         bytes memory initData = abi.encodeWithSelector(
             RegistrarController.initialize.selector,
+            "Facet Names",
+            "FACETNAME",
             address(this),
-            address(this),
-            "facet.eth",
             prices,
-            500 ether,
-            28 days,
             weth
         );
         

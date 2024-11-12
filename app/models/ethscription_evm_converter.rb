@@ -44,33 +44,19 @@ module EthscriptionEVMConverter
       
       if predeploy_address == "0xdd0b7d9c9c4d8534b384db5339f4a26dffc6e139"
         if data['args']['name'] == "Facet Cards" && creator == '0xc2172a6315c1d7f6855768f843c420ebb36eda97'
-          data['args']['name'] = "Facet Names"
-          data['args']['symbol'] = "FACETNAME"
-          
           contract = get_contract_from_predeploy_info(name: "RegistrarController")
           
           predeploy_address = Eth::Util.keccak256("RegistrarController").last(20).bytes_to_hex
-          
-          prices = [
-            31709791983764584,
-            3170979198376458,
-            1585489599188229,
-            317097919837645,
-            31709791983764,
-            31709791983764
-          ]
           
           initialize_calldata = TransactionHelper.get_function_calldata(
             contract: contract,
             function: 'initialize',
             args: [
-              "0x0C051103f51C0C5d81209fE6057468B3F6297969".downcase,
-              "0xc3c11decb6Cd36e7396B78d3744482627f22d636".downcase,
-              "facet.eth",
-              prices,
-              500.ether,
-              20.days,
-              "0x1673540243e793b0e77c038d4a88448eff524dce".downcase
+              "Facet Names",
+              "FACETNAME",
+              data['args']['owner'],
+              data['args']['charCountToUsdWeiCentsPrice'],
+              data['args']['_WETH'],
             ]
           )
           

@@ -223,6 +223,8 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, 
     /// @param baseURI_ The base token URI for NFT metadata.
     /// @param collectionURI_ The URI for the collection's metadata.
     function initialize(
+        string memory tokenName,
+        string memory tokenSymbol,
         ENS registry_,
         address owner_,
         bytes32 baseNode_,
@@ -236,7 +238,7 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, 
         s()._baseURI = baseURI_;
         s()._collectionURI = collectionURI_;
         
-        _initializeERC721("Facet Names", "FACETNAME");
+        _initializeERC721(tokenName, tokenSymbol);
     }
     
     constructor() {
