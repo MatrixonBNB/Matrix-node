@@ -47,14 +47,14 @@ contract MigrationManager is EventReplayable, IMigrationManager {
     EnumerableSetLib.AddressSet allERC721Tokens;
     mapping(address => EnumerableSetLib.Uint256Set) erc721TokenToTokenIds;
     
-    
     function recordEvent(
         StoredEvent memory storedEvent
     ) external whileInV1 {
         require(storedEvent.eventHash != bytes32(0), "Event hash cannot be zero");
         
         storedEvents[lastStoredEventIndex] = storedEvent;
-        lastStoredEventIndex++;
+        
+        unchecked { ++lastStoredEventIndex; }
     }
     
     function storedEventsCount() public view returns (uint256) {
@@ -145,13 +145,6 @@ contract MigrationManager is EventReplayable, IMigrationManager {
         }
     }
     
-    event BatchComplete(
-        uint256 eventsEmittedInBatch,
-        uint256 remainingEventsCounted,
-        uint256 remainingEventsComputed,
-        uint256 remainingTransactions
-    );
-    
     function executeMigration() external whileInV2 returns (uint256 remainingEvents) {
         require(msg.sender == MigrationLib.SYSTEM_ADDRESS, "Only system address can call");
         require(!migrationExecuted, "Migration already executed");
@@ -181,13 +174,6 @@ contract MigrationManager is EventReplayable, IMigrationManager {
             
             require(calculateTotalEventsToEmit() == 0 , "Remaining events should match total events to emit");
         }
-        
-        emit BatchComplete(
-            currentBatchEmittedEvents,
-            remainingEvents,
-            calculateTotalEventsToEmit(),
-            transactionsRequired()
-        );
     }
     
     function batchFinished() public view returns (bool) {
@@ -198,14 +184,16 @@ contract MigrationManager is EventReplayable, IMigrationManager {
         uint32 currentIndex = storedEventProcessedCount;
         uint32 endIndex = lastStoredEventIndex;
         
-        while (currentIndex < endIndex && !batchFinished()) {
-            StoredEvent storage storedEvent = storedEvents[currentIndex];
-            
-            EventReplayable(storedEvent.emitter).emitStoredEvent(storedEvent);
-            delete storedEvents[currentIndex];
-            
-            currentIndex++;
-            currentBatchEmittedEvents++;
+        unchecked {
+            while (currentIndex < endIndex && !batchFinished()) {
+                StoredEvent storage storedEvent = storedEvents[currentIndex];
+                
+                EventReplayable(storedEvent.emitter).emitStoredEvent(storedEvent);
+                delete storedEvents[currentIndex];
+                
+                currentIndex++;
+                currentBatchEmittedEvents++;
+            }
         }
         
         storedEventProcessedCount = currentIndex;

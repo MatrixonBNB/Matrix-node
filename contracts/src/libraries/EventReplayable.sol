@@ -55,7 +55,14 @@ abstract contract EventReplayable {
     }
     
     function emitStoredEvent(IMigrationManager.StoredEvent memory storedEvent) external {
-        require(msg.sender == MigrationLib.MIGRATION_MANAGER, "Only MigrationManager can emit events");
+        address manager = MigrationLib.MIGRATION_MANAGER;
+        assembly {
+            if xor(caller(), manager) {
+                mstore(0x00, 0x2fb9930a) // 0x3cc50b45 is the 4-byte selector of "NotMigrationManager()"
+                revert(0x1C, 0x04) // returns the stored 4-byte selector from above
+            }
+        }
+        
         _emitStoredEvent(storedEvent);
     }
     
