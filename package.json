@@ -1,8 +1,0 @@
-{
-  "name": "evm-facet",
-  "version": "1.0.0",
-  "description": "A Rails project with Solidity contracts",
-  "main": "index.js",
-  "author": "Your Name",
-  "license": "MIT"
-}
