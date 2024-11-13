@@ -43,27 +43,6 @@ CREATE FUNCTION public.check_facet_block_order() RETURNS trigger
         $$;
 
 
---
--- Name: check_legacy_value_conflict(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.check_legacy_value_conflict() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-      BEGIN
-        IF EXISTS (
-          SELECT 1
-          FROM legacy_value_mappings
-          WHERE legacy_value = NEW.legacy_value
-            AND new_value <> NEW.new_value
-        ) THEN
-          RAISE EXCEPTION 'Conflict: legacy_value % is already mapped to a different new_value', NEW.legacy_value;
-        END IF;
-        RETURN NEW;
-      END;
-      $$;
-
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -315,39 +294,6 @@ ALTER SEQUENCE public.l1_smart_contracts_id_seq OWNED BY public.l1_smart_contrac
 
 
 --
--- Name: legacy_value_mappings; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.legacy_value_mappings (
-    id bigint NOT NULL,
-    legacy_value character varying NOT NULL,
-    new_value character varying NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT new_value_pattern_check CHECK ((((new_value)::text ~ '^0x[a-f0-9]{64}$'::text) OR ((new_value)::text ~ '^0x[a-f0-9]{40}$'::text)))
-);
-
-
---
--- Name: legacy_value_mappings_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.legacy_value_mappings_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: legacy_value_mappings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.legacy_value_mappings_id_seq OWNED BY public.legacy_value_mappings.id;
-
-
---
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -389,13 +335,6 @@ ALTER TABLE ONLY public.facet_transactions ALTER COLUMN id SET DEFAULT nextval('
 --
 
 ALTER TABLE ONLY public.l1_smart_contracts ALTER COLUMN id SET DEFAULT nextval('public.l1_smart_contracts_id_seq'::regclass);
-
-
---
--- Name: legacy_value_mappings id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.legacy_value_mappings ALTER COLUMN id SET DEFAULT nextval('public.legacy_value_mappings_id_seq'::regclass);
 
 
 --
@@ -444,14 +383,6 @@ ALTER TABLE ONLY public.facet_transactions
 
 ALTER TABLE ONLY public.l1_smart_contracts
     ADD CONSTRAINT l1_smart_contracts_pkey PRIMARY KEY (id);
-
-
---
--- Name: legacy_value_mappings legacy_value_mappings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.legacy_value_mappings
-    ADD CONSTRAINT legacy_value_mappings_pkey PRIMARY KEY (id);
 
 
 --
@@ -582,13 +513,6 @@ CREATE UNIQUE INDEX index_l1_smart_contracts_on_address ON public.l1_smart_contr
 
 
 --
--- Name: index_legacy_value_mappings_on_legacy_value; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_legacy_value_mappings_on_legacy_value ON public.legacy_value_mappings USING btree (legacy_value);
-
-
---
 -- Name: eth_blocks trigger_check_eth_block_order; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -600,13 +524,6 @@ CREATE TRIGGER trigger_check_eth_block_order BEFORE INSERT ON public.eth_blocks 
 --
 
 CREATE TRIGGER trigger_check_facet_block_order BEFORE INSERT ON public.facet_blocks FOR EACH ROW EXECUTE FUNCTION public.check_facet_block_order();
-
-
---
--- Name: legacy_value_mappings trigger_check_legacy_value_conflict; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER trigger_check_legacy_value_conflict BEFORE INSERT OR UPDATE ON public.legacy_value_mappings FOR EACH ROW EXECUTE FUNCTION public.check_legacy_value_conflict();
 
 
 --
@@ -649,7 +566,6 @@ SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
 ('20240924215928'),
-('20240813133726'),
 ('20240627143934'),
 ('20240627143407'),
 ('20240627143108'),
