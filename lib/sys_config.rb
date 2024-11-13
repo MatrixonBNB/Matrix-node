@@ -10,7 +10,7 @@ module SysConfig
       5_000_000_000
     elsif is_first_v2_block?(block)
       # TODO
-      L2_BLOCK_GAS_LIMIT * 20
+      5_000_000_000
     else
       L2_BLOCK_GAS_LIMIT
     end

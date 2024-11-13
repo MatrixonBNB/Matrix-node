@@ -28,6 +28,8 @@ module GethDriver
       "--nodiscover",
       "--cache 16000",
       "--rpc.gascap 5000000000",
+      "--rpc.batch-request-limit=10000",
+      "--rpc.batch-response-max-size=100000000",
       "--cache.preimages",
       "--maxpeers 0",
       # "--verbosity 2",

@@ -166,7 +166,9 @@ contract MigrationManager is EventReplayable, IMigrationManager {
         
         processStoredEvents();
         
-        processFactories();
+        if (!batchFinished()) {
+            processFactories();
+        }
         
         if (!batchFinished()) {
             processERC20Tokens();
