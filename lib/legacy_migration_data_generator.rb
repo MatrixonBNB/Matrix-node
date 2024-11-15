@@ -27,14 +27,19 @@ class LegacyMigrationDataGenerator
     Ethscription.validate_import?
   end
   
-  # def blocks_behind
-  #   (eth_v2_fork_block - next_block_to_import) + 1
-  # end
+  def current_finalized_block_number
+    finalized_block = ethereum_client.get_block("finalized")
+    finalized_block['number'].to_i(16)
+  end
+  memoize :current_finalized_block_number, ttl: 1.minute
   
-  # TODO: reimplement blocks_behind
+  def blocks_behind
+    return 0 if next_block_to_import.blank?
+    (current_finalized_block_number - next_block_to_import) + 1
+  end
+  
   def import_batch_size
-    # [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
-    ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i
+    [blocks_behind, ENV.fetch('BLOCK_IMPORT_BATCH_SIZE', 2).to_i].min
   end
   
   def import_blocks_until_done
@@ -539,8 +544,6 @@ class LegacyMigrationDataGenerator
   end
   
   def next_blocks_to_import(n)
-    # ensure_genesis_blocks
-    
     max_db_block = EthBlock.maximum(:number)
     
     unless max_db_block
@@ -549,7 +552,11 @@ class LegacyMigrationDataGenerator
     
     start_block = max_db_block + 1
     
-    (start_block...(start_block + n)).to_a
+    block_numbers = (start_block...(start_block + n)).to_a
+    
+    block_numbers.reject do |block_number|
+      block_number > current_finalized_block_number
+    end
   end
   
   def propose_facet_block(
