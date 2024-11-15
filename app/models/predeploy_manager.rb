@@ -77,11 +77,15 @@ module PredeployManager
   end
   memoize :local_from_predeploy
   
-  def generate_alloc_for_genesis(use_dump: false)
+  def generate_alloc_for_genesis(l1_network_name:, use_dump: false)
     genesis_test = Rails.root.join('contracts', 'facet-local-genesis-allocs.json')
     our_allocs = JSON.parse(IO.read(genesis_test))
     
-    optimism_file = Rails.root.join('config', 'facet-optimism-genesis-allocs.json')
+    optimism_file = Rails.root.join('config', "facet-optimism-genesis-allocs-#{l1_network_name}.json")
+    unless File.exist?(optimism_file)
+      raise "Optimism genesis allocs file not found: #{optimism_file}"
+    end
+    
     optimism_allocs = JSON.parse(File.read(optimism_file))
     
     duplicates = our_allocs.keys & optimism_allocs.keys
@@ -178,7 +182,7 @@ module PredeployManager
       gasLimit: "0x#{SysConfig::L2_BLOCK_GAS_LIMIT.to_s(16)}",
       difficulty: "0x0",
       mixHash: mix_hash,
-      alloc: generate_alloc_for_genesis(use_dump: use_dump)
+      alloc: generate_alloc_for_genesis(l1_network_name: l1_network_name, use_dump: use_dump)
     }
   end
   
@@ -204,24 +208,24 @@ module PredeployManager
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
     
-    ["mainnet", "sepolia"].each do |network|
-      filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
-      facet_chain_dir = File.join(geth_dir, 'facet-chain')
-      FileUtils.mkdir_p(facet_chain_dir) unless File.directory?(facet_chain_dir)
-      genesis_path = File.join(facet_chain_dir, filename)
+    network = ChainIdManager.current_l1_network
+    
+    filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+    facet_chain_dir = File.join(geth_dir, 'facet-chain')
+    FileUtils.mkdir_p(facet_chain_dir) unless File.directory?(facet_chain_dir)
+    genesis_path = File.join(facet_chain_dir, filename)
 
-      # Generate the genesis data for the specific network
-      genesis_data = generate_full_genesis_json(
-        l1_network_name: network,
-        l1_genesis_block_number: SysConfig.l1_genesis_block_number,
-        use_dump: use_dump
-      )
+    # Generate the genesis data for the specific network
+    genesis_data = generate_full_genesis_json(
+      l1_network_name: network,
+      l1_genesis_block_number: SysConfig.l1_genesis_block_number,
+      use_dump: use_dump
+    )
 
-      # Write the data to the appropriate file
-      File.write(genesis_path, JSON.pretty_generate(genesis_data))
-      
-      puts "Generated #{filename}"
-    end
+    # Write the data to the appropriate file
+    File.write(genesis_path, JSON.pretty_generate(genesis_data))
+    
+    puts "Generated #{filename}"
     
     generate_predeploy_info_json
   end
@@ -230,8 +234,8 @@ module PredeployManager
     @_l1_rpc_client ||= EthRpcClient.new(ENV.fetch('L1_RPC_URL'))
   end
   
-  def processed_geth_dump
-    raw_dump = GethDriver.get_state_dump
+  def processed_geth_dump(geth_dir = ENV.fetch('LOCAL_GETH_DIR'))
+    raw_dump = GethDriver.get_state_dump(geth_dir)
 
     processed_alloc = {}
 
@@ -258,7 +262,6 @@ module PredeployManager
     
     foundry_parsed.each do |contract|
       address = contract['addr']
-      next if address == "0x11110000000000000000000000000000000000c5"
       contract_name = contract['name']
       
       sol_file = SOL_DIR.join('src', 'predeploys').join("#{contract_name}.sol")
