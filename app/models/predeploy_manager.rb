@@ -208,24 +208,24 @@ module PredeployManager
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
     
-    network = ChainIdManager.current_l1_network
-    
-    filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
-    facet_chain_dir = File.join(geth_dir, 'facet-chain')
-    FileUtils.mkdir_p(facet_chain_dir) unless File.directory?(facet_chain_dir)
-    genesis_path = File.join(facet_chain_dir, filename)
+    ["mainnet", "sepolia"].each do |network|
+      filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+      facet_chain_dir = File.join(geth_dir, 'facet-chain')
+      FileUtils.mkdir_p(facet_chain_dir) unless File.directory?(facet_chain_dir)
+      genesis_path = File.join(facet_chain_dir, filename)
 
-    # Generate the genesis data for the specific network
-    genesis_data = generate_full_genesis_json(
-      l1_network_name: network,
-      l1_genesis_block_number: SysConfig.l1_genesis_block_number,
-      use_dump: use_dump
-    )
+      # Generate the genesis data for the specific network
+      genesis_data = generate_full_genesis_json(
+        l1_network_name: network,
+        l1_genesis_block_number: SysConfig.l1_genesis_block_number,
+        use_dump: use_dump
+      )
 
-    # Write the data to the appropriate file
-    File.write(genesis_path, JSON.pretty_generate(genesis_data))
-    
-    puts "Generated #{filename}"
+      # Write the data to the appropriate file
+      File.write(genesis_path, JSON.pretty_generate(genesis_data))
+      
+      puts "Generated #{filename}"
+    end
     
     generate_predeploy_info_json
   end
