@@ -258,7 +258,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         return base.isApprovedOrOwner(spender, id);
     }
     
-    function _encodeName(string memory name) public pure returns (bytes32) {
+    function encodeName(string memory name) public pure returns (bytes32) {
         (, bytes32 node) = NameEncoder.dnsEncodeName(name);
         return node;
     }
@@ -402,7 +402,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
                 );
             }
             
-            bytes32 node = _encodeName(names[i].concat(rootName));
+            bytes32 node = encodeName(names[i].concat(rootName));
             resolver.setAddr(node, owners[i]);
         }
     }
@@ -427,7 +427,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         string memory name = L2Resolver(resolverAddress).name(node);
         if (bytes(name).length == 0) return false;
         
-        bytes32 forwardNode = _encodeName(name);
+        bytes32 forwardNode = encodeName(name);
         address resolvedAddress = L2Resolver(resolver).addr(forwardNode);
         
         return resolvedAddress == addr;
@@ -436,7 +436,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
     function setPrimaryName(string memory name) public {
         string memory fullName = string.concat(name, rootName);
 
-        bytes32 nameNode = _encodeName(fullName);
+        bytes32 nameNode = encodeName(fullName);
         address owner = registry.owner(nameNode);
         
         address tokenOwner = ownerOfName(name);
@@ -506,7 +506,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         });
         
         register(request);
-        bytes32 node = _encodeName(name.concat(rootName));
+        bytes32 node = encodeName(name.concat(rootName));
         resolver.setAddr(node, to);
     }
        

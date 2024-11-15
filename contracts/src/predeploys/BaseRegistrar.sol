@@ -286,4 +286,18 @@ contract BaseRegistrar is FacetERC721, Ownable, Initializable, EventReplayable, 
     {
         return super._isApprovedOrOwner(spender, tokenId);
     }
+
+    function _afterTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
+        super._afterTokenTransfer(from, to, tokenId);
+        
+        if (MigrationLib.isInMigration() && from != address(0) && to != address(0)) {
+            bytes32 labelHash = bytes32(tokenId);
+            bytes32 node = keccak256(abi.encodePacked(s().baseNode, labelHash));
+            address currentRegistryOwner = s().registry.owner(node);
+            
+            if (currentRegistryOwner != to) {
+                s().registry.setSubnodeOwner(s().baseNode, labelHash, to);
+            }
+        }
+    }
 }

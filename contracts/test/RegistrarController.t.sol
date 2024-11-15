@@ -211,7 +211,7 @@ contract RegistrarControllerTest is Test {
         );
         
         // Get the node
-        bytes32 node = controller._encodeName("test.facet.eth");
+        bytes32 node = controller.encodeName("test.facet.eth");
         
         // Verify all text records were set correctly
         assertEq(
@@ -287,7 +287,7 @@ contract RegistrarControllerTest is Test {
         uint256 v2TokenId = uint256(keccak256(bytes("test")));
         uint256 v1TokenId = controller.v2TokenIdToV1TokenId(v2TokenId);
         
-        bytes32 node = controller._encodeName("test.facet.eth");
+        bytes32 node = controller.encodeName("test.facet.eth");
         
         // Set initial details
         string[] memory initialLinks = new string[](1);
@@ -522,5 +522,58 @@ contract RegistrarControllerTest is Test {
             assertEq(endBalance, startBalance - price, "Incorrect payment amount");
             vm.stopPrank();
         }
+    }
+
+    function test_EnsRegistryOwnershipUpdatesOnTransfer() public {
+        vm.startPrank(alice);
+        
+        // Register name for Alice
+        uint256 registrationFee = controller.registerPrice("test", 365 days);
+        weth.approve(address(controller), registrationFee);
+        controller.registerNameWithPayment(alice, "test", 365 days);
+        
+        // Get the node
+        bytes32 node = controller.encodeName("test.facet.eth");
+        
+        // Verify initial ENS registry ownership
+        address registryOwner = controller.registry().owner(node);
+        assertEq(registryOwner, alice, "Initial registry owner should be Alice");
+        
+        // Transfer the name to Bob
+        controller.base().transferFrom(alice, bob, uint256(keccak256(bytes("test"))));
+        
+        // Verify ENS registry ownership was updated
+        registryOwner = controller.registry().owner(node);
+        assertEq(registryOwner, bob, "Registry owner should be updated to Bob after transfer");
+        
+        vm.stopPrank();
+    }
+
+    function test_EnsRegistryOwnershipMultipleTransfers() public {
+        vm.startPrank(alice);
+        
+        // Register name
+        uint256 registrationFee = controller.registerPrice("test", 365 days);
+        weth.approve(address(controller), registrationFee);
+        controller.registerNameWithPayment(alice, "test", 365 days);
+        
+        bytes32 node = controller.encodeName("test.facet.eth");
+        uint256 tokenId = uint256(keccak256(bytes("test")));
+        
+        // Transfer Alice -> Bob -> Alice -> Bob
+        controller.base().transferFrom(alice, bob, tokenId);
+        vm.stopPrank();
+        
+        vm.startPrank(bob);
+        controller.base().transferFrom(bob, alice, tokenId);
+        vm.stopPrank();
+        
+        vm.startPrank(alice);
+        controller.base().transferFrom(alice, bob, tokenId);
+        vm.stopPrank();
+        
+        // Verify final ENS registry ownership
+        address registryOwner = controller.registry().owner(node);
+        assertEq(registryOwner, bob, "Registry owner should be Bob after multiple transfers");
     }
 }
