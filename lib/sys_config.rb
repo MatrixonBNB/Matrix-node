@@ -9,8 +9,8 @@ module SysConfig
     if in_migration_mode?
       5_000_000_000
     elsif is_first_v2_block?(block)
-      # TODO
-      5_000_000_000
+      approx_imigration_gas = 4_000_000_000
+      approx_imigration_gas + L2_BLOCK_GAS_LIMIT
     else
       L2_BLOCK_GAS_LIMIT
     end
