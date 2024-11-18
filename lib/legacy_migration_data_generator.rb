@@ -27,6 +27,10 @@ class LegacyMigrationDataGenerator
     Ethscription.validate_import?
   end
   
+  def last_mainnet_block_to_import
+    ENV.fetch('LAST_MAINNET_BLOCK_TO_IMPORT').to_i
+  end
+  
   def current_finalized_block_number
     finalized_block = ethereum_client.get_block("finalized")
     finalized_block['number'].to_i(16)
@@ -550,13 +554,18 @@ class LegacyMigrationDataGenerator
       raise "No blocks in the database"
     end
     
-    start_block = max_db_block + 1
+    block_numbers_to_import = []
+    next_block = max_db_block + 1
     
-    block_numbers = (start_block...(start_block + n)).to_a
-    
-    block_numbers.reject do |block_number|
-      block_number > current_finalized_block_number
+    n.times do
+      break if next_block > last_mainnet_block_to_import
+      break if next_block > current_finalized_block_number
+      
+      block_numbers_to_import << next_block
+      next_block = block_numbers_to_import.max + 1
     end
+    
+    block_numbers_to_import
   end
   
   def propose_facet_block(
