@@ -27,9 +27,6 @@ module EVMHelpers
     contract = Eth::Contract.from_bin(name: contract_name, bin: contract_bytecode, abi: contract_abi)
     contract.parent.bin_runtime = contract_bin_runtime
     contract.freeze
-  rescue => e
-    binding.irb unless ChainIdManager.on_sepolia?
-    raise
   end
   memoize :memoized_compile_contract
 
@@ -37,9 +34,6 @@ module EVMHelpers
     encoded_constructor_params = contract.parent.function_hash['constructor'].get_call_data(*constructor_args)
     deploy_data = contract.bin + encoded_constructor_params
     deploy_data.freeze
-  rescue => e
-    binding.irb
-    raise
   end
   memoize :get_deploy_data
 end

@@ -97,7 +97,6 @@ class Ethscription < T::Struct
     end
     
     unless DataUri.esip6?(content_uri)
-      binding.irb
       raise
     end
     

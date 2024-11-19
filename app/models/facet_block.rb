@@ -78,9 +78,6 @@ class FacetBlock < ApplicationRecord
     if resp['parentBeaconBlockRoot']
       self.parent_beacon_block_root = resp['parentBeaconBlockRoot']
     end
-  rescue => e
-    binding.irb
-    raise
   end
   
   def calculated_base_fee_per_gas

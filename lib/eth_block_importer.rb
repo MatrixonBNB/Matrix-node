@@ -376,9 +376,6 @@ class EthBlockImporter
       safe_block: current_facet_safe_block,
       finalized_block: current_facet_finalized_block
     )
-  rescue => e
-    binding.irb
-    raise
   end
   
   def geth_driver

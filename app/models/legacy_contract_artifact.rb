@@ -51,12 +51,7 @@ class LegacyContractArtifact < ApplicationRecord
       parsed = JSON.parse(all_json)
       
       parsed.map do |artifact|
-        begin
-          LegacyContractArtifactStruct.new(**artifact.symbolize_keys)
-        rescue => e
-          binding.irb
-          raise
-        end
+        LegacyContractArtifactStruct.new(**artifact.symbolize_keys)
       end
     end
   end
