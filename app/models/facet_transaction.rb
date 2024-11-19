@@ -88,6 +88,10 @@ class FacetTransaction < ApplicationRecord
     bin = Eth::Util.hex_to_bin(hex[2..])
     tx = Eth::Rlp.decode(bin)
 
+    unless tx.is_a?(Array)
+      raise Eth::Tx::ParameterError, "Transaction is not an array!"
+    end
+    
     # So people can add "extra data" to burn more gas
     unless [6, 7].include?(tx.size)
       raise Eth::Tx::ParameterError, "Transaction missing fields!"
@@ -225,23 +229,6 @@ class FacetTransaction < ApplicationRecord
 
     tx_type = Eth::Util.serialize_int_to_big_endian(DEPOSIT_TX_TYPE)
     "#{tx_type}#{tx_encoded}".bytes_to_hex
-  end
-  
-  def estimate_gas
-    # Should use this unless it fails
-    
-    _input = input.starts_with?("0x") ? input : "0x" + input
-    
-    geth_params = {
-      from: from_address,
-      to: to_address,
-      data: _input
-    }
-    
-    TransactionHelper.client.call("eth_estimateGas", [geth_params, "latest"])
-  rescue => e
-    binding.irb
-    raise
   end
   
   def self.tx_decode_errors
