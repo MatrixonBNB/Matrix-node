@@ -5,6 +5,7 @@ import {StringUtils} from "ens-contracts/utils/StringUtils.sol";
 
 import {IPriceOracle} from "src/facetnames/interface/IPriceOracle.sol";
 import "solady/utils/Initializable.sol";
+import {MigrationLib} from "src/libraries/MigrationLib.sol";
 /// @title Stable Pricing Oracle
 ///
 /// @notice The pricing mechanism for setting the "base price" of names on a per-letter basis.
@@ -66,28 +67,46 @@ contract StablePriceOracle is IPriceOracle, Initializable {
         uint256 len = name.strlen();
         uint256 basePrice;
 
-        if (len >= 10) {
-            basePrice = price10Letter * duration;
-        } else if (len >= 5) {
-            basePrice = price5Letter * duration;
-        } else if (len == 4) {
-            basePrice = price4Letter * duration;
-        } else if (len == 3) {
-            basePrice = price3Letter * duration;
-        } else if (len == 2) {
-            basePrice = price2Letter * duration;
+        if (MigrationLib.isInMigration()) {
+            // USD-based pricing model for migration
+            if (len >= 10) {
+                basePrice = price10Letter * duration;
+            } else if (len >= 5) {
+                basePrice = price5Letter * duration;
+            } else if (len == 4) {
+                basePrice = price4Letter * duration;
+            } else if (len == 3) {
+                basePrice = price3Letter * duration;
+            } else if (len == 2) {
+                basePrice = price2Letter * duration;
+            } else {
+                basePrice = price1Letter * duration;
+            }
+            
+            uint256 usdWeiCentsInOneEth = 200000000000000000000000;
+            uint256 totalPriceWeiCents = basePrice;
+            uint256 totalPriceEth = (totalPriceWeiCents * 1 ether) / usdWeiCentsInOneEth;
+            
+            return IPriceOracle.Price({base: totalPriceEth, premium: 0});
         } else {
-            basePrice = price1Letter * duration;
+            // Simple pricing model for non-migration
+            if (len >= 10) {
+                basePrice = 3_168_087 * duration;
+            } else if (len >= 5) {
+                basePrice = 31_680_878 * duration;
+            } else if (len == 4) {
+                basePrice = 316_808_781 * duration;
+            } else if (len == 3) {
+                basePrice = 3_168_087_814 * duration;
+            } else if (len == 2) {
+                basePrice = 31_680_878_140 * duration;
+            } else {
+                basePrice = 316_808_781_402 * duration;
+            }
+            
+            uint256 premium_ = _premium(name, expires, duration);
+            return IPriceOracle.Price({base: basePrice, premium: premium_});
         }
-        
-        uint256 usdWeiCentsInOneEth = 200000000000000000000000;
-        
-        uint256 totalPriceWeiCents = basePrice;
-        
-        uint256 totalPriceEth = (totalPriceWeiCents * 1 ether) / usdWeiCentsInOneEth;
-        
-        uint256 premium_ = _premium(name, expires, duration);
-        return IPriceOracle.Price({base: totalPriceEth, premium: premium_});
     }
 
     /// @notice Returns the pricing premium denominated in wei.
