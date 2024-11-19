@@ -70,6 +70,11 @@ contract FacetOptimismMintableERC20 is IOptimismMintableERC20, ILegacyMintableER
         setBridgeAndRemoteToken(_bridge, _remoteToken);
     }
     
+    function updateNameAndSymbol(string memory _name, string memory _symbol) public onlyOwner {
+        _FacetERC20Storage().name = _name;
+        _FacetERC20Storage().symbol = _symbol;
+    }
+    
     function setBridgeAndRemoteToken(address _bridge, address _remoteToken) public onlyOwner {
         s().bridge = _bridge;
         s().remoteToken = _remoteToken;
