@@ -39,4 +39,8 @@ abstract contract Pausable {
         require(!_PausableStorage().paused, "Contract is paused");
         _;
     }
+    
+    function isPaused() public view returns (bool) {
+        return _PausableStorage().paused;
+    }
 }
