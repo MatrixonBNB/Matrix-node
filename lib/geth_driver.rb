@@ -10,7 +10,9 @@ module GethDriver
     genesis_filename = ChainIdManager.on_mainnet? ? "facet-mainnet.json" : "facet-sepolia.json"
     
     command = [
+      "./facet-chain/unzip_genesis.sh &&",
       "make geth &&",
+      "mkdir -p ./datadir &&",
       "rm -rf ./datadir/* &&",
       "./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} &&",
       "./build/bin/geth --datadir ./datadir",
@@ -38,6 +40,7 @@ module GethDriver
       "--history.state 0",
       "--history.transactions 0",
       "--nocompaction",
+      "--rollup.enabletxpooladmission=false",
       "--rollup.disabletxpoolgossip",
       "console"
     ].join(' ')
@@ -88,17 +91,6 @@ module GethDriver
   end
   
   def trace_transaction(tx_hash)
-    # contract = EVMHelpers.compile_contract("predeploys/NFTCollectionVa11")
-    # function = contract.parent.function_hash['contractURI']
-    # data = function.get_call_data
-    
-    # result = GethDriver.non_auth_client.call("eth_call", [{
-    #   to: "0xdcf075616bf2d26775c3500ea3c1513e0442966a",
-    #   data: data
-    # }, "latest"])
-    
-    # function.parse_result(result)
-    
     non_auth_client.call("debug_traceTransaction", [tx_hash, {
       enableMemory: true,
       disableStack: false,

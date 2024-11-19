@@ -241,6 +241,10 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
     }
         
     function adminResetInvariants() public onlyOwner {
+        _adminResetInvariants();
+    }
+    
+    function _adminResetInvariants() internal {
         int256 diff = consistencyCheck();
         if (diff > 0) {
             s().totalBridgedIn += diff;
@@ -249,8 +253,10 @@ contract EthscriptionERC20BridgeV6e4 is FacetERC20, Initializable, Pausable, Upg
         }
     }
     
-    function _verifyInvariants() internal view returns (bool) {
-        if (MigrationLib.isInMigration()) return true;
+    function _verifyInvariants() internal returns (bool) {
+        if (MigrationLib.isInMigration()) {
+            _adminResetInvariants();
+        }
         
         bool c1 = int256(totalSupply()) == s().totalBridgedIn - s().totalWithdrawComplete - s().pendingWithdrawalAmount;
         bool c2 = s().totalWithdrawComplete + s().pendingWithdrawalAmount <= s().totalBridgedIn;

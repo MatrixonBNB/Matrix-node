@@ -24,7 +24,7 @@ module GethTestHelper
     
     genesis_filename = ChainIdManager.on_mainnet? ? "facet-mainnet.json" : "facet-sepolia.json"
     
-    system("cd #{geth_dir} && make geth && ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir #{@temp_datadir} facet-chain/#{genesis_filename}")
+    system("cd #{geth_dir} && ./facet-chain/unzip_genesis.sh && make geth && ./build/bin/geth init --cache.preimages --state.scheme=hash --datadir #{@temp_datadir} facet-chain/#{genesis_filename}")
     
     geth_command = [
       "#{geth_dir}/build/bin/geth",
@@ -47,6 +47,7 @@ module GethTestHelper
       "--history.state", "0",
       "--history.transactions", "0",
       "--nocompaction",
+      "--rollup.enabletxpooladmission=false",
       "--rollup.disabletxpoolgossip",
       "--cache", "12000",
       "--cache.preimages",
