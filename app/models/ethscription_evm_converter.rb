@@ -70,6 +70,11 @@ module EthscriptionEVMConverter
         end
       elsif predeploy_address == "0xc30f329f29806a5e4db65ee5aa7652826f65bd9d"
         predeploy_address = "0x89cfcf16d1fffb3937b47f1d1a22850c0ad80f6e"
+      elsif predeploy_address == "0x897d289b77c8393783829489b9ab3255c0158064" && creator == '0xc2172a6315c1d7f6855768f843c420ebb36eda97'
+        if data['args']['name'] == "Facet Ether"
+          data['args']['name'] = "Wrapped Ether"
+          data['args']['symbol'] = "WETH"
+        end
       end
       
       begin
