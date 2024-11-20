@@ -17,6 +17,16 @@ module PredeployManager
         address = LegacyContractArtifact.address_from_suffix(filename)
         
         map[address] = filename
+        
+        if is_deployed_by_contract?(filename)
+          address = addr_from_name(filename)
+          
+          if map[address].present?
+            raise "Address collision detected!"
+          end
+          
+          map[address] = filename
+        end
       end
     end
 
@@ -31,7 +41,11 @@ module PredeployManager
     ]
     
     contract_names.each do |name|
-      address = Eth::Util.keccak256(name).last(20).bytes_to_hex
+      address = addr_from_name(name)
+      
+      if map[address].present?
+        raise "Address collision detected!"
+      end
       
       map[address] = name
     end
@@ -96,9 +110,17 @@ module PredeployManager
     merged = optimism_allocs.merge(our_allocs)
     
     if use_dump
-      merged.delete('0x22220000000000000000000000000000000000d6')
-      merged.delete('0x11110000000000000000000000000000000000c5')
-      merged = processed_geth_dump.merge(merged)
+      dump_dir = ENV.fetch('L2_GETH_DUMP_PATH')
+      
+      dump = processed_geth_dump(dump_dir)
+      
+      dump.each do |address, dump_data|
+        if merged[address]
+          merged[address]['storage'] = dump_data['storage']
+        else
+          merged[address] = dump_data
+        end
+      end
     end
     
     unless in_migration_mode?
@@ -178,7 +200,7 @@ module PredeployManager
     {
       config: config,
       timestamp: "0x#{timestamp.to_s(16)}",
-      extraData: "Think outside the block".ljust(32).bytes_to_hex,
+      extraData: "0xb1bdb91f010c154dd04e5c11a6298e91472c27a347b770684981873a6408c11c",
       gasLimit: "0x#{SysConfig::L2_BLOCK_GAS_LIMIT.to_s(16)}",
       difficulty: "0x0",
       mixHash: mix_hash,
@@ -208,24 +230,24 @@ module PredeployManager
     
     geth_dir = ENV.fetch('LOCAL_GETH_DIR')
     
-    ["mainnet", "sepolia"].each do |network|
-      filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
-      facet_chain_dir = File.join(geth_dir, 'facet-chain')
-      FileUtils.mkdir_p(facet_chain_dir) unless File.directory?(facet_chain_dir)
-      genesis_path = File.join(facet_chain_dir, filename)
+    network = ChainIdManager.current_l1_network
+    
+    filename = network == "mainnet" ? "facet-mainnet.json" : "facet-sepolia.json"
+    facet_chain_dir = File.join(geth_dir, 'facet-chain')
+    FileUtils.mkdir_p(facet_chain_dir) unless File.directory?(facet_chain_dir)
+    genesis_path = File.join(facet_chain_dir, filename)
 
-      # Generate the genesis data for the specific network
-      genesis_data = generate_full_genesis_json(
-        l1_network_name: network,
-        l1_genesis_block_number: SysConfig.l1_genesis_block_number,
-        use_dump: use_dump
-      )
+    # Generate the genesis data for the specific network
+    genesis_data = generate_full_genesis_json(
+      l1_network_name: network,
+      l1_genesis_block_number: SysConfig.l1_genesis_block_number,
+      use_dump: use_dump
+    )
 
-      # Write the data to the appropriate file
-      File.write(genesis_path, JSON.pretty_generate(genesis_data))
-      
-      puts "Generated #{filename}"
-    end
+    # Write the data to the appropriate file
+    File.write(genesis_path, JSON.pretty_generate(genesis_data))
+    
+    puts "Generated #{filename}"
     
     generate_predeploy_info_json
   end
@@ -264,6 +286,8 @@ module PredeployManager
       address = contract['addr']
       contract_name = contract['name']
       
+      next if address == "0x11110000000000000000000000000000000000c5"
+      
       sol_file = SOL_DIR.join('src', 'predeploys').join("#{contract_name}.sol")
       
       if sol_file.exist?
@@ -291,5 +315,15 @@ module PredeployManager
     end
   
     puts "All contracts processed."
+  end
+  
+  def addr_from_name(name)
+    Eth::Util.keccak256(name).last(20).bytes_to_hex
+  end
+  
+  def is_deployed_by_contract?(contract_name)
+    contract_name.start_with?("ERC20BridgeV") ||
+    contract_name.start_with?("FacetBuddyV") ||
+    contract_name.start_with?("FacetSwapPairV")
   end
 end

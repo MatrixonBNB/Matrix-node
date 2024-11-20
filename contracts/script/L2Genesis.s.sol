@@ -61,13 +61,6 @@ contract L2Genesis is Script {
             etchContract(name, addr);
         }
     }
-    
-    function isDeployedByContract(string memory contractName) internal pure returns (bool) {
-        return contractName.startsWith("ERC20BridgeV") ||
-               contractName.startsWith("FacetBuddyV") ||
-               contractName.startsWith("FacetSwapPairV");
-    }
-
     function etchContract(string memory contractName, address addr) internal {
         string memory artifactPath = string(abi.encodePacked("src/predeploys/", contractName, ".sol"));
         artifactPath = string(abi.encodePacked(artifactPath, ":", contractName));
@@ -106,21 +99,6 @@ contract L2Genesis is Script {
         
         PredeployContract[] memory derivedContracts = new PredeployContract[](predeployContracts.contracts.length);
         uint256 derivedCount = 0;
-
-        for (uint i = 0; i < predeployContracts.contracts.length; i++) {
-            string memory name = predeployContracts.contracts[i].name;
-            address addr = predeployContracts.contracts[i].addr;
-            
-            if (isDeployedByContract(name)) {
-                console.log("Deployed by contract:", name);
-                string memory artifactPath = string(abi.encodePacked("predeploys/", name, ".sol:", name));
-                bytes memory creationCode = vm.getCode(artifactPath);
-                bytes32 initCodeHash = keccak256(creationCode);
-                address derivedAddress = address(uint160(uint256(initCodeHash)));
-                derivedContracts[derivedCount] = PredeployContract({name: name, addr: derivedAddress});
-                derivedCount++;
-            }
-        }
 
         // Add derived contracts to predeployContracts
         for (uint i = 0; i < derivedCount; i++) {

@@ -134,7 +134,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         
         _initializeOwner(owner_);
 
-        address registryImplementation = address(uint160(uint256(keccak256("Registry"))));
+        address registryImplementation = MigrationLib.predeployAddrFromName("Registry");
         
         registry = Registry(address(new ERC1967Proxy(
             registryImplementation,
@@ -144,7 +144,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
             )
         )));
         
-        address baseImplementation = address(uint160(uint256(keccak256("BaseRegistrar"))));
+        address baseImplementation = MigrationLib.predeployAddrFromName("BaseRegistrar");
         
         base = BaseRegistrar(address(new ERC1967Proxy(
             baseImplementation,
@@ -160,7 +160,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
             )
         )));
         
-        address priceOracleImplementation = address(uint160(uint256(keccak256("ExponentialPremiumPriceOracle"))));
+        address priceOracleImplementation = MigrationLib.predeployAddrFromName("ExponentialPremiumPriceOracle");
         
         prices = ExponentialPremiumPriceOracle(address(new ERC1967Proxy(
             priceOracleImplementation,
@@ -172,7 +172,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
             )
         )));
         
-        address reverseRegistrarImplementation = address(uint160(uint256(keccak256("ReverseRegistrar"))));
+        address reverseRegistrarImplementation = MigrationLib.predeployAddrFromName("ReverseRegistrar");
         
         reverseRegistrar = IReverseRegistrar(address(new ERC1967Proxy(
             reverseRegistrarImplementation,
@@ -190,7 +190,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         
         reverseRegistrar.claim(owner());
         
-        address resolverImplementation = address(uint160(uint256(keccak256("L2Resolver"))));
+        address resolverImplementation = MigrationLib.predeployAddrFromName("L2Resolver");
         
         bytes memory initData = abi.encodeWithSelector(
             L2Resolver.initialize.selector,
@@ -219,7 +219,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         ReverseRegistrar(address(reverseRegistrar)).transferOwnership(owner());
         base.transferOwnership(owner());
         
-        address stickerRegistryImpl = address(uint160(uint256(keccak256("StickerRegistry"))));
+        address stickerRegistryImpl = MigrationLib.predeployAddrFromName("StickerRegistry");
         ERC1967Proxy proxy = new ERC1967Proxy(stickerRegistryImpl, "");
         
         stickerRegistry = StickerRegistry(address(proxy));

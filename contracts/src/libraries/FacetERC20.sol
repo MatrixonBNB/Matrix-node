@@ -59,7 +59,7 @@ abstract contract FacetERC20 is ERC20 {
     }
     
     error NotMigrationManager();
-    function emitTransferEvent(address to, uint256 amount) external {
+    function emitTransferEvent(address to) external {
         address manager = MigrationLib.MIGRATION_MANAGER;
         assembly {
             if xor(caller(), manager) {
@@ -68,10 +68,14 @@ abstract contract FacetERC20 is ERC20 {
             }
         }
         
+        uint256 balance = balanceOf(to);
+        
+        if (balance == 0) return;
+        
         emit Transfer({
             from: address(0),
             to: to,
-            amount: amount
+            amount: balance
         });
     }
     

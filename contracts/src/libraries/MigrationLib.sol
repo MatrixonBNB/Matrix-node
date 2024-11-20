@@ -47,4 +47,8 @@ library MigrationLib {
     function dummyHasCode() private view returns (bool) {
         return DUMMY_ADDRESS.code.length != 0;
     }
+    
+    function predeployAddrFromName(string memory name) internal pure returns (address) {
+        return address(uint160(uint256(keccak256(bytes(name)))));
+    }
 }
