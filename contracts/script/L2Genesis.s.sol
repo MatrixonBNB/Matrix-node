@@ -89,7 +89,7 @@ contract L2Genesis is Script {
         string[] memory inputs = new string[](3);
         inputs[0] = "bash";
         inputs[1] = "-c";
-        inputs[2] = "bundle exec rails runner 'puts ({contracts: PredeployManager.predeploy_to_local_map.invert.map { |name, addr| {name: name, addr: addr} } }.to_json)' | tail -n 1";
+        inputs[2] = "bundle exec rails runner 'puts ({contracts: PredeployManager.predeploy_to_local_map.map { |addr, name| {name: name, addr: addr} } }.to_json)' | tail -n 1";
         bytes memory result = vm.ffi(inputs);
         string memory json = string(result);
         
