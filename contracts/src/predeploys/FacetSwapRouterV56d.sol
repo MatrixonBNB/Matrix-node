@@ -8,8 +8,11 @@ import "src/libraries/FacetERC20.sol";
 import "src/libraries/Pausable.sol";
 import "src/libraries/FacetOwnable.sol";
 import "solady/utils/Initializable.sol";
+import "solady/utils/SafeTransferLib.sol";
 
 contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausable {
+    using SafeTransferLib for address;
+    
     struct FacetSwapRouterStorage {
         address factory;
         address WETH;
@@ -156,8 +159,8 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         } else {
             amounts[amounts.length - 1] = amounts[amounts.length - 1] - feeAmount;
         }
-        ERC20 outputToken = ERC20(path[path.length - 1]);
-        outputToken.transfer(to, amounts[amounts.length - 1]);
+        address outputToken = path[path.length - 1];
+        outputToken.safeTransfer(to, amounts[amounts.length - 1]);
         emit FeeAdjustedSwap(path[0], path[path.length - 1], amounts[0], amounts[amounts.length - 1], feeAmount, to);
         return amounts;
     }
@@ -197,8 +200,8 @@ contract FacetSwapRouterV56d is Initializable, Upgradeable, FacetOwnable, Pausab
         } else {
             amounts[amounts.length - 1] = amountOut;
         }
-        ERC20 outputToken = ERC20(path[path.length - 1]);
-        outputToken.transfer(to, amounts[amounts.length - 1]);
+        address outputToken = path[path.length - 1];
+        outputToken.safeTransfer(to, amounts[amounts.length - 1]);
         emit FeeAdjustedSwap(path[0], path[path.length - 1], amounts[0], amounts[amounts.length - 1], feeAmount, to);
         return amounts;
     }
