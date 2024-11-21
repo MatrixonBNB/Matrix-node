@@ -96,14 +96,6 @@ contract L2Genesis is Script {
         // Parse the JSON and populate the struct
         bytes memory parsedJson = vm.parseJson(json);
         predeployContracts = abi.decode(parsedJson, (PredeployContractList));
-        
-        PredeployContract[] memory derivedContracts = new PredeployContract[](predeployContracts.contracts.length);
-        uint256 derivedCount = 0;
-
-        // Add derived contracts to predeployContracts
-        for (uint i = 0; i < derivedCount; i++) {
-            predeployContracts.contracts.push(derivedContracts[i]);
-        }
     }
 
     function writePredeployContractsToJson() internal {
