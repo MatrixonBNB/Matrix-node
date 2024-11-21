@@ -61,13 +61,6 @@ contract L2Genesis is Script {
             etchContract(name, addr);
         }
     }
-    
-    function isDeployedByContract(string memory contractName) internal pure returns (bool) {
-        return contractName.startsWith("ERC20BridgeV") ||
-               contractName.startsWith("FacetBuddyV") ||
-               contractName.startsWith("FacetSwapPairV");
-    }
-
     function etchContract(string memory contractName, address addr) internal {
         string memory artifactPath = string(abi.encodePacked("src/predeploys/", contractName, ".sol"));
         artifactPath = string(abi.encodePacked(artifactPath, ":", contractName));
@@ -96,36 +89,13 @@ contract L2Genesis is Script {
         string[] memory inputs = new string[](3);
         inputs[0] = "bash";
         inputs[1] = "-c";
-        inputs[2] = "bundle exec rails runner 'puts ({contracts: PredeployManager.predeploy_to_local_map.invert.map { |name, addr| {name: name, addr: addr} } }.to_json)' | tail -n 1";
+        inputs[2] = "bundle exec rails runner 'puts ({contracts: PredeployManager.predeploy_to_local_map.map { |addr, name| {name: name, addr: addr} } }.to_json)' | tail -n 1";
         bytes memory result = vm.ffi(inputs);
         string memory json = string(result);
         
         // Parse the JSON and populate the struct
         bytes memory parsedJson = vm.parseJson(json);
         predeployContracts = abi.decode(parsedJson, (PredeployContractList));
-        
-        PredeployContract[] memory derivedContracts = new PredeployContract[](predeployContracts.contracts.length);
-        uint256 derivedCount = 0;
-
-        for (uint i = 0; i < predeployContracts.contracts.length; i++) {
-            string memory name = predeployContracts.contracts[i].name;
-            address addr = predeployContracts.contracts[i].addr;
-            
-            if (isDeployedByContract(name)) {
-                console.log("Deployed by contract:", name);
-                string memory artifactPath = string(abi.encodePacked("predeploys/", name, ".sol:", name));
-                bytes memory creationCode = vm.getCode(artifactPath);
-                bytes32 initCodeHash = keccak256(creationCode);
-                address derivedAddress = address(uint160(uint256(initCodeHash)));
-                derivedContracts[derivedCount] = PredeployContract({name: name, addr: derivedAddress});
-                derivedCount++;
-            }
-        }
-
-        // Add derived contracts to predeployContracts
-        for (uint i = 0; i < derivedCount; i++) {
-            predeployContracts.contracts.push(derivedContracts[i]);
-        }
     }
 
     function writePredeployContractsToJson() internal {

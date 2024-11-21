@@ -93,7 +93,7 @@ abstract contract FacetERC721 is ERC721 {
     }
     
     error NotMigrationManager();
-    function emitTransferEvent(address to, uint256 id) external {
+    function emitTransferEvent(uint256 id) external {
         address manager = MigrationLib.MIGRATION_MANAGER;
         assembly {
             if xor(caller(), manager) {
@@ -102,9 +102,13 @@ abstract contract FacetERC721 is ERC721 {
             }
         }
         
+        address owner = _ownerOf(id);
+        
+        if (owner == address(0)) return;
+        
         emit Transfer({
             from: address(0),
-            to: to,
+            to: owner,
             id: id
         });
     }

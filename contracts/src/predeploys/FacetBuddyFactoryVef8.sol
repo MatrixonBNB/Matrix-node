@@ -37,8 +37,7 @@ contract FacetBuddyFactoryVef8 is Initializable {
         }
 
         bytes32 salt = keccak256(abi.encodePacked(forUser));
-        bytes32 hsh = keccak256(type(FacetBuddyVe5c).creationCode);
-        address implementationAddress = address(uint160(uint256(hsh)));
+        address implementationAddress = MigrationLib.predeployAddrFromName("FacetBuddyVe5c");
         bytes memory initBytes = abi.encodeCall(FacetBuddyVe5c.initialize, (s().erc20Bridge, forUser));
 
         address buddy = address(new ERC1967Proxy{salt: salt}(implementationAddress, initBytes));
@@ -58,8 +57,7 @@ contract FacetBuddyFactoryVef8 is Initializable {
 
     function predictBuddyAddress(address forUser) public view returns (address) {
         bytes32 salt = keccak256(abi.encodePacked(forUser));
-        bytes32 hsh = keccak256(type(FacetBuddyVe5c).creationCode);
-        address implementationAddress = address(uint160(uint256(hsh)));
+        address implementationAddress = MigrationLib.predeployAddrFromName("FacetBuddyVe5c");
         bytes memory initBytes = abi.encodeCall(FacetBuddyVe5c.initialize, (s().erc20Bridge, forUser));
 
         bytes32 bytecodeHash = keccak256(abi.encodePacked(

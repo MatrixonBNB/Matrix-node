@@ -67,8 +67,7 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         require(token0 != address(0), "FacetSwapV1: ZERO_ADDRESS");
         require(s().getPair[token0][token1] == address(0), "FacetSwapV1: PAIR_EXISTS");
 
-        bytes32 hsh = keccak256(type(FacetSwapPairVdfd).creationCode);
-        address implementationAddress = address(uint160(uint256(hsh)));
+        address implementationAddress = MigrationLib.predeployAddrFromName("FacetSwapPairVdfd");
         
         bytes32 proxySalt = keccak256(abi.encodePacked(token0, token1));
         bytes memory initBytes = abi.encodeCall(FacetSwapPairVdfd.initialize, ());

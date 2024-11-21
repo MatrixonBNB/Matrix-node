@@ -9,6 +9,7 @@ import "./ERC20BridgeV1aa.sol";
 import "solady/utils/LibString.sol";
 import "solady/utils/Initializable.sol";
 import "src/libraries/ERC1967Proxy.sol";
+import "src/libraries/MigrationLib.sol";
 
 contract ERC20BridgeFactoryVce0 is Ownable, Pausable, Upgradeable, Initializable {
     using LibString for *;
@@ -75,8 +76,7 @@ contract ERC20BridgeFactoryVce0 is Ownable, Pausable, Upgradeable, Initializable
         }
 
         bytes32 salt = keccak256(abi.encodePacked(tokenSmartContract));
-        bytes32 hsh = keccak256(type(ERC20BridgeV1aa).creationCode);
-        address implementationAddress = address(uint160(uint256(hsh)));
+        address implementationAddress = MigrationLib.predeployAddrFromName("ERC20BridgeV1aa");
         bytes memory initBytes = abi.encodeCall(
             ERC20BridgeV1aa.initialize,
             (tokenSmartContract, s().trustedSmartContract, string(abi.encodePacked("Facet ", name)), string(abi.encodePacked("f", symbol.upper())), decimals)
@@ -108,8 +108,7 @@ contract ERC20BridgeFactoryVce0 is Ownable, Pausable, Upgradeable, Initializable
 
     function predictBridgeAddress(address tokenSmartContract, uint8 decimals, string memory symbol, string memory name) public view returns (address) {
         bytes32 salt = keccak256(abi.encodePacked(tokenSmartContract));
-        bytes32 hsh = keccak256(type(ERC20BridgeV1aa).creationCode);
-        address implementationAddress = address(uint160(uint256(hsh)));
+        address implementationAddress = MigrationLib.predeployAddrFromName("ERC20BridgeV1aa");
         bytes memory initBytes = abi.encodeCall(
             ERC20BridgeV1aa.initialize,
             (tokenSmartContract, s().trustedSmartContract, string(abi.encodePacked("Facet ", name)), string(abi.encodePacked("f", symbol.upper())), decimals)

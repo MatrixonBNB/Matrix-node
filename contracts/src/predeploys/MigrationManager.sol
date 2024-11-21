@@ -25,7 +25,7 @@ contract MigrationManager is EventReplayable, IMigrationManager {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     using EnumerableSetLib for EnumerableSetLib.Uint256Set;
     
-    uint256 public constant MAX_EVENTS_PER_BATCH = 100;
+    uint256 public constant MAX_EVENTS_PER_BATCH = 50;
     
     bool public migrationExecuted;
     
@@ -188,7 +188,8 @@ contract MigrationManager is EventReplayable, IMigrationManager {
     }
     
     function batchFinished() public view returns (bool) {
-        return currentBatchEmittedEvents >= MAX_EVENTS_PER_BATCH;
+        require(currentBatchEmittedEvents <= MAX_EVENTS_PER_BATCH, "Exceeded max events per batch");
+        return currentBatchEmittedEvents == MAX_EVENTS_PER_BATCH;
     }
     
     function processStoredEvents() internal whileInV2 {
@@ -321,16 +322,10 @@ contract MigrationManager is EventReplayable, IMigrationManager {
             uint256 holdersLength = holders.length();
             for (uint256 j = holdersLength; j > 0; --j) {
                 address holder = holders.at(j - 1);
-                uint256 balance = FacetERC20(token).balanceOf(holder);
                 
                 require(holder != address(0), "Should not happen");
                 
-                if (balance > 0) {
-                    FacetERC20(token).emitTransferEvent({
-                        to: holder,
-                        amount: balance
-                    });
-                }
+                FacetERC20(token).emitTransferEvent(holder);
                 
                 currentBatchEmittedEvents++;
                 holders.remove(holder);
@@ -352,14 +347,8 @@ contract MigrationManager is EventReplayable, IMigrationManager {
             uint256 tokenIdsLength = tokenIds.length();
             for (uint256 j = tokenIdsLength; j > 0; --j) {
                 uint256 tokenId = tokenIds.at(j - 1);
-                address owner = FacetERC721(token).safeOwnerOf(tokenId);
                 
-                if (owner != address(0)) {
-                    FacetERC721(token).emitTransferEvent({
-                        to: owner,
-                        id: tokenId
-                    });
-                }
+                FacetERC721(token).emitTransferEvent(tokenId);
                 
                 currentBatchEmittedEvents++;
                 tokenIds.remove(tokenId);
