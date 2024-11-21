@@ -14,23 +14,15 @@ module PredeployManager
       filename = File.basename(file_path, ".sol")
   
       if filename.match(/V[a-f0-9]{3}$/i)
-        address = LegacyContractArtifact.address_from_suffix(filename)
-        
-        map[address] = filename
+        add_to_map(map, LegacyContractArtifact.address_from_suffix(filename), filename)
         
         if is_deployed_by_contract?(filename)
-          address = addr_from_name(filename)
-          
-          if map[address].present?
-            raise "Address collision detected!"
-          end
-          
-          map[address] = filename
+          add_to_map(map, addr_from_name(filename), filename)
         end
       end
     end
 
-    contract_names = [
+    [
       "BaseRegistrar",
       "ExponentialPremiumPriceOracle",
       "L2Resolver",
@@ -38,24 +30,21 @@ module PredeployManager
       "Registry",
       "ReverseRegistrar",
       "StickerRegistry"
-    ]
+    ].each { |name| add_to_map(map, addr_from_name(name), name) }
     
-    contract_names.each do |name|
-      address = addr_from_name(name)
-      
-      if map[address].present?
-        raise "Address collision detected!"
-      end
-      
-      map[address] = name
-    end
-    
-    map["0x11110000000000000000000000000000000000c5"] = "NonExistentContractShim"
-    map["0x22220000000000000000000000000000000000d6"] = "MigrationManager"
+    add_to_map(map, "0x11110000000000000000000000000000000000c5", "NonExistentContractShim")
+    add_to_map(map, "0x22220000000000000000000000000000000000d6", "MigrationManager")
     
     map
   end
   memoize :predeploy_to_local_map
+  
+  def add_to_map(map, address, name)
+    if map[address].present?
+      raise "Address collision detected! #{name} collides with #{map[address]} at #{address}"
+    end
+    map[address] = name
+  end
   
   def predeploy_info
     parsed = JSON.parse(File.read(PREDEPLOY_INFO_PATH))
