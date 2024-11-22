@@ -10,14 +10,18 @@ class CreateEthBlocks < ActiveRecord::Migration[7.1]
       t.bigint :timestamp, null: false
       
       t.datetime :imported_at
-
-      t.check_constraint "mix_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "parent_hash ~ '^0x[a-f0-9]{64}$'"      
-      t.check_constraint "parent_beacon_block_root ~ '^0x[a-f0-9]{64}$'"      
+      
+      if pg_adapter?
+        t.check_constraint "mix_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "parent_hash ~ '^0x[a-f0-9]{64}$'"      
+        t.check_constraint "parent_beacon_block_root ~ '^0x[a-f0-9]{64}$'"      
+      end
 
       t.timestamps
     end
+    
+    return unless pg_adapter?
     
     add_index :eth_blocks, :number, unique: true
     add_index :eth_blocks, :block_hash, unique: true

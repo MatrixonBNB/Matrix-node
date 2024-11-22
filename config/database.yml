@@ -1,11 +1,11 @@
 default: &default
-  adapter: postgresql
+  adapter: "<%= ENV['MIGRATION_MODE'] == 'true' ? 'postgresql' : 'sqlite3' %>"
   encoding: unicode
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
 primary: &primary
   <<: *default
-  url: <%= ENV.fetch("DATABASE_URL") %>
+  url: "<%= ENV['MIGRATION_MODE'] == 'true' ? ENV.fetch('DATABASE_URL') : 'sqlite3::memory:' %>"
 
 secondary:
   <<: *default

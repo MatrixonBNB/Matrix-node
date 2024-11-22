@@ -26,12 +26,16 @@ class CreateFacetBlocks < ActiveRecord::Migration[7.1]
       t.bigint :fct_mint_rate
       t.numeric :fct_mint_period_l1_data_gas, precision: 78, scale: 0
       
-      t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "parent_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "prev_randao ~ '^0x[a-f0-9]{64}$'"
+      if pg_adapter?
+        t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "parent_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "prev_randao ~ '^0x[a-f0-9]{64}$'"
+      end
 
       t.timestamps
     end
+
+    return unless pg_adapter?
 
     add_index :facet_blocks, :number, unique: true
     add_index :facet_blocks, :block_hash, unique: true
