@@ -346,7 +346,11 @@ module EthscriptionEVMConverter
         end
       end  
       
-      deploy_receipt = FacetTransactionReceipt.find_by("legacy_contract_address_map ? :legacy_to", legacy_to: legacy_to)
+      deploy_receipt = if ActiveRecord::Base.connection.adapter_name.downcase.starts_with?('sqlite')
+        FacetTransactionReceipt.where("json_extract(legacy_contract_address_map, '$." + ActiveRecord::Base.connection.quote_string(legacy_to) + "') IS NOT NULL").first
+      else
+        FacetTransactionReceipt.find_by("legacy_contract_address_map ? :legacy_to", legacy_to: legacy_to)
+      end
       
       unless deploy_receipt
         raise ContractMissing, "Contract #{legacy_to} not found"

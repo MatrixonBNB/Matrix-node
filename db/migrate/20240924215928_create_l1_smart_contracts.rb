@@ -7,7 +7,9 @@ class CreateL1SmartContracts < ActiveRecord::Migration[7.1]
       t.timestamps
       
       t.index :address, unique: true
-      t.check_constraint "address ~ '^0x[0-9a-f]{40}$'"
+      if pg_adapter?
+        t.check_constraint "address ~ '^0x[0-9a-f]{40}$'"
+      end
     end
   end
 end

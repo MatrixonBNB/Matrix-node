@@ -22,6 +22,11 @@ module Clockwork
   end
 
   every(6.seconds, 'import_blocks_until_done') do
+    if ActiveRecord::Base.connection.adapter_name.downcase.starts_with?('sqlite')
+      ActiveRecord::Migration.verbose = false
+      ActiveRecord::MigrationContext.new("db/migrate/").migrate
+    end
+    
     loop do
       EthBlockImporter.instance.import_blocks_until_done
       sleep 6
