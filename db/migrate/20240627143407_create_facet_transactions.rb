@@ -18,15 +18,19 @@ class CreateFacetTransactions < ActiveRecord::Migration[7.1]
       t.numeric :value, precision: 78, scale: 0, null: false
       t.numeric :max_fee_per_gas, precision: 78, scale: 0
       
-      t.check_constraint "source_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "tx_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "eth_transaction_hash ~ '^0x[a-f0-9]{64}$'"
-      t.check_constraint "from_address ~ '^0x[a-f0-9]{40}$'"
-      t.check_constraint "to_address ~ '^0x[a-f0-9]{40}$'"
+      if pg_adapter?
+        t.check_constraint "source_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "block_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "tx_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "eth_transaction_hash ~ '^0x[a-f0-9]{64}$'"
+        t.check_constraint "from_address ~ '^0x[a-f0-9]{40}$'"
+        t.check_constraint "to_address ~ '^0x[a-f0-9]{40}$'"
+      end
       
       t.timestamps
     end
+
+    return unless pg_adapter?
 
     add_index :facet_transactions, :source_hash, unique: true
     add_index :facet_transactions, :block_hash
