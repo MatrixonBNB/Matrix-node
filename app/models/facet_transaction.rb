@@ -43,8 +43,6 @@ class FacetTransaction < ApplicationRecord
       USER_DEPOSIT_SOURCE_DOMAIN
     )
     
-    tx.max_fee_per_gas = 2 ** 256 - 1
-    
     tx
   end
   
@@ -88,7 +86,7 @@ class FacetTransaction < ApplicationRecord
       raise Eth::Tx::ParameterError, "Transaction is not an array!"
     end
     
-    unless tx.size == 7
+    unless tx.size == 6
       raise Eth::Tx::ParameterError, "Transaction missing fields!"
     end
     
@@ -104,15 +102,13 @@ class FacetTransaction < ApplicationRecord
     
     to = tx[1].length.zero? ? nil : tx[1].bytes_to_hex
     value = deserialize_rlp_int(tx[2])
-    max_gas_fee = deserialize_rlp_int(tx[3])
-    gas_limit = deserialize_rlp_int(tx[4])
-    data = tx[5].bytes_to_hex
+    gas_limit = deserialize_rlp_int(tx[3])
+    data = tx[4].bytes_to_hex
 
     tx = new
     tx.chain_id = clamp_uint(chain_id, 256)
     tx.to_address = validated_address(to)
     tx.value = clamp_uint(value, 256)
-    tx.max_fee_per_gas = clamp_uint(max_gas_fee, 256)
     tx.gas_limit = clamp_uint(gas_limit, 64)
     tx.input = data
     
@@ -152,7 +148,6 @@ class FacetTransaction < ApplicationRecord
     tx.to_address = L1_INFO_ADDRESS
     tx.value = 0
     tx.mint = 0
-    tx.max_fee_per_gas = 0
     tx.gas_limit = 1_000_000
     tx.input = calldata
     tx.from_address = SYSTEM_ADDRESS
@@ -185,7 +180,6 @@ class FacetTransaction < ApplicationRecord
     tx.to_address = MIGRATION_MANAGER_ADDRESS
     tx.value = 0
     tx.mint = 0
-    tx.max_fee_per_gas = 0
     tx.gas_limit = 10_000_000
     tx.input = function_selector
     tx.from_address = SYSTEM_ADDRESS
@@ -214,7 +208,6 @@ class FacetTransaction < ApplicationRecord
     tx_data.push(Eth::Util.hex_to_bin(to_address.to_s))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(mint))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(value))
-    tx_data.push(Eth::Util.serialize_int_to_big_endian(max_fee_per_gas))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(gas_limit))
     tx_data.push('')
     tx_data.push(Eth::Util.hex_to_bin(input))

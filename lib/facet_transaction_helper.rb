@@ -92,7 +92,6 @@ module FacetTransactionHelper
     input:,
     to:,
     gas_limit:,
-    max_fee_per_gas: 10.gwei,
     value: 0
   )
     chain_id = ChainIdManager.current_l2_chain_id
@@ -101,9 +100,9 @@ module FacetTransactionHelper
       Eth::Util.serialize_int_to_big_endian(chain_id),
       Eth::Util.hex_to_bin(to.to_s),
       Eth::Util.serialize_int_to_big_endian(value),
-      Eth::Util.serialize_int_to_big_endian(max_fee_per_gas),
       Eth::Util.serialize_int_to_big_endian(gas_limit),
-      Eth::Util.hex_to_bin(input)
+      Eth::Util.hex_to_bin(input),
+      '',
     ])
 
     "0x#{FacetTransaction::FACET_TX_TYPE.to_s(16).rjust(2, '0')}#{rlp_encoded.unpack1('H*')}"
