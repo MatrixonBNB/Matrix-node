@@ -52,9 +52,13 @@ if missing.any?
     puts "    Can be set via environment variable #{key}"
     puts "    Or via command line argument --#{key.downcase.tr('_', '-')}"
   end
+  
+  # Use the first missing key for the example
+  example_key = missing.keys.first
+  
   puts "\nExample usage:"
-  puts "  #{key}=value bundle exec clockwork derive_facet_blocks.rb"
-  puts "  bundle exec clockwork derive_facet_blocks.rb --#{missing.keys.first.downcase.tr('_', '-')} value"
+  puts "  #{example_key}=value bundle exec clockwork derive_facet_blocks.rb"
+  puts "  bundle exec clockwork derive_facet_blocks.rb --#{example_key.downcase.tr('_', '-')} value"
   exit 1
 end
 
