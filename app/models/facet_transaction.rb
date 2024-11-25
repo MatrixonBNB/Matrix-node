@@ -88,8 +88,7 @@ class FacetTransaction < ApplicationRecord
       raise Eth::Tx::ParameterError, "Transaction is not an array!"
     end
     
-    # So people can add "extra data" to burn more gas
-    unless [6, 7].include?(tx.size)
+    unless tx.size == 7
       raise Eth::Tx::ParameterError, "Transaction missing fields!"
     end
     
