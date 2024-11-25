@@ -75,7 +75,6 @@ module FacetTransactionHelper
       binding.irb
     end
     expect(receipt.status).to eq(expected_status)
-    expect(receipt.l1TxOrigin).to eq(params[:from_address]&.downcase || "0x" + "2" * 40)
     
     receipt
   end

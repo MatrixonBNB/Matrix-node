@@ -82,7 +82,7 @@ class EthTransaction < T::Struct
     return unless to_address == FACET_INBOX_ADDRESS
     
     FacetTransaction.from_payload(
-      l1_tx_origin: from_address,
+      contract_initiated: false,
       from_address: from_address,
       input: input,
       tx_hash: tx_hash,
@@ -93,7 +93,7 @@ class EthTransaction < T::Struct
   def try_facet_tx_from_events
     facet_tx_creation_events.each do |log|
       facet_tx = FacetTransaction.from_payload(
-        l1_tx_origin: from_address,
+        contract_initiated: true,
         from_address: log['address'],
         input: log['data'],
         tx_hash: tx_hash,
@@ -109,7 +109,7 @@ class EthTransaction < T::Struct
 
     create_potentially_valid_ethscription(
       creator: from_address,
-      l1_tx_origin: from_address,
+      contract_initiated: false,
       initial_owner: to_address,
       content_uri: utf8_input
     )
@@ -133,7 +133,7 @@ class EthTransaction < T::Struct
     
     create_potentially_valid_ethscription(
       creator: event['address'],
-      l1_tx_origin: from_address,
+      contract_initiated: true,
       initial_owner: initial_owner,
       content_uri: content_uri
     )

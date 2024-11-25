@@ -6,7 +6,7 @@ class FacetTransaction < ApplicationRecord
   belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
   has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
   
-  attr_accessor :chain_id, :l1_tx_origin, :l1_data_gas_used, :contract_initiated, :ethscription
+  attr_accessor :chain_id, :l1_data_gas_used, :contract_initiated, :ethscription
   
   FACET_TX_TYPE = 0x46
   DEPOSIT_TX_TYPE = 0x7E
@@ -30,11 +30,7 @@ class FacetTransaction < ApplicationRecord
     tx.eth_transaction_hash = ethscription.transaction_hash
     tx.from_address = ethscription.creator
     
-    tx.contract_initiated = ethscription.contract_initiated?
-    
-    # It has a burn function
-    l2_to_l1_message_passer = "0x4200000000000000000000000000000000000016"
-    tx.l1_tx_origin = l2_to_l1_message_passer
+    tx.contract_initiated = ethscription.contract_initiated
     
     payload = [
       ethscription.block_hash.hex_to_bytes,
@@ -70,7 +66,7 @@ class FacetTransaction < ApplicationRecord
   end
   
   def self.from_payload(
-    l1_tx_origin:,
+    contract_initiated:,
     from_address:,
     input:,
     tx_hash:,
@@ -123,9 +119,8 @@ class FacetTransaction < ApplicationRecord
     
     tx.eth_transaction_hash = tx_hash
     tx.from_address = from_address
-    tx.l1_tx_origin = l1_tx_origin
     
-    tx.contract_initiated = tx.l1_tx_origin != tx.from_address
+    tx.contract_initiated = contract_initiated
     
     tx.l1_data_gas_used = calculate_data_gas_used(
       input,
@@ -216,7 +211,6 @@ class FacetTransaction < ApplicationRecord
   def to_facet_payload
     tx_data = []
     tx_data.push(Eth::Util.hex_to_bin(source_hash))
-    tx_data.push(Eth::Util.hex_to_bin(l1_tx_origin.to_s))
     tx_data.push(Eth::Util.hex_to_bin(calculated_from_address))
     tx_data.push(Eth::Util.hex_to_bin(to_address.to_s))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(mint))
