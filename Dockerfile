@@ -21,21 +21,21 @@ RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
     build-essential \
     git \
-    libvips \
     pkg-config \
     libsecp256k1-dev \
     automake \
     autoconf \
-    libtool \
-    curl
+    libtool && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Install application gems
 COPY Gemfile Gemfile.lock ./
 RUN bundle config build.rbsecp256k1 --use-system-libraries && \
-    bundle install
+    bundle install --jobs 4 --retry 3
 
 # Copy application code and precompile bootsnap
 COPY . .
+ENV BOOTSNAP_COMPILE_CACHE_THREADS=4
 RUN bundle exec bootsnap precompile app/ lib/
 
 # Final stage
@@ -44,9 +44,8 @@ FROM base
 # Install only runtime dependencies
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
-    libvips \
-    libsecp256k1-dev \
-    && rm -rf /var/lib/apt/lists /var/cache/apt/archives
+    libsecp256k1-dev && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Copy built artifacts
 COPY --from=build /usr/local/bundle /usr/local/bundle
