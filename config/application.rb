@@ -21,7 +21,9 @@ module SimpleVm
     config.active_record.async_query_executor = :global_thread_pool
     
     config.active_record.raise_int_wider_than_64bit = false
-
+    
+    config.api_only = true
+    
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
