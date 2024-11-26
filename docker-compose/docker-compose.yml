@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   geth:
-    image: ghcr.io/0xfacet/facet-geth:facet
+    image: ghcr.io/0xfacet/facet-geth:v1.0.0
     environment:
       - JWT_SECRET=${JWT_SECRET}
       - GENESIS_FILE=${GENESIS_FILE}
@@ -21,7 +21,7 @@ services:
       retries: 5
 
   node:
-    image: ghcr.io/0xfacet/facet-node:main
+    image: ghcr.io/0xfacet/facet-node:v1.0.0
     environment:
       - L1_NETWORK=${L1_NETWORK}
       - GETH_RPC_URL=http://geth:8551
