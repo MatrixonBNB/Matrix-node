@@ -325,7 +325,18 @@ module EthscriptionEVMConverter
     data = content['data']
     fn = data['function']
     
-    ['upgradeAndCall', 'upgrade', 'upgradePairs', 'upgradePair'].include?(fn)
+    [
+      # Old names
+      'upgradeAndCall',
+      'upgrade',
+      'upgradePairs',
+      'upgradePair',
+      # New names
+      'upgradeToAndCall',
+      'upgradeTo',
+      'upgradePairsTo',
+      'upgradePairTo'
+    ].include?(fn)
   end
   
   def clear_caches!
