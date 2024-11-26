@@ -1,0 +1,22 @@
+steps:
+  # Pull the images
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'ghcr.io/0xfacet/facet-geth:facet']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'ghcr.io/0xfacet/facet-node:main']
+
+  # Start the services using docker compose (note: no hyphen)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['compose', '-f', 'docker-compose/docker-compose.yml', 'up', '-d']
+    env:
+      - 'JWT_SECRET=${_JWT_SECRET}'
+      - 'GENESIS_FILE=${_GENESIS_FILE}'
+      - 'L1_NETWORK=${_L1_NETWORK}'
+      - 'L1_RPC_URL=${_L1_RPC_URL}'
+      - 'L1_GENESIS_BLOCK=${_L1_GENESIS_BLOCK}'
+      - 'GENESIS_TIMESTAMP=${_GENESIS_TIMESTAMP}'
+      - 'GENESIS_MIX_HASH=${_GENESIS_MIX_HASH}'
+      - 'BLOCK_IMPORT_BATCH_SIZE=${_BLOCK_IMPORT_BATCH_SIZE}'
+      - 'RPC_GAS_CAP=${_RPC_GAS_CAP}'
+
+timeout: '1800s'
