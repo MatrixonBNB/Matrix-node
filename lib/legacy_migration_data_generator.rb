@@ -328,6 +328,15 @@ class LegacyMigrationDataGenerator
       
       "0x8d3cf03f51c9813dffb2f804e2ec6f8f187b687b0e3374bf44936adc15d938f8",
       "0xabea86865dc24c3719ebe2c0d75ff8b81f4124449a66b2a15dc6dcff75cf44d7",
+      
+      # Set upgrade admin on the registrar controller
+      "0xe1914673639c8983d7ea41e73695ad8065fb2ca62452f4ed7a63baf69fc15ec6",
+
+      # Upgrade registrar controller
+      "0xc1f1654ea88a63f7125d8efc1df749f910cc4c0ab6b42ad5d22a2b6f35c700b8",
+
+      # Upgrade admin on FacetBuddyFactory
+      "0x7e1962124d9748f480e5d6c6a6cf9b017fe0a7d4d2dd7a2adc1198440e5c4410"
     ]
   end
   
