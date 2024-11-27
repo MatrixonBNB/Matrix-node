@@ -76,7 +76,9 @@ module TransactionHelper
     function:,
     args:
   )
-    function_obj = contract.parent.function_hash[function]
+    proxy_contract = PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy")
+
+    function_obj = contract.parent.function_hash[function] || proxy_contract.parent.function_hash[function]
     function_obj.get_call_data(*args).freeze
   rescue NoMethodError => e
     raise if Ethscription.validate_import?

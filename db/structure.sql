@@ -229,7 +229,6 @@ CREATE TABLE public.facet_transactions (
     tx_type character varying NOT NULL,
     mint numeric(78,0) NOT NULL,
     value numeric(78,0) NOT NULL,
-    max_fee_per_gas numeric(78,0),
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_rails_12c02c54dd CHECK (((tx_hash)::text ~ '^0x[a-f0-9]{64}$'::text)),

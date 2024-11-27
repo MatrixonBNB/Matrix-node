@@ -33,7 +33,7 @@ RSpec.describe FacetTransaction do
   end
 
   describe '.from_payload' do
-    let(:l1_tx_origin) { "0x" + "1" * 40 }
+    let(:contract_initiated) { false }
     let(:from_address) { "0x" + "2" * 40 }
     let(:tx_hash) { "0x" + "3" * 64 }
     let(:block_hash) { "0x" + "4" * 64 }
@@ -70,7 +70,7 @@ RSpec.describe FacetTransaction do
         input = encode_tx({})
         
         tx = FacetTransaction.from_payload(
-          l1_tx_origin: l1_tx_origin,
+          contract_initiated: contract_initiated,
           from_address: from_address,
           input: input,
           tx_hash: tx_hash,
@@ -80,7 +80,7 @@ RSpec.describe FacetTransaction do
         expect(tx).to be_a(FacetTransaction)
         expect(tx.chain_id).to eq(ChainIdManager.current_l2_chain_id)
         expect(tx.from_address).to eq(from_address)
-        expect(tx.l1_tx_origin).to eq(l1_tx_origin)
+        expect(tx.contract_initiated).to eq(contract_initiated)
         expect(tx.eth_transaction_hash).to eq(tx_hash)
       end
     end
@@ -90,7 +90,7 @@ RSpec.describe FacetTransaction do
         input = "0x00" + encode_tx({}).slice(4..)
         
         tx = FacetTransaction.from_payload(
-          l1_tx_origin: l1_tx_origin,
+          contract_initiated: contract_initiated,
           from_address: from_address,
           input: input,
           tx_hash: tx_hash,
@@ -116,7 +116,7 @@ RSpec.describe FacetTransaction do
         }
         
         tx = FacetTransaction.from_payload(
-          l1_tx_origin: l1_tx_origin,
+          contract_initiated: contract_initiated,
           from_address: from_address,
           input: modified_input,
           tx_hash: tx_hash,

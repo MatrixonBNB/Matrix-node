@@ -107,12 +107,6 @@ module EthscriptionEVMConverter
       
       to_address = calculate_to_address(data['to'])
       
-      if data['function'] == 'upgradePairs'
-        data['args']['pairs'] = data['args']['pairs'].map do |pair|
-          calculate_to_address(pair)
-        end
-      end
-      
       implementation_address = get_implementation(to_address)
       contract = get_contract_from_predeploy_info(address: implementation_address)
       
@@ -124,10 +118,43 @@ module EthscriptionEVMConverter
           raise "No implementation address for #{to_address}"
         end
       end
+
+      if data['function'] == 'upgradeAndCall'
+        data['function'] = 'upgradeToAndCall'
+        
+        data['args'].delete("newSource")
+        data['args']['newImplementation'] = "0x" + data['args'].delete("newHash").last(40)
+        data['args']['_data'] = data['args'].delete("migrationCalldata")
+      end
+      
+      if data['function'] == 'upgrade'
+        data['function'] = 'upgradeTo'
+        
+        data['args'].delete("newSource")
+        data['args']['newImplementation'] = "0x" + data['args'].delete("newHash").last(40)
+      end
+
+      if data['function'] == 'upgradePairs'
+        data['function'] = 'upgradePairsTo'
+        
+        data['args']['pairs'] = data['args']['pairs'].map do |pair|
+          calculate_to_address(pair)
+        end
+        data['args'].delete("newSource")
+        data['args']['newImplementation'] = "0x" + data['args'].delete("newHash").last(40)
+      end
+      
+      if data['function'] == 'upgradePair'
+        data['function'] = 'upgradePairTo'
+        
+        data['args']['pair'] = calculate_to_address(data['args']['pair'])
+        data['args'].delete("newSource")
+        data['args']['newImplementation'] = "0x" + data['args'].delete("newHash").last(40)
+      end
       
       args = convert_args(contract, data['function'], data['args'])
       
-      if data['function'] == 'upgradeAndCall'
+      if data['function'] == 'upgradeToAndCall'
         new_impl_address = "0x" + args.first.last(40)
         new_contract = get_contract_from_predeploy_info(address: new_impl_address)
         migrationCalldata = JSON.parse(args.last)
@@ -142,10 +169,8 @@ module EthscriptionEVMConverter
           function: migrationCalldata['function'],
           args: migration_args
         )
-        
-        args[1] = ''
-        
-        args[2] = cooked
+
+        args[1] = cooked
       elsif data['function'] == 'setMetadataRenderer'
         begin
           metadata_calldata = JSON.parse(data['args'].is_a?(Array) ? data['args'].last : data['args']['data'])
@@ -300,7 +325,18 @@ module EthscriptionEVMConverter
     data = content['data']
     fn = data['function']
     
-    ['upgradeAndCall', 'upgrade', 'upgradePairs', 'upgradePair'].include?(fn)
+    [
+      # Old names
+      'upgradeAndCall',
+      'upgrade',
+      'upgradePairs',
+      'upgradePair',
+      # New names
+      'upgradeToAndCall',
+      'upgradeTo',
+      'upgradePairsTo',
+      'upgradePairTo'
+    ].include?(fn)
   end
   
   def clear_caches!
@@ -370,6 +406,9 @@ module EthscriptionEVMConverter
     def convert_args(contract, function_name, args)
       contract_name = contract.name
       function = contract.functions.find { |f| f.name == function_name }
+      
+      proxy_contract = PredeployManager.get_contract_from_predeploy_info(name: "ERC1967Proxy")
+      function ||= proxy_contract.functions.find { |f| f.name == function_name }
       
       unless function
         current_suffix = contract_name.last(3)

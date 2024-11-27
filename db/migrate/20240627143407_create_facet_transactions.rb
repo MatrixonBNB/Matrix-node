@@ -16,7 +16,6 @@ class CreateFacetTransactions < ActiveRecord::Migration[7.1]
       t.string :tx_type, null: false
       t.numeric :mint, precision: 78, scale: 0, null: false
       t.numeric :value, precision: 78, scale: 0, null: false
-      t.numeric :max_fee_per_gas, precision: 78, scale: 0
       
       if pg_adapter?
         t.check_constraint "source_hash ~ '^0x[a-f0-9]{64}$'"

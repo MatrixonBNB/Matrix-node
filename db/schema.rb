@@ -179,7 +179,6 @@ ActiveRecord::Schema[7.1].define(version: 2024_06_28_125033) do
     t.string "tx_type", null: false
     t.decimal "mint", precision: 78, null: false
     t.decimal "value", precision: 78, null: false
-    t.decimal "max_fee_per_gas", precision: 78
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["block_hash", "eth_call_index"], name: "index_facet_transactions_on_block_hash_and_eth_call_index", unique: true
