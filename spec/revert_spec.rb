@@ -153,16 +153,6 @@ RSpec.describe "Reverts" do
       function: 'createRevert',
       args: [false],
     )
-    
-    call_contract_function(
-      contract: counter_contract,
-      address: counter_address,
-      from: from_address,
-      function: 'createRevert',
-      args: [false],
-      max_fee_per_gas: 1,
-      expect_failure: true
-    )
   end
   
   it 'tries to transfer too much' do

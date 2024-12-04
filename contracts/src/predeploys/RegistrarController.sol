@@ -14,7 +14,7 @@ import {StablePriceOracle, IPriceOracle} from "src/facetnames/StablePriceOracle.
 import {ExponentialPremiumPriceOracle} from "./ExponentialPremiumPriceOracle.sol";
 import {ReverseRegistrar} from "./ReverseRegistrar.sol";
 import {NameEncoder} from "ens-contracts/utils/NameEncoder.sol";
-import "./Constants.sol";
+import "../libraries/EnsConstants.sol";
 import {LibString} from "solady/utils/LibString.sol";
 import {ENS} from "ens-contracts/registry/ENS.sol";
 
@@ -226,7 +226,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         stickerRegistry.initialize();
         stickerRegistry.addController(address(this));
         stickerRegistry.transferOwnership(owner());
-        stickerRegistry.setUpgradeAdmin(owner());
+        ERC1967Proxy(payable(address(stickerRegistry))).setUpgradeAdmin(owner());
     }
     
     function transferFrom(address from, address to, uint256 id) public {
@@ -297,7 +297,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         _transferPayment(price);
         
         if (MigrationLib.isInMigration()) {
-            request.duration += 30 days;
+            request.duration += 365 days;
         }
 
         _register(request, price);
@@ -542,10 +542,5 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
             stickerExpiry,
             grantingAddress
         );
-    }
-
-    event ContractUpgraded(address indexed newImplementation);
-    function upgrade(bytes32 newHash, string calldata newSource) external {
-        emit ContractUpgraded(address(0));
     }
 }

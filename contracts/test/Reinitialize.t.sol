@@ -32,7 +32,7 @@ contract ReinitializeTest is Test {
             EthscriptionERC20BridgeV6e4.onUpgrade,
             (address(this), 1000)   
         );
-        console.log("bridge.upgradeAdmin()", bridge.upgradeAdmin());
-        bridge.upgradeToAndCall(address(new EthscriptionERC20BridgeV6e4()), initData);
+        console.log("bridge.upgradeAdmin()", ERC1967Proxy(payable(address(bridge))).upgradeAdmin());
+        ERC1967Proxy(payable(address(bridge))).upgradeToAndCall(address(new EthscriptionERC20BridgeV6e4()), initData);
     }
 }

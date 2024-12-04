@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import "src/libraries/ERC1967Proxy.sol";
 import "src/libraries/Upgradeable.sol";
 import "solady/utils/Initializable.sol";
 import "solady/utils/LibString.sol";
@@ -107,13 +108,9 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
         s().lpFeeBPS = lpFeeBPS;
     }
     
-    function upgradePairs(address[] calldata pairs, bytes32 newHash, string calldata newSource) public {
-        require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
-        require(pairs.length <= 10, "Too many pairs to upgrade at once");
-        
+    function upgradePairsTo(address[] calldata pairs, address newImplementation) public onlyUpgradeAdmin {
         for (uint256 i = 0; i < pairs.length; i++) {
-            address pair = pairs[i];
-            upgradePair(pair, newHash, "");
+            upgradePairToAndCall(pairs[i], newImplementation, bytes(''));
         }
     }
 
@@ -122,14 +119,9 @@ contract FacetSwapFactoryVac5 is Initializable, Upgradeable {
             upgradePairToAndCall(pairs[i], newImplementation, data);
         }
     }
-
-    function upgradePair(address pair, bytes32 newHash, string memory newSource) public {
-        require(msg.sender == upgradeAdmin(), "NOT_AUTHORIZED");
-        Upgradeable(pair).upgrade(newHash, newSource);
-    }
     
-    function upgradePairToAndCall(address pair, address newImplementation, bytes calldata data) public onlyUpgradeAdmin {
-        Upgradeable(pair).upgradeToAndCall(newImplementation, data);
+    function upgradePairToAndCall(address pair, address newImplementation, bytes memory data) public onlyUpgradeAdmin {
+        ERC1967Proxy(payable(pair)).upgradeToAndCall(newImplementation, data);
     }
     
     error NotMigrationManager();

@@ -8,7 +8,7 @@ import {IERC165} from "openzeppelin-contracts/contracts/utils/introspection/ERC1
 import {Ownable} from "solady/auth/Ownable.sol";
 import {LibString} from "solady/utils/LibString.sol";
 
-import {GRACE_PERIOD} from "./Constants.sol";
+import {GRACE_PERIOD} from "../libraries/EnsConstants.sol";
 
 import "../libraries/MigrationLib.sol";
 import "src/libraries/FacetERC721.sol";

@@ -10,13 +10,9 @@ class Ethscription < T::Struct
   const :block_blockhash, String
   const :transaction_index, Integer
   const :creator, String
-  const :l1_tx_origin, String
   const :initial_owner, String
   const :content_uri, String
-  
-  def contract_initiated?
-    l1_tx_origin != creator
-  end
+  const :contract_initiated, T::Boolean
   
   def valid_data_uri?
     DataUri.valid?(content_uri)

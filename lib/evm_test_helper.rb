@@ -18,7 +18,6 @@ module EVMTestHelper
     args: [],
     value: 0,
     gas_limit: 1_000_000,
-    max_fee_per_gas: 1.gwei,
     expect_failure: false,
     expect_blank: false,
     sub_calls: []
@@ -31,7 +30,6 @@ module EVMTestHelper
       args: args,
       value: value,
       gas_limit: gas_limit,
-      max_fee_per_gas: max_fee_per_gas,
       expect_failure: expect_failure,
       expect_blank: expect_blank,
       sub_calls: sub_calls
@@ -44,7 +42,6 @@ module EVMTestHelper
     args: [],
     value: 0,
     gas_limit: 5_000_000,
-    max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
     data = EVMHelpers.get_deploy_data(contract, args)
@@ -55,7 +52,6 @@ module EVMTestHelper
       from_address: from,
       value: value,
       gas_limit: gas_limit,
-      max_fee_per_gas: max_fee_per_gas,
       expect_failure: expect_failure
     )
     
@@ -69,7 +65,6 @@ module EVMTestHelper
     args: [],
     value: 0,
     gas_limit: 5_000_000,
-    max_fee_per_gas: 10.gwei,
     expect_failure: false
   )
     begin
@@ -87,7 +82,6 @@ module EVMTestHelper
         args: [],
         value: value,
         gas_limit: gas_limit,
-        max_fee_per_gas: max_fee_per_gas,
         expect_failure: expect_failure
       ).contract_address
       
@@ -108,7 +102,6 @@ module EVMTestHelper
       args: [implementation_contract.address, initialize_calldata],
       value: value,
       gas_limit: gas_limit,
-      max_fee_per_gas: max_fee_per_gas,
       expect_failure: expect_failure
     )
     
@@ -122,7 +115,6 @@ module EVMTestHelper
     chain_id_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.chain_id)
     to_bin = Eth::Util.hex_to_bin(facet_transaction.to_address.to_s)
     value_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.value)
-    max_gas_fee_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.max_fee_per_gas)
     gas_limit_bin = Eth::Util.serialize_int_to_big_endian(facet_transaction.gas_limit)
     data_bin = Eth::Util.hex_to_bin(facet_transaction.input)
 
@@ -146,7 +138,6 @@ module EVMTestHelper
           input: tx[:facet_data],
           to: tx[:to_address],
           gas_limit: tx[:gas_limit] || 1_000_000,
-          max_fee_per_gas: tx[:max_fee_per_gas] || 10.gwei,
           value: tx[:value] || 0
         )
         
@@ -166,7 +157,6 @@ module EVMTestHelper
         input: kwargs[:facet_data],
         to: kwargs[:to_address],
         gas_limit: kwargs[:gas_limit] || 1_000_000,
-        max_fee_per_gas: kwargs[:max_fee_per_gas] || 10.gwei,
         value: kwargs[:value] || 0
       )
       
@@ -195,7 +185,6 @@ module EVMTestHelper
       from_address: from,
       to_address: payload[:to],
       value: payload[:data][:value] || 0,
-      max_fee_per_gas: payload[:data][:max_fee_per_gas] || 10.gwei,
       gas_limit: payload[:data][:gas_limit] || 1_000_000,
       expect_failure: expect_failure,
       block_timestamp: block_timestamp
@@ -215,7 +204,6 @@ module EVMTestHelper
         args: (payload[:data][:args].is_a?(Hash) ? payload[:data][:args].values : payload[:data][:args]),
         value: payload[:data][:value] || 0,
         gas_limit: payload[:data][:gas_limit] || 1_000_000,
-        max_fee_per_gas: payload[:data][:max_fee_per_gas] || 10.gwei,
         expect_failure: false
       )
     else
@@ -335,7 +323,6 @@ module EVMTestHelper
         from_address: call[:from],
         value: call[:value] || 0,
         gas_limit: call[:gas_limit] || 1_000_000,
-        max_fee_per_gas: call[:max_fee_per_gas] || 1.gwei,
         expect_failure: call[:expect_failure] || false,
         expect_blank: call[:expect_blank] || false,
         sub_calls: call[:sub_calls] || []
