@@ -297,7 +297,7 @@ contract RegistrarController is Ownable, Pausable, Initializable, EventReplayabl
         _transferPayment(price);
         
         if (MigrationLib.isInMigration()) {
-            request.duration += 30 days;
+            request.duration += 365 days;
         }
 
         _register(request, price);
