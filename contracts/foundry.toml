@@ -1,7 +1,7 @@
 [profile.default]
 src = "src"
 out = 'forge-artifacts'
-libs = ["lib"]
+libs = ["dependencies"]
 via_ir = true
 optimizer = true
 optimizer_runs = 200
@@ -21,13 +21,16 @@ fs_permissions = [
 ignored_error_codes = ["transient-storage", "code-size", "init-code-size", 5159]
 
 remappings = [
-  "solady/=lib/solady/src",
-  "lib/solady/=lib/solady/src",
-  "src/=src/",
-  "@ensdomains/buffer/=lib/buffer",
-  "ens-contracts/=lib/ens-contracts/contracts",
-  '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
-  'forge-std/=lib/forge-std/src',
+    # Clean imports for Solidity files
+    "@openzeppelin/contracts/=dependencies/@openzeppelin-contracts-5.1.0/contracts/",
+    "forge-std/=dependencies/forge-std-1.9.4/src/",
+    "ens-contracts/=dependencies/ens-contracts-1.0.1/contracts/",
+    "@ensdomains/buffer/=dependencies/buffer-0.0.0/",
+    "verifications/=dependencies/verifications-0.0.0/",
+    "facet-sol/=dependencies/facet-sol-1.0.0/",
+    "solady/=dependencies/solady-0.0.278/src/",
+    "lib/solady/=dependencies/solady-0.0.278/src/",
+    "eas-contracts/=dependencies/eas-contracts-1.3.0/contracts/"
 ]
 
 [profile.scripts]
@@ -42,3 +45,17 @@ l1 = "${L1_RPC}"
 
 [etherscan]
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
+
+[dependencies]
+forge-std = "1.9.4"
+"@openzeppelin-contracts" = { version = "5.1.0", git = "https://github.com/OpenZeppelin/openzeppelin-contracts.git", rev = "6e05b68bd96ab90a4049adb89f20fd578404b274" }
+solady = { version = "0.0.278", git = "https://github.com/vectorized/solady.git", rev = "a2f53c1f15ed07671d805e3a4a0e306b2a09d3bc" }
+ens-contracts = { version = "1.0.1", git = "https://github.com/ensdomains/ens-contracts.git", rev = "5421b5689e695531dc9739f0ad861839bdd231cb" }
+eas-contracts = { version = "1.3.0", git = "https://github.com/ethereum-attestation-service/eas-contracts.git", rev = "e4a9be156a3c024c647d09b84a20ee690fdb7d85" }
+facet-sol = { version = "1.0.0", git = "https://github.com/0xFacet/facet-sol.git", rev = "56e009e3d18f0c3fdef132ffc171991bbaf33e37" }
+buffer = { version = "0.0.0", git = "https://github.com/ensdomains/buffer.git", rev = "82cc819" }
+verifications = { version = "0.0.0", git = "https://github.com/coinbase/verifications.git", rev = "831a0d2" }
+
+[soldeer]
+recursive_deps = true
+remappings_location = "config"
