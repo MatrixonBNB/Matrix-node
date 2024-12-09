@@ -9,8 +9,7 @@ module SysConfig
     if in_migration_mode?
       5_000_000_000
     elsif is_first_v2_block?(block)
-      approx_imigration_gas = 4_000_000_000
-      approx_imigration_gas + L2_BLOCK_GAS_LIMIT
+      migration_gas + L2_BLOCK_GAS_LIMIT
     else
       L2_BLOCK_GAS_LIMIT
     end
@@ -18,6 +17,18 @@ module SysConfig
   
   def l1_genesis_block_number
     ENV.fetch("L1_GENESIS_BLOCK").to_i
+  end
+  
+  def migration_gas
+    if current_l1_network == "mainnet"
+      3_871_347_580
+    else
+      3_870_476_472
+    end
+  end
+  
+  def current_l1_network
+    ChainIdManager.current_l1_network
   end
   
   def genesis_timestamp
