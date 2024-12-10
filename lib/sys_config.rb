@@ -2,7 +2,7 @@ module SysConfig
   extend self
   
   FACET_INBOX_ADDRESS = "0x00000000000000000000000000000000000face7".freeze
-  L2_BLOCK_GAS_LIMIT = Integer(ENV.fetch('L2_BLOCK_GAS_LIMIT', 240_000_000))
+  L2_BLOCK_GAS_LIMIT = Integer(ENV.fetch('L2_BLOCK_GAS_LIMIT', 200_000_000))
   L2_BLOCK_TIME = 12
   
   def block_gas_limit(block)
