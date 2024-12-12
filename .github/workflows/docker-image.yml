@@ -5,6 +5,8 @@ on:
     branches: [ "v*", "main" ]
     tags:
       - 'v*'
+  release:
+    types: [published]
   pull_request:
     branches: [ "v*", "main" ]
 
@@ -31,9 +33,25 @@ jobs:
       with:
         images: ghcr.io/0xfacet/facet-node
         tags: |
-          type=ref,event=branch  # Creates tags for branches (v1.0.0, main)
-          type=sha,format=short  # Creates short SHA tags
-          type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}  # Only tag latest from main branch
+          # Latest commit SHA
+          type=sha,format=short
+          
+          # Branch names (v1.0.0, main, etc)
+          type=ref,event=branch
+          
+          # Git tags (v1.0.0, etc)
+          type=ref,event=tag
+          
+          # Semantic versioning for releases
+          type=semver,pattern={{version}},event=tag
+          type=semver,pattern={{major}}.{{minor}},event=tag
+          type=semver,pattern={{major}},event=tag
+          
+          # Latest release tag
+          type=raw,value=latest-release,enable=${{ github.event_name == 'release' }}
+          
+          # Latest on main branch
+          type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
