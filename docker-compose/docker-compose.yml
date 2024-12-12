@@ -1,6 +1,6 @@
 services:
   geth:
-    image: ghcr.io/0xfacet/facet-geth:v1.0.0
+    image: ghcr.io/0xfacet/facet-geth:sha-9f4ec8c
     environment:
       JWT_SECRET: ${JWT_SECRET}
       GENESIS_FILE: ${GENESIS_FILE}
