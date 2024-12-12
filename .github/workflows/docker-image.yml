@@ -2,13 +2,13 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "v*", "main" ]
+    branches: [ "*v*", "main" ]
     tags:
-      - 'v*'
+      - '*v*'
   release:
     types: [published]
   pull_request:
-    branches: [ "v*", "main" ]
+    branches: [ "*v*", "main" ]
 
 jobs:
   build:
