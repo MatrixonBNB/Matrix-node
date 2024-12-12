@@ -1,6 +1,6 @@
 services:
   geth:
-    image: ghcr.io/0xfacet/facet-geth:sha-9f4ec8c
+    image: ghcr.io/0xfacet/facet-geth:v1.0.1
     environment:
       JWT_SECRET: ${JWT_SECRET}
       GENESIS_FILE: ${GENESIS_FILE}
@@ -19,7 +19,7 @@ services:
       start_period: 10s
 
   node:
-    image: ghcr.io/0xfacet/facet-node:v1.0.0
+    image: ghcr.io/0xfacet/facet-node:v1.0.1
     environment:
       JWT_SECRET: ${JWT_SECRET}
       L1_NETWORK: ${L1_NETWORK}
