@@ -122,10 +122,7 @@ class FacetTransaction < ApplicationRecord
       contract_initiated: tx.contract_initiated
     )
     
-    tx.source_hash = FacetTransaction.compute_source_hash(
-      tx_hash.hex_to_bytes,
-      USER_DEPOSIT_SOURCE_DOMAIN,
-    )
+    tx.source_hash = tx_hash
     
     tx
   rescue *tx_decode_errors, InvalidAddress, InvalidRlpInt => e
