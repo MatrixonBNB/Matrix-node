@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe "Stress tests" do
   include ActiveSupport::Testing::TimeHelpers
   let(:from_address) { "0x1000000000000000000000000000000000000000" }
-  let(:block_gas_limit) { 240_000_000 } # 240M gas limit
+  let(:block_gas_limit) { SysConfig::L2_BLOCK_GAS_LIMIT } # 240M gas limit
   let(:tx_gas_limit) { 50_000_000 } # 50M per-tx gas limit
   
   let!(:gas_burner_contract) { EVMHelpers.compile_contract('GasBurner') }
@@ -135,10 +135,12 @@ RSpec.describe "Stress tests" do
         puts "  Gas actually used: #{receipt.gasUsed}"
         puts "  Status: #{receipt.status == 1 ? 'Success' : 'Failed'}"
         
+        gas_used_in_prev_receipts = receipt.cumulativeGasUsed - receipt.gasUsed
+        
         # Check both per-tx and block gas limits
         if original_call[:gas_limit] > tx_gas_limit
           expect(receipt.status).to eq(0), "Transaction #{i + 1} should have failed due to exceeding per-tx gas limit"
-        elsif receipt.gas > block_gas_limit - receipts[0...i].sum(&:gasUsed)
+        elsif receipt.gas + gas_used_in_prev_receipts > block_gas_limit
           expect(receipt.status).to eq(0), "Transaction #{i + 1} should have failed due to insufficient block gas"
         else
           expect(receipt.status).to eq(1), "Transaction #{i + 1} should have succeeded"
