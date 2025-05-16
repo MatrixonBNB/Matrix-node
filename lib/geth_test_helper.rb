@@ -7,8 +7,9 @@ module GethTestHelper
     authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
     discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
     
-    PredeployManager.write_genesis_json(clear_cache: false)
-    # SolidityCompiler.compile_all_legacy_files
+    MemeryExtensions.clear_all_caches!
+    SolidityCompiler.reset_checksum
+    SolidityCompiler.compile_all_legacy_files
     
     teardown_rspec_geth
     

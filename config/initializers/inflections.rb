@@ -12,10 +12,5 @@
 
 # These inflection rules are supported but not enabled by default:
 ActiveSupport::Inflector.inflections(:en) do |inflect|
-  inflect.acronym "VM"
   inflect.acronym "EVM"
-  inflect.acronym "EIP"
-  inflect.acronym "EIP1559"
-  inflect.acronym "EIP2930"
-  inflect.acronym "EIPs"
 end
