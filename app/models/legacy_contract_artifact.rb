@@ -1,4 +1,4 @@
-class LegacyContractArtifact < ApplicationRecord
+class LegacyContractArtifact
   class LegacyContractArtifactStruct < T::Struct
     const :id, Integer
     const :transaction_hash, String
@@ -21,10 +21,6 @@ class LegacyContractArtifact < ApplicationRecord
   
   class AmbiguousSuffixError < StandardError; end
   include Memery
-  self.table_name = "contract_artifacts"
-  
-  scope :oldest_first, -> { order(:block_number, :transaction_index, :internal_transaction_index) }
-  scope :newest_first, -> { order(block_number: :desc, transaction_index: :desc, internal_transaction_index: :desc) }
   
   def self.file_location(network = ENV.fetch('L1_NETWORK'))
     Rails.root.join('config', "legacy-contract-artifacts-#{network}.json")
@@ -40,7 +36,7 @@ class LegacyContractArtifact < ApplicationRecord
     if File.exist?(file_location)
       File.read(file_location)
     else
-      LegacyContractArtifact.all.oldest_first.to_json
+      raise
     end
   end
   

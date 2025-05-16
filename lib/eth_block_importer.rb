@@ -281,7 +281,7 @@ class EthBlockImporter
       
       parent_eth_block = eth_block_cache[block_number - 1]
       
-      if parent_eth_block && parent_eth_block.block_hash != block_result['parentHash']
+      if parent_eth_block && parent_eth_block.block_hash != Hash32.from_hex(block_result['parentHash'])
         eth_block_cache.delete_if { |number, _| number >= parent_eth_block.number }
         
         facet_block_cache.delete_if do |_, facet_block|
@@ -320,7 +320,7 @@ class EthBlockImporter
       
       res << OpenStruct.new(
         facet_block: imported_facet_blocks.last,
-        transactions_imported: imported_facet_blocks.last.in_memory_txs.length
+        transactions_imported: imported_facet_blocks.last.facet_transactions.length
       )
     end
   

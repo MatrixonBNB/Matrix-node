@@ -1,6 +1,15 @@
 require_relative "boot"
 
-require "rails/all"
+# Instead of loading all railties (which pulls in ActiveRecord), require only what we need.
+require "rails"
+# Pick the frameworks you want:
+require "action_controller/railtie"
+require "action_mailer/railtie"
+require "action_view/railtie"
+require "active_job/railtie"
+require "action_cable/engine"
+# NOTE: active_record/railtie intentionally omitted
+# require "active_record/railtie"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
@@ -15,12 +24,6 @@ module SimpleVm
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w(assets tasks))
-    
-    config.active_record.schema_format = :sql
-    
-    config.active_record.async_query_executor = :global_thread_pool
-    
-    config.active_record.raise_int_wider_than_64bit = false
     
     config.api_only = true
     

@@ -156,7 +156,7 @@ module GethDriver
       first_block_receipts = EthRpcClient.l2.get_block_receipts(1)
       
       failed_system_txs = first_block_receipts.select do |receipt|
-        receipt['from'].downcase == FacetTransaction::SYSTEM_ADDRESS.downcase &&
+        FacetTransaction::SYSTEM_ADDRESS == Address20.from_hex(receipt['from']) &&
         receipt['status'] != '0x1'
       end
       
@@ -190,6 +190,9 @@ module GethDriver
       version = 2
     end
     
+    payload_attributes = ByteString.deep_hexify(payload_attributes)
+    fork_choice_state = ByteString.deep_hexify(fork_choice_state)
+    
     fork_choice_response = client.call("engine_forkchoiceUpdatedV#{version}", [fork_choice_state, payload_attributes])
     if fork_choice_response['error']
       raise "Fork choice update failed: #{fork_choice_response['error']}"
@@ -218,6 +221,8 @@ module GethDriver
       new_payload_request << new_facet_block.parent_beacon_block_root
     end
     
+    new_payload_request = ByteString.deep_hexify(new_payload_request)
+    
     new_payload_response = client.call("engine_newPayloadV#{version}", new_payload_request)
     
     status = new_payload_response['status']
@@ -237,6 +242,8 @@ module GethDriver
       safeBlockHash: new_safe_block.block_hash,
       finalizedBlockHash: new_finalized_block.block_hash
     }
+    
+    fork_choice_state = ByteString.deep_hexify(fork_choice_state)
     
     fork_choice_response = client.call("engine_forkchoiceUpdatedV#{version}", [fork_choice_state, nil])
 

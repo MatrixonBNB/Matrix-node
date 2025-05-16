@@ -1,12 +1,30 @@
-class FacetTransaction < ApplicationRecord
+class FacetTransaction < T::Struct
   include SysConfig
+  include AttrAssignable
+
+  prop :chain_id, T.nilable(Integer)
+  prop :l1_data_gas_used, T.nilable(Integer)
+  prop :contract_initiated, T.nilable(T::Boolean)
+  prop :eth_transaction_hash, T.nilable(Hash32)
+  prop :eth_call_index, T.nilable(Integer)
+  prop :block_hash, T.nilable(Hash32)
+  prop :block_number, T.nilable(Integer)
+  prop :deposit_receipt_version, T.nilable(String)
+  prop :from_address, T.nilable(Address20)
+  prop :gas_limit, T.nilable(Integer)
+  prop :tx_hash, T.nilable(Hash32)
+  prop :input, T.nilable(ByteString)
+  prop :source_hash, T.nilable(Hash32)
+  prop :to_address, T.nilable(Address20)
+  prop :transaction_index, T.nilable(Integer)
+  prop :tx_type, T.nilable(String)
+  prop :mint, T.nilable(Integer)
+  prop :value, T.nilable(Integer)
+
+  prop :facet_block, T.nilable(FacetBlock)
+  
   class InvalidAddress < StandardError; end
   class InvalidRlpInt < StandardError; end
-  
-  belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash, optional: true
-  has_one :facet_transaction_receipt, primary_key: :tx_hash, foreign_key: :transaction_hash, dependent: :destroy
-  
-  attr_accessor :chain_id, :l1_data_gas_used, :contract_initiated, :ethscription
   
   FACET_TX_TYPE = 0x46
   DEPOSIT_TX_TYPE = 0x7E
@@ -15,9 +33,9 @@ class FacetTransaction < ApplicationRecord
   L1_INFO_DEPOSIT_SOURCE_DOMAIN = 1
   UPGRADE_DEPOSITED_SOURCE_DOMAIN = 2
   
-  SYSTEM_ADDRESS = "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001"
-  L1_INFO_ADDRESS = "0x4200000000000000000000000000000000000015"
-  MIGRATION_MANAGER_ADDRESS = "0x22220000000000000000000000000000000000d6"
+  SYSTEM_ADDRESS = Address20.from_hex("0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001")
+  L1_INFO_ADDRESS = Address20.from_hex("0x4200000000000000000000000000000000000015")
+  MIGRATION_MANAGER_ADDRESS = Address20.from_hex("0x22220000000000000000000000000000000000d6")
   
   def self.from_ethscription(ethscription)
     tx = new
@@ -33,26 +51,28 @@ class FacetTransaction < ApplicationRecord
     tx.contract_initiated = ethscription.contract_initiated
     
     payload = [
-      ethscription.block_hash.hex_to_bytes,
-      ethscription.transaction_hash.hex_to_bytes,
+      ethscription.block_hash.to_bin,
+      ethscription.transaction_hash.to_bin,
       0.zpad(32)
     ].join
     
     tx.source_hash = FacetTransaction.compute_source_hash(
-      payload,
+      ByteString.from_bin(payload),
       USER_DEPOSIT_SOURCE_DOMAIN
     )
     
     tx
   end
   
+  sig { params(tx_count_in_block: Integer).returns(Integer) }
   def assign_gas_limit_from_tx_count_in_block(tx_count_in_block)
     block_gas_limit = SysConfig.block_gas_limit(facet_block)
     self.gas_limit = block_gas_limit / (tx_count_in_block + 1) # Attributes tx
   end
   
+  sig { params(hex_string: ByteString, contract_initiated: T::Boolean).returns(Integer) }
   def self.calculate_data_gas_used(hex_string, contract_initiated:)
-    bytes = hex_string.hex_to_bytes
+    bytes = hex_string.to_bin
     zero_count = bytes.count("\x00")
     non_zero_count = bytes.bytesize - zero_count
     
@@ -63,6 +83,13 @@ class FacetTransaction < ApplicationRecord
     end
   end
   
+  sig { params(
+    contract_initiated: T::Boolean,
+    from_address: Address20,
+    input: ByteString,
+    tx_hash: Hash32,
+    block_hash: Hash32
+  ).returns(T.nilable(FacetTransaction)) }
   def self.from_payload(
     contract_initiated:,
     from_address:,
@@ -70,7 +97,7 @@ class FacetTransaction < ApplicationRecord
     tx_hash:,
     block_hash:
   )
-    hex = input
+    hex = input.to_hex
     
     hex = Eth::Util.remove_hex_prefix hex
     type = hex[0, 2]
@@ -107,10 +134,13 @@ class FacetTransaction < ApplicationRecord
 
     tx = new
     tx.chain_id = clamp_uint(chain_id, 256)
-    tx.to_address = validated_address(to)
+    
+    validated_to = validated_address(to)
+    tx.to_address = validated_to ? Address20.from_hex(validated_to) : nil
+    
     tx.value = clamp_uint(value, 256)
     tx.gas_limit = clamp_uint(gas_limit, 64)
-    tx.input = data
+    tx.input = ByteString.from_hex(data)
     
     tx.eth_transaction_hash = tx_hash
     tx.from_address = from_address
@@ -152,12 +182,12 @@ class FacetTransaction < ApplicationRecord
     tx.facet_block = facet_block
     
     payload = [
-      facet_block.eth_block_hash.hex_to_bytes,
+      facet_block.eth_block_hash.to_bin,
       facet_block.sequence_number.zpad(32)
     ].join
     
     tx.source_hash = FacetTransaction.compute_source_hash(
-      payload,
+      ByteString.from_bin(payload),
       L1_INFO_DEPOSIT_SOURCE_DOMAIN
     )
     
@@ -169,7 +199,7 @@ class FacetTransaction < ApplicationRecord
       raise "Invalid block number #{facet_block.number}!"
     end
     
-    function_selector = Eth::Util.keccak256('executeMigration()').first(4).bytes_to_hex
+    function_selector = ByteString.from_bin(Eth::Util.keccak256('executeMigration()').first(4))
     upgrade_intent = "emit events required to complete v1 to v2 migration batch ##{batch_number}"
 
     tx = new
@@ -184,34 +214,38 @@ class FacetTransaction < ApplicationRecord
     tx.facet_block = facet_block
     
     tx.source_hash = FacetTransaction.compute_source_hash(
-      Eth::Util.keccak256(upgrade_intent),
+      ByteString.from_bin(Eth::Util.keccak256(upgrade_intent)),
       L1_INFO_DEPOSIT_SOURCE_DOMAIN
     )
     
     tx
   end
   
+  sig { params(payload: ByteString, source_domain: Integer).returns(Hash32) }
   def self.compute_source_hash(payload, source_domain)
-    Eth::Util.keccak256(
+    bin_val = Eth::Util.keccak256(
       Eth::Util.zpad_int(source_domain, 32) +
-      Eth::Util.keccak256(payload)
-    ).bytes_to_hex
+      Eth::Util.keccak256(payload.to_bin)
+    )
+    
+    Hash32.from_bin(bin_val)
   end
   
+  sig { returns(ByteString) }
   def to_facet_payload
     tx_data = []
-    tx_data.push(Eth::Util.hex_to_bin(source_hash))
-    tx_data.push(Eth::Util.hex_to_bin(calculated_from_address))
-    tx_data.push(Eth::Util.hex_to_bin(to_address.to_s))
+    tx_data.push(source_hash.to_bin)
+    tx_data.push(calculated_from_address.to_bin)
+    tx_data.push(to_address ? to_address.to_bin : '')
     tx_data.push(Eth::Util.serialize_int_to_big_endian(mint))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(value))
     tx_data.push(Eth::Util.serialize_int_to_big_endian(gas_limit))
     tx_data.push('')
-    tx_data.push(Eth::Util.hex_to_bin(input))
+    tx_data.push(input.to_bin)
     tx_encoded = Eth::Rlp.encode(tx_data)
 
     tx_type = Eth::Util.serialize_int_to_big_endian(DEPOSIT_TX_TYPE)
-    "#{tx_type}#{tx_encoded}".bytes_to_hex
+    ByteString.from_bin("#{tx_type}#{tx_encoded}")
   end
   
   def self.tx_decode_errors

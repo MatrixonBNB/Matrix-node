@@ -7,14 +7,14 @@ module FacetTransactionHelper
     # Convert transaction params to EthTransaction objects
     eth_transactions = transactions.map.with_index do |tx_params, index|
       EthTransaction.new(
-        block_hash: bytes_stub(rand),
+        block_hash: Hash32.from_hex(bytes_stub(rand)),
         block_number: current_max_eth_block.number + 1,
         block_timestamp: current_max_eth_block.timestamp + 12,
-        tx_hash: bytes_stub(rand),
+        tx_hash: Hash32.from_hex(bytes_stub(rand)),
         transaction_index: index,  # Use index for transaction ordering
-        input: tx_params[:input],
+        input: ByteString.from_hex(tx_params[:input]),
         chain_id: 1,
-        from_address: (tx_params[:from_address] || "0x" + "2" * 40).downcase,
+        from_address: Address20.from_hex(tx_params[:from_address] || "0x" + "2" * 40),
         to_address: FacetTransaction::FACET_INBOX_ADDRESS,
         status: 1,
         logs: tx_params[:events] || []
@@ -22,7 +22,7 @@ module FacetTransactionHelper
     end
 
     rpc_results = eth_txs_to_rpc_result(eth_transactions)
-    block_result = rpc_results[0].merge('parentHash' => current_max_eth_block.block_hash)
+    block_result = rpc_results[0].merge('parentHash' => current_max_eth_block.block_hash.to_hex)
     receipt_result = rpc_results[1]
     
     instance = EthBlockImporter.instance
@@ -33,14 +33,14 @@ module FacetTransactionHelper
     allow(mock_ethereum_client).to receive(:get_transaction_receipts).and_return(receipt_result)
 
     importer = EthBlockImporter.instance
-    facet_blocks, eth_blocks = importer.import_next_block
+    facet_blocks, eth_blocks = importer.import_next_block# rescue binding.irb
     
     latest_l2_block = EthRpcClient.l2.get_block("latest", true)
-    
+    # binding.irb
     # Return array of receipts
-    eth_transactions.map do |eth_tx|
+    res = eth_transactions.map do |eth_tx|
       tx_in_geth = latest_l2_block['transactions'].find do |tx|
-        tx['sourceHash'] == eth_tx.facet_tx_source_hash
+        eth_tx.facet_tx_source_hash == Hash32.from_hex(tx['sourceHash'])
       end
       
       next nil if tx_in_geth.nil?
@@ -53,6 +53,8 @@ module FacetTransactionHelper
       
       combined_receipt
     end.compact
+
+    res
   end
 
   # Keep the original method for backwards compatibility
@@ -65,6 +67,7 @@ module FacetTransactionHelper
     end
     
     receipt = receipts.first
+    binding.irb unless receipt.present?
     expect(receipt).to be_present
     
     expected_status = params[:expect_error] ? 0 : 1
@@ -117,7 +120,7 @@ module FacetTransactionHelper
   def generate_event_log(data, from_address, log_index, removed = false)
     {
       'address' => from_address,
-      'topics' => [EthTransaction::FacetLogInboxEventSig],
+      'topics' => [EthTransaction::FacetLogInboxEventSig.to_hex],
       'data' => data,
       'logIndex' => "0x" + log_index.to_s(16),
       'removed' => removed
@@ -169,27 +172,27 @@ module FacetTransactionHelper
   
   def eth_txs_to_rpc_result(eth_transactions)
     block_result = {
-      'hash' => eth_transactions.first.block_hash,
+      'hash' => eth_transactions.first.block_hash.to_hex,
       'number' => "0x" + eth_transactions.first.block_number.to_s(16),
       'baseFeePerGas' => "0x" + 1.gwei.to_s(16),
       'timestamp' => "0x" + eth_transactions.first.block_timestamp.to_s(16),
-      'parentBeaconBlockRoot' => eth_transactions.first.block_hash,
-      'mixHash' => eth_transactions.first.block_hash,
+      'parentBeaconBlockRoot' => eth_transactions.first.block_hash.to_hex,
+      'mixHash' => eth_transactions.first.block_hash.to_hex,
       'transactions' => eth_transactions.map do |tx|
         {
-          'hash' => tx.tx_hash,
+          'hash' => tx.tx_hash.to_hex,
           'transactionIndex' => "0x" + tx.transaction_index.to_s(16),
-          'input' => tx.input,
+          'input' => tx.input.to_hex,
           'chainId' => "0x" + tx.chain_id.to_s(16),
-          'from' => tx.from_address,
-          'to' => tx.to_address
+          'from' => tx.from_address.to_hex,
+          'to' => tx.to_address.to_hex
         }
       end
     }
 
     receipt_result = eth_transactions.map do |tx|
       {
-        'transactionHash' => tx.tx_hash,
+        'transactionHash' => tx.tx_hash.to_hex,
         'status' => "0x" + tx.status.to_s(16),
         'logs' => tx.logs
       }

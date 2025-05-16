@@ -27,7 +27,7 @@ class GethClient
     if l2_block_number > 0
       l2_block = call("eth_getBlockByNumber", ["0x#{l2_block_number.to_s(16)}", true])
       l2_attributes_tx = l2_block['transactions'].first
-      L1AttributesTxCalldata.decode(l2_attributes_tx['input'])
+      L1AttributesTxCalldata.decode(ByteString.from_hex(l2_attributes_tx['input']))
     else
       l1_block = EthRpcClient.l1.get_block(SysConfig.l1_genesis_block_number)
       eth_block = EthBlock.from_rpc_result(l1_block)

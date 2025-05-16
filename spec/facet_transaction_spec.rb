@@ -34,19 +34,19 @@ RSpec.describe FacetTransaction do
 
   describe '.from_payload' do
     let(:contract_initiated) { false }
-    let(:from_address) { "0x" + "2" * 40 }
-    let(:tx_hash) { "0x" + "3" * 64 }
-    let(:block_hash) { "0x" + "4" * 64 }
+    let(:from_address) { Address20.from_hex("0x" + "2" * 40) }
+    let(:tx_hash) { Hash32.from_hex("0x" + "3" * 64) }
+    let(:block_hash) { Hash32.from_hex("0x" + "4" * 64) }
     
     def encode_tx(params)
       # Default valid parameters
       defaults = {
         chain_id: ChainIdManager.current_l2_chain_id,
-        to: "0x" + "5" * 40,
+        to: Address20.from_hex("0x" + "5" * 40),
         value: 1000,
         max_gas_fee: 1_000_000,
         gas_limit: 1_000_000,
-        data: "0x"
+        data: ByteString.from_hex("0x")
       }
       
       params = defaults.merge(params)
@@ -54,25 +54,25 @@ RSpec.describe FacetTransaction do
       # RLP encode the transaction
       rlp_encoded = Eth::Rlp.encode([
         Eth::Util.serialize_int_to_big_endian(params[:chain_id]),
-        Eth::Util.hex_to_bin(params[:to]),
+        params[:to].to_bin,
         Eth::Util.serialize_int_to_big_endian(params[:value]),
         Eth::Util.serialize_int_to_big_endian(params[:max_gas_fee]),
         Eth::Util.serialize_int_to_big_endian(params[:gas_limit]),
-        Eth::Util.hex_to_bin(params[:data])
+        params[:data].to_bin
       ])
       
-      # Add transaction type prefix
-      "0x#{FacetTransaction::FACET_TX_TYPE.to_s(16).rjust(2, '0')}#{rlp_encoded.bytes_to_hex}"
+      tx_type = Eth::Util.serialize_int_to_big_endian(FacetTransaction::FACET_TX_TYPE)
+      
+      ByteString.from_bin("#{tx_type}#{rlp_encoded}").to_hex
     end
 
     context 'with valid transaction' do
       it 'decodes a basic transaction' do
         input = encode_tx({})
-        
         tx = FacetTransaction.from_payload(
           contract_initiated: contract_initiated,
           from_address: from_address,
-          input: input,
+          input: ByteString.from_hex(input),
           tx_hash: tx_hash,
           block_hash: block_hash
         )
@@ -92,7 +92,7 @@ RSpec.describe FacetTransaction do
         tx = FacetTransaction.from_payload(
           contract_initiated: contract_initiated,
           from_address: from_address,
-          input: input,
+          input: ByteString.from_hex(input),
           tx_hash: tx_hash,
           block_hash: block_hash
         )
@@ -112,13 +112,12 @@ RSpec.describe FacetTransaction do
             Eth::Util.serialize_int_to_big_endian(1_000_000),
             Eth::Util.serialize_int_to_big_endian(1_000_000),
             ""
-          ]).bytes_to_hex
+          ])
         }
-        
         tx = FacetTransaction.from_payload(
           contract_initiated: contract_initiated,
           from_address: from_address,
-          input: modified_input,
+          input: ByteString.from_bin(modified_input),
           tx_hash: tx_hash,
           block_hash: block_hash
         )

@@ -43,8 +43,6 @@ gem "pry", "~> 0.14.2"
 
 gem "rspec", "~> 3.13"
 
-gem "rspec-rails", "~> 6.1"
-
 gem "awesome_print", "~> 1.9"
 
 gem "eth", github: "0xFacet/eth.rb"

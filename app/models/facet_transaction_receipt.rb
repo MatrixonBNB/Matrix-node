@@ -1,8 +1,29 @@
-class FacetTransactionReceipt < ApplicationRecord
+class FacetTransactionReceipt < T::Struct
   include Memery
+  include AttrAssignable
   
-  belongs_to :facet_transaction, primary_key: :tx_hash, foreign_key: :transaction_hash
-  belongs_to :facet_block, primary_key: :block_hash, foreign_key: :block_hash
+  # Primary schema fields
+  prop :transaction_hash, T.nilable(String)
+  prop :block_hash, T.nilable(String)
+  prop :block_number, T.nilable(Integer)
+  prop :contract_address, T.nilable(String)
+  prop :legacy_contract_address_map, T.nilable(T::Hash[T.untyped, T.untyped]), default: {}
+  prop :cumulative_gas_used, T.nilable(Integer)
+  prop :deposit_nonce, T.nilable(String)
+  prop :deposit_receipt_version, T.nilable(String)
+  prop :effective_gas_price, T.nilable(Integer)
+  prop :from_address, T.nilable(String)
+  prop :gas_used, T.nilable(Integer)
+  prop :logs, T.nilable(T::Array[T.untyped]), default: []
+  prop :logs_bloom, T.nilable(String)
+  prop :status, T.nilable(Integer)
+  prop :to_address, T.nilable(String)
+  prop :transaction_index, T.nilable(Integer)
+  prop :tx_type, T.nilable(String)
+
+  # Association-like fields
+  prop :facet_transaction, T.nilable(T.untyped)
+  prop :facet_block, T.nilable(T.untyped)
   
   def trace
     # t = process_trace(GethDriver.trace_transaction(transaction_hash))

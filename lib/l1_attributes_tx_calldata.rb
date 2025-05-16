@@ -3,21 +3,31 @@ module L1AttributesTxCalldata
   
   FUNCTION_SELECTOR = Eth::Util.keccak256('setL1BlockValuesEcotone()').first(4)
   
+  sig { params(
+    timestamp: Integer,
+    number: Integer,
+    base_fee: Integer,
+    hash: Hash32,
+    sequence_number: Integer,
+    fct_mint_rate: Integer,
+    fct_mint_period_l1_data_gas: Integer,
+    blob_base_fee: Integer
+  ).returns(ByteString) }
   def build(
     timestamp:,
     number:,
     base_fee:,
-    blob_base_fee: 1,
     hash:,
     sequence_number:,
     fct_mint_rate:,
-    fct_mint_period_l1_data_gas:
+    fct_mint_period_l1_data_gas:,
+    blob_base_fee: 1
   )
     base_fee_scalar = 0
     blob_base_fee_scalar = 1
     batcher_hash = "\x00" * 32
     
-    hash = hash.hex_to_bin
+    hash = hash.to_bin
     
     unless hash.length == 32
       raise "Invalid hash length"
@@ -38,11 +48,12 @@ module L1AttributesTxCalldata
       fct_mint_rate.zpad(16)
     ].join
     
-    packed_data.bytes_to_hex
+    ByteString.from_bin(packed_data)
   end
   
+  sig { params(calldata: ByteString).returns(T::Hash[Symbol, T.untyped]) }
   def decode(calldata)
-    data = calldata.hex_to_bytes
+    data = calldata.to_bin
   
     # Remove the function selector
     data = data[4..-1]

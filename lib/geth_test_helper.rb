@@ -7,9 +7,6 @@ module GethTestHelper
     authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
     discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
     
-    EthBlock.all.each(&:destroy)
-    FacetBlock.all.each(&:destroy)
-    
     PredeployManager.write_genesis_json(clear_cache: false)
     # SolidityCompiler.compile_all_legacy_files
     

@@ -35,7 +35,7 @@ RSpec.describe "Transaction Gas Handling" do
 
     res = import_eth_tx(input: "0x1234", events: events, from_address: from_address)
   
-    aliased_from = AddressAliasHelper.apply_l1_to_l2_alias(from_address)
+    aliased_from = AddressAliasHelper.apply_l1_to_l2_alias(Address20.from_hex(from_address)).to_hex
     
     base_fee = GethDriver.client.call("eth_getBlockByNumber", ["latest", false])['baseFeePerGas'].to_i(16)
     

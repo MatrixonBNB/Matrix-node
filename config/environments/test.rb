@@ -55,8 +55,7 @@ Rails.application.configure do
   # Disable request forgery protection in test environment.
   config.action_controller.allow_forgery_protection = false
 
-  # Store uploaded files on the local file system in a temporary directory.
-  config.active_storage.service = :test
+  # Active Storage not in use.
 
   config.action_mailer.perform_caching = false
 
@@ -83,7 +82,5 @@ Rails.application.configure do
   # Raise error when a before_action's only/except options reference missing actions
   config.action_controller.raise_on_missing_callback_actions = true
   
-  if ENV['MIGRATION_MODE'] != 'true'
-    config.active_record.maintain_test_schema = false
-  end
+  # Active Record removed; no database schema maintenance.
 end
