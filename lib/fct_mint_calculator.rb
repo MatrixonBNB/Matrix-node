@@ -59,17 +59,6 @@ module FctMintCalculator
   end
 
   def assign_mint_amounts(facet_txs, facet_block)
-    if in_migration_mode?
-      facet_txs.each { |tx| tx.mint = 1e6.ether }
-      
-      facet_block.assign_attributes(
-        fct_mint_rate: INITIAL_RATE,
-        fct_mint_period_l1_data_gas: 0
-      )
-      
-      return
-    end
-    
     prev_l1_attributes = GethDriver.client.get_l1_attributes(facet_block.number - 1)
     prev_rate = prev_l1_attributes[:fct_mint_rate] 
     cumulative_l1_data_gas = prev_l1_attributes[:fct_mint_period_l1_data_gas]

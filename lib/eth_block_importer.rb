@@ -260,10 +260,6 @@ class EthBlockImporter
   def import_blocks(block_numbers)
     puts "Block Importer: importing blocks #{block_numbers.join(', ')}"
     start = Time.current
-
-    if in_migration_mode?
-      raise "Use LegacyMigrationDataGenerator to import migration data"
-    end
     
     block_responses = l1_rpc_results.select do |block_number, _|
       block_numbers.include?(block_number)

@@ -112,10 +112,6 @@ module PredeployManager
       end
     end
     
-    unless in_migration_mode?
-      merged.delete('0x11110000000000000000000000000000000000c5')
-    end
-    
     merged.sort_by { |key, _| key.downcase }.to_h
   end
   

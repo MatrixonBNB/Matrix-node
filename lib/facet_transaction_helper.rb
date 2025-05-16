@@ -32,8 +32,6 @@ module FacetTransactionHelper
     allow(mock_ethereum_client).to receive(:get_block).and_return(block_result)
     allow(mock_ethereum_client).to receive(:get_transaction_receipts).and_return(receipt_result)
 
-    allow_any_instance_of(SysConfig).to receive(:in_migration_mode?).and_return(false)
-    
     importer = EthBlockImporter.instance
     facet_blocks, eth_blocks = importer.import_next_block
     
@@ -164,10 +162,6 @@ module FacetTransactionHelper
       else
         super
       end
-    end
-    
-    def obj.decoded_logs
-      FacetTransactionReceipt.new(logs: self.logs).decoded_logs
     end
     
     obj

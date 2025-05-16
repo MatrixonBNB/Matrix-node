@@ -1,6 +1,4 @@
 class LegacyContractArtifact < ApplicationRecord
-  include LegacyModel
-  
   class LegacyContractArtifactStruct < T::Struct
     const :id, Integer
     const :transaction_hash, String
