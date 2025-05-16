@@ -5,8 +5,6 @@ ruby "3.3.4"
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "7.1.3.4"
 
-gem "sqlite3", "~> 1.7"
-
 gem 'bundler', '2.5.14'
 
 # Use Redis adapter to run Action Cable in production
@@ -69,7 +67,6 @@ gem "airbrake", "~> 13.0"
 gem "dalli", "~> 3.2"
 gem "clipboard", "~> 2.0", :group => [:development, :test]
 gem "order_query", "~> 0.5.3"
-gem "rack-cors", "~> 2.0"
 
 gem "diffy", "~> 3.4"
 
