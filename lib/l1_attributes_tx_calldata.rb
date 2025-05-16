@@ -35,17 +35,17 @@ module L1AttributesTxCalldata
     
     packed_data = [
       FUNCTION_SELECTOR,
-      base_fee_scalar.zpad(4),
-      blob_base_fee_scalar.zpad(4),
-      sequence_number.zpad(8),
-      timestamp.zpad(8),
-      number.zpad(8),
-      base_fee.zpad(32),
-      blob_base_fee.zpad(32),
+      Eth::Util.zpad_int(base_fee_scalar, 4),
+      Eth::Util.zpad_int(blob_base_fee_scalar, 4),
+      Eth::Util.zpad_int(sequence_number, 8),
+      Eth::Util.zpad_int(timestamp, 8),
+      Eth::Util.zpad_int(number, 8),
+      Eth::Util.zpad_int(base_fee, 32),
+      Eth::Util.zpad_int(blob_base_fee, 32),
       hash,
       batcher_hash,
-      fct_mint_period_l1_data_gas.zpad(16),
-      fct_mint_rate.zpad(16)
+      Eth::Util.zpad_int(fct_mint_period_l1_data_gas, 16),
+      Eth::Util.zpad_int(fct_mint_rate, 16)
     ].join
     
     ByteString.from_bin(packed_data)
@@ -76,8 +76,8 @@ module L1AttributesTxCalldata
       number: number,
       base_fee: base_fee,
       blob_base_fee: blob_base_fee,
-      hash: "0x#{hash}",
-      batcher_hash: "0x#{batcher_hash}",
+      hash: Hash32.from_hex("0x#{hash}"),
+      batcher_hash: Hash32.from_hex("0x#{batcher_hash}"),
       sequence_number: sequence_number,
       blob_base_fee_scalar: blob_base_fee_scalar,
       base_fee_scalar: base_fee_scalar,

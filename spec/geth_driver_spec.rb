@@ -60,7 +60,7 @@ RSpec.describe GethDriver do
       expect(log_event['address']).to eq(contract_address)
       expect(log_event['topics'][1]).to eq("0x" + from_address[2..].rjust(64, '0'))
       
-      decoded_data = Eth::Abi.decode(["string"], log_event['data'].hex_to_bytes)
+      decoded_data = Eth::Abi.decode(["string"], ByteString.from_hex(log_event['data']).to_bin)
       expect(decoded_data[0]).to eq("Hello, World!")
    
       contract = EVMHelpers.get_contract('contracts/Counter2', contract_address)

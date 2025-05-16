@@ -137,7 +137,7 @@ module GethDriver
     
     if SysConfig.is_first_v2_block?(new_facet_block)
       migration_manager_address = "0x22220000000000000000000000000000000000d6"
-      function_selector = Eth::Util.keccak256('transactionsRequired()').first(4).bytes_to_hex
+      function_selector = ByteString.from_bin(Eth::Util.keccak256('transactionsRequired()').first(4)).to_hex
 
       result = EthRpcClient.l2.eth_call(
         to: migration_manager_address,

@@ -53,7 +53,7 @@ class FacetTransaction < T::Struct
     payload = [
       ethscription.block_hash.to_bin,
       ethscription.transaction_hash.to_bin,
-      0.zpad(32)
+      Eth::Util.zpad_int(0, 32)
     ].join
     
     tx.source_hash = FacetTransaction.compute_source_hash(
@@ -127,20 +127,22 @@ class FacetTransaction < T::Struct
       raise Eth::Tx::ParameterError, "Invalid chain ID #{chain_id}!"
     end
     
-    to = tx[1].length.zero? ? nil : tx[1].bytes_to_hex
+    begin
+      to = tx[1].length.zero? ? nil : Address20.from_bin(tx[1])
+    rescue ByteString::InvalidByteLength => e
+      raise InvalidAddress, "Invalid address length: #{e.message}"
+    end
+    
     value = deserialize_rlp_int(tx[2])
     gas_limit = deserialize_rlp_int(tx[3])
-    data = tx[4].bytes_to_hex
+    data = ByteString.from_bin(tx[4])
 
     tx = new
     tx.chain_id = clamp_uint(chain_id, 256)
-    
-    validated_to = validated_address(to)
-    tx.to_address = validated_to ? Address20.from_hex(validated_to) : nil
-    
+    tx.to_address = to
     tx.value = clamp_uint(value, 256)
     tx.gas_limit = clamp_uint(gas_limit, 64)
-    tx.input = ByteString.from_hex(data)
+    tx.input = data
     
     tx.eth_transaction_hash = tx_hash
     tx.from_address = from_address
@@ -183,7 +185,7 @@ class FacetTransaction < T::Struct
     
     payload = [
       facet_block.eth_block_hash.to_bin,
-      facet_block.sequence_number.zpad(32)
+      Eth::Util.zpad_int(facet_block.sequence_number, 32)
     ].join
     
     tx.source_hash = FacetTransaction.compute_source_hash(
@@ -257,14 +259,6 @@ class FacetTransaction < T::Struct
     ]
   end
   
-  def self.validated_address(str)
-    if str.nil? || str.match?(/\A0x[0-9a-f]{40}\z/)
-      str
-    else
-      raise InvalidAddress, "Invalid address #{str}!"
-    end
-  end
-  
   def trace
     GethDriver.trace_transaction(tx_hash)
   end
@@ -285,7 +279,7 @@ class FacetTransaction < T::Struct
     bytes = bytes.b
     
     if bytes.starts_with?("\x00")
-      raise InvalidRlpInt, "Invalid RLP integer: #{bytes.bytes_to_hex}"
+      raise InvalidRlpInt, "Invalid RLP integer: #{ByteString.from_bin(bytes).to_hex}"
     end
     
     Eth::Util.deserialize_big_endian_to_int(bytes)

@@ -37,7 +37,7 @@ class GethClient
         base_fee: eth_block.base_fee_per_gas,
         blob_base_fee: 1,
         hash: eth_block.block_hash,
-        batcher_hash: ("\x00" * 32).hex_to_bytes,
+        batcher_hash: Hash32.from_bin("\x00".b * 32).to_hex,
         sequence_number: 0,
         base_fee_scalar: 0,
         blob_base_fee_scalar: 1,
@@ -80,7 +80,7 @@ class GethClient
   end
   
   def jwt
-    JWT.encode(jwt_payload, jwt_secret.hex_to_bytes, 'HS256')
+    JWT.encode(jwt_payload, ByteString.from_hex(jwt_secret).to_bin, 'HS256')
   end
 
   def shutdown

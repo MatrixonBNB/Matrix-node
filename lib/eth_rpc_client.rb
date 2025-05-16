@@ -81,47 +81,6 @@ class EthRpcClient
     )
   end
   
-  def account_range(block_number = "latest", start = "0x", max_results: 256256256)
-    if block_number.is_a?(Integer)
-      block_number = "0x" + block_number.to_s(16)
-    end
-    
-    start = start.bytes_to_hex
-    
-    query_api(
-      method: 'debug_accountRange',
-      params: [block_number, start, max_results, false, false, false]
-    )
-  end
-  
-  def all_accounts(block_number, max_results: 225625625656)
-    accounts = {}
-    next_key = ""
-    previous_key = nil
-    
-    loop do
-      result = account_range(block_number, next_key, max_results: max_results)
-      accounts.merge!(result['accounts'])
-      
-      next_key = result['next']
-      break if next_key == "" || next_key.nil? || next_key == previous_key
-      previous_key = next_key
-    end
-    
-    accounts
-  end
-  
-  def get_code_at_address(address, block_number = "latest")
-    if block_number.is_a?(Integer)
-      block_number = "0x" + block_number.to_s(16)
-    end
-    
-    query_api(
-      method: 'eth_getCode',
-      params: [address, block_number]
-    )
-  end
-  
   def get_block_number
     query_api(method: 'eth_blockNumber').to_i(16)
   end

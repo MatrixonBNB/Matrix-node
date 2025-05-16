@@ -86,7 +86,7 @@ module FacetTransactionHelper
   
   def bytes_stub(i, len = 32)
     hsh = Eth::Util.keccak256(["stub", i.to_s].join(":"))
-    hsh.last(len).bytes_to_hex
+    ByteString.from_bin(hsh.last(len)).to_hex
   end
 
   def generate_facet_tx_payload(
@@ -110,7 +110,7 @@ module FacetTransactionHelper
   end
   
   def calldata_mint_amount(hex_string)
-    bytes = hex_string.hex_to_bytes
+    bytes = ByteString.from_hex(hex_string).to_bin
     zero_count = bytes.count("\x00")
     non_zero_count = bytes.bytesize - zero_count
     

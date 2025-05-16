@@ -7,9 +7,9 @@ class EthTransaction < T::Struct
   const :tx_hash, Hash32
   const :transaction_index, Integer
   const :input, ByteString
-  const :chain_id, Integer
+  const :chain_id, T.nilable(Integer)
   const :from_address, Address20
-  const :to_address, Address20
+  const :to_address, T.nilable(Address20)
   const :status, Integer
   const :logs, T::Array[T.untyped], default: []
   const :eth_block, T.nilable(EthBlock)

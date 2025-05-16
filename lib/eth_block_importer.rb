@@ -114,7 +114,7 @@ class EthBlockImporter
       l2_candidate = find_first_l2_block_in_epoch(l2_candidate)
       
       l1_result = ethereum_client.get_block(l1_candidate)
-      l1_hash = l1_result['hash']
+      l1_hash = Hash32.from_hex(l1_result['hash'])
       
       l1_attributes = GethDriver.client.get_l1_attributes(l2_candidate)
       

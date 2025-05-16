@@ -1,4 +1,6 @@
 class ByteString
+  class InvalidByteLength < StandardError; end
+  
   sig { params(bin: String).void }
   def initialize(bin)
     validate_bin!(bin)
@@ -77,6 +79,11 @@ class ByteString
       obj
     end
   end
+  
+  sig { returns(ByteString) }
+  def keccak256
+    ByteString.from_bin(Eth::Util.keccak256(self.to_bin))
+  end
 
   private
 
@@ -110,26 +117,10 @@ class ByteString
     len = required_byte_length
     return if len.nil?
     unless bin.bytesize == len
-      raise ArgumentError, "#{name} expects #{len} bytes, got #{bin.bytesize}"
+      raise InvalidByteLength, "#{name} expects #{len} bytes, got #{bin.bytesize}"
     end
   end
 
   sig { returns(String) }
   attr_reader :bytes
-end
-
-# Exactly 32 bytes (64 hex chars) – typical for hashes.
-class Hash32 < ByteString
-  sig { override.returns(Integer) }
-  def self.required_byte_length
-    32
-  end
-end
-
-# Exactly 20 bytes (40 hex chars) – typical for Ethereum addresses.
-class Address20 < ByteString
-  sig { override.returns(Integer) }
-  def self.required_byte_length
-    20
-  end
 end
