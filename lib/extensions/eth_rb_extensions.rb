@@ -3,7 +3,7 @@ module EthRbExtensions
     attr_accessor :bin_runtime
     
     def init_code_hash
-      @init_code_hash ||= Eth::Util.keccak256(bin.hex_to_bytes).bytes_to_hex
+      @init_code_hash ||= ByteString.from_hex(bin).keccak256.to_hex
     end
     
     def function_hash
@@ -80,7 +80,7 @@ module EthRbExtensions
       else
         Eth::Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
       end
-    rescue Eth::Abi::EncodingError, Eth::Abi::ValueOutOfBounds, Ethscription::InvalidArgValue => e
+    rescue Eth::Abi::EncodingError, Eth::Abi::ValueOutOfBounds => e
       puts "Error in get_call_data: #{e.message.inspect}"
       puts "Types: #{types.inspect}"
       puts "Args: #{args.inspect}"
@@ -107,7 +107,7 @@ module EthRbExtensions
           base = arg_value.start_with?('0x') ? 16 : 10
           Integer(arg_value, base)
         elsif arg_value.start_with?("0x") && type.base_type != "string"
-          arg_value.hex_to_bin
+          Eth::Util.hex_to_bin(arg_value)
         else
           arg_value
         end
@@ -182,7 +182,7 @@ module EthRbExtensions
           decoded_event[input["name"]] = topics[index + 1]
         else
           value = Eth::Abi.decode([input["type"]], topics[index + 1]).first rescue binding.irb
-          value = value.bytes_to_hex if input["type"].starts_with?("bytes")
+          value = ByteString.from_bin(value).to_hex if input["type"].starts_with?("bytes")
           decoded_event[input["name"]] = value
         end
       end
@@ -229,7 +229,7 @@ module EthRbExtensions
           v.is_a?(String) ? v.force_encoding("utf-8") : v
         end
       elsif type.start_with?("bytes")
-        value.bytes_to_hex
+        ByteString.from_bin(value).to_hex
       elsif type == "string"
         value.force_encoding("utf-8")
       else
@@ -345,7 +345,7 @@ module EthRbExtensions
           v.is_a?(String) ? v.force_encoding("utf-8") : v
         end
       elsif type.start_with?("bytes")
-        value.bytes_to_hex
+        ByteString.from_bin(value).to_hex
       elsif type == "string"
         value.force_encoding("utf-8")
       else

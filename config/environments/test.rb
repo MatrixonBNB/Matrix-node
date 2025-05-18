@@ -27,44 +27,22 @@ Rails.application.configure do
   config.consider_all_requests_local = true
   
   if Rails.root.join("tmp/caching-dev.txt").exist?
-    config.cache_store = :mem_cache_store, {
-      servers: ['localhost'],
-      options: {
-        failover: true,
-        socket_timeout: 1.5,
-        socket_failure_delay: 0.2,
-        down_retry_delay: 60,
-        compress: true,
-        namespace: "facet_node_test_#{Rails.root}"
-      }
-    }
+    config.cache_store = :memory_store, { size: 64.megabytes }
     config.public_file_server.headers = {
       "Cache-Control" => "public, max-age=#{2.days.to_i}"
     }
   else
-    config.action_controller.perform_caching = false
-
     config.cache_store = :null_store
   end
   
   config.logger = ActiveSupport::Logger.new(STDOUT)
   config.log_level = :info
-  # Render exception templates for rescuable exceptions and raise for other exceptions.
-  config.action_dispatch.show_exceptions = :rescuable
 
-  # Disable request forgery protection in test environment.
-  config.action_controller.allow_forgery_protection = false
-
-  # Store uploaded files on the local file system in a temporary directory.
-  config.active_storage.service = :test
-
-  config.action_mailer.perform_caching = false
+  # Active Storage not in use.
 
   # Tell Action Mailer not to deliver emails to the real world.
   # The :test delivery method accumulates sent emails in the
   # ActionMailer::Base.deliveries array.
-  config.action_mailer.delivery_method = :test
-
   # Print deprecation notices to the stderr.
   config.active_support.deprecation = :stderr
 
@@ -81,9 +59,6 @@ Rails.application.configure do
   # config.action_view.annotate_rendered_view_with_filenames = true
 
   # Raise error when a before_action's only/except options reference missing actions
-  config.action_controller.raise_on_missing_callback_actions = true
   
-  if ENV['MIGRATION_MODE'] != 'true'
-    config.active_record.maintain_test_schema = false
-  end
+  # Active Record removed; no database schema maintenance.
 end

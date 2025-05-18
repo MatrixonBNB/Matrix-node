@@ -38,11 +38,11 @@ RSpec.describe EthBlockImporter do
     end
 
     it 'correctly processes an event-based Facet transaction' do
-      contract_from = "0x" + "3" * 40
+      contract_from = Address20.from_hex("0x" + "3" * 40)
       aliased_contract_from = AddressAliasHelper.apply_l1_to_l2_alias(contract_from)
       
       events = [
-        generate_event_log(facet_payload, contract_from, 0)
+        generate_event_log(facet_payload, contract_from.to_hex, 0)
       ]
       
       combined = import_eth_tx(
@@ -50,7 +50,7 @@ RSpec.describe EthBlockImporter do
         events: events
       )
       
-      expect(combined.from).to eq(aliased_contract_from)
+      expect(combined.from).to eq(aliased_contract_from.to_hex)
     end
     
     it "won't import more than one event-based Facet transaction" do

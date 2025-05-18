@@ -5,12 +5,6 @@ ruby "3.3.4"
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "7.1.3.4"
 
-if ENV['MIGRATION_MODE'] == "true"
-  gem "pg", "~> 1.1"
-else
-  gem "sqlite3", "~> 1.7"
-end
-
 gem 'bundler', '2.5.14'
 
 # Use Redis adapter to run Action Cable in production
@@ -37,17 +31,6 @@ group :development, :test do
   gem "timecop"
 end
 
-group :development do
-  # Use console on exceptions pages [https://github.com/rails/web-console]
-  gem "web-console"
-
-  # Add speed badges [https://github.com/MiniProfiler/rack-mini-profiler]
-  # gem "rack-mini-profiler"
-
-  # Speed up commands on slow machines / big apps [https://github.com/rails/spring]
-  # gem "spring"
-end
-
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
@@ -57,8 +40,6 @@ end
 gem "pry", "~> 0.14.2"
 
 gem "rspec", "~> 3.13"
-
-gem "rspec-rails", "~> 6.1"
 
 gem "awesome_print", "~> 1.9"
 
@@ -78,15 +59,11 @@ gem "httparty", "~> 0.22.0"
 
 gem "jwt", "~> 2.8"
 
-gem "activerecord-import", "~> 1.7"
-
 gem "clockwork", "~> 3.0"
 
 gem "airbrake", "~> 13.0"
-gem "dalli", "~> 3.2"
 gem "clipboard", "~> 2.0", :group => [:development, :test]
 gem "order_query", "~> 0.5.3"
-gem "rack-cors", "~> 2.0"
 
 gem "diffy", "~> 3.4"
 

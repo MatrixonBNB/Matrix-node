@@ -1,6 +1,7 @@
 require_relative "boot"
 
-require "rails/all"
+# Instead of loading all railties (which pulls in ActiveRecord), require only what we need.
+require "rails"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
@@ -16,29 +17,11 @@ module SimpleVm
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w(assets tasks))
     
-    config.active_record.schema_format = :sql
-    
-    config.active_record.async_query_executor = :global_thread_pool
-    
-    config.active_record.raise_int_wider_than_64bit = false
-    
-    config.api_only = true
-    
-    # Configuration for the application, engines, and railties goes here.
-    #
-    # These settings can be overridden in specific environments using the files
-    # in config/environments, which are processed later.
-    #
-    # config.time_zone = "Central Time (US & Canada)"
-    # config.eager_load_paths << Rails.root.join("extras")
-    config.middleware.insert_after ActionDispatch::Static, Rack::Deflater
-    config.middleware.use ActionDispatch::Cookies
-    config.middleware.use ActionDispatch::Session::CookieStore
     
     additional_paths = %w(
       lib
-      lib/solidity
       lib/extensions
+      spec/support
     ).map{|i| Rails.root.join(i)}
     config.autoload_paths += additional_paths
     config.eager_load_paths += additional_paths

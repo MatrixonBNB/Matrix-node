@@ -14,7 +14,6 @@ Rails.application.configure do
 
   # Full error reports are disabled and caching is turned on.
   config.consider_all_requests_local = false
-  config.action_controller.perform_caching = true
 
   # Ensures that a master key has been made available in ENV["RAILS_MASTER_KEY"], config/master.key, or an environment
   # key such as config/credentials/production.key. This key is used to decrypt credentials (and other encrypted files).
@@ -55,16 +54,8 @@ Rails.application.configure do
   # want to log everything, set the level to "debug".
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
 
-  config.cache_store = :mem_cache_store,
-  (ENV["MEMCACHIER_SERVERS"] || "").split(","),
-  {:username => ENV["MEMCACHIER_USERNAME"],
-   :password => ENV["MEMCACHIER_PASSWORD"],
-   :failover => true,
-   :socket_timeout => 1.5,
-   :socket_failure_delay => 0.2,
-   :down_retry_delay => 60,
-   compress: true
-  }
+  # Use in-memory cache; no external dependency
+  config.cache_store = :memory_store, { size: 64.megabytes }
 
   # Use a real queuing backend for Active Job (and separate queues per environment).
   # config.active_job.queue_adapter = :resque
@@ -80,11 +71,6 @@ Rails.application.configure do
 
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
-
-  # Do not dump schema after migrations.
-  config.active_record.dump_schema_after_migration = false
-  
-  config.active_record.sqlite3_production_warning = false
 
   # Enable DNS rebinding protection and other `Host` header attacks.
   # config.hosts = [

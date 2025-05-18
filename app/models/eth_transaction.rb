@@ -1,28 +1,23 @@
 class EthTransaction < T::Struct
   include SysConfig
   
-  const :block_hash, String
+  const :block_hash, Hash32
   const :block_number, Integer
   const :block_timestamp, Integer
-  const :tx_hash, String
+  const :tx_hash, Hash32
   const :transaction_index, Integer
-  const :input, T.nilable(String)
+  const :input, ByteString
   const :chain_id, T.nilable(Integer)
-  const :from_address, T.nilable(String)
-  const :to_address, T.nilable(String)
-  const :status, T.nilable(Integer)
+  const :from_address, Address20
+  const :to_address, T.nilable(Address20)
+  const :status, Integer
   const :logs, T::Array[T.untyped], default: []
   const :eth_block, T.nilable(EthBlock)
   const :facet_transactions, T::Array[FacetTransaction], default: []
   
-  FacetLogInboxEventSig = "0x00000000000000000000000000000000000000000000000000000000000face7"
-  
-  def self.event_signature(event_name)
-    "0x" + Eth::Util.bin_to_hex(Eth::Util.keccak256(event_name))
-  end
+  FacetLogInboxEventSig = ByteString.from_hex("0x00000000000000000000000000000000000000000000000000000000000face7")
 
-  CreateEthscriptionEventSig = event_signature("ethscriptions_protocol_CreateEthscription(address,string)")
-
+  sig { params(block_result: T.untyped, receipt_result: T.untyped).returns(T::Array[EthTransaction]) }
   def self.from_rpc_result(block_result, receipt_result)
     block_hash = block_result['hash']
     block_number = block_result['number'].to_i(16)
@@ -33,51 +28,35 @@ class EthTransaction < T::Struct
       current_receipt = indexed_receipts[tx['hash']]
       
       EthTransaction.new(
-        block_hash: block_hash,
+        block_hash: Hash32.from_hex(block_hash),
         block_number: block_number,
         block_timestamp: block_result['timestamp'].to_i(16),
-        tx_hash: tx['hash'],
+        tx_hash: Hash32.from_hex(tx['hash']),
         transaction_index: tx['transactionIndex'].to_i(16),
-        input: tx['input'],
+        input: ByteString.from_hex(tx['input']),
         chain_id: tx['chainId']&.to_i(16),
-        from_address: tx['from'],
-        to_address: tx['to'],
+        from_address: Address20.from_hex(tx['from']),
+        to_address: tx['to'] ? Address20.from_hex(tx['to']) : nil,
         status: current_receipt['status'].to_i(16),
         logs: current_receipt['logs'],
       )
     end
   end
   
+  sig { params(block_results: T.untyped, receipt_results: T.untyped).returns(T::Array[T.untyped]) }
   def self.facet_txs_from_rpc_results(block_results, receipt_results)
     eth_txs = from_rpc_result(block_results, receipt_results)
     eth_txs.sort_by(&:transaction_index).map(&:to_facet_tx).compact
   end
   
+  sig { returns(T.nilable(FacetTransaction)) }
   def to_facet_tx
-    return unless is_success?
-    
-    in_migration_mode? ? to_facet_tx_v1 : to_facet_tx_v2
-  end
-  
-  def to_facet_tx_v2
     return unless is_success?
     
     facet_tx_from_input || try_facet_tx_from_events
   end
   
-  def to_facet_tx_v1
-    ethscription = to_ethscription
-    return unless ethscription
-    
-    FacetTransaction.from_ethscription(ethscription)
-  end
-  
-  def to_ethscription
-    return unless is_success?
-    
-    find_ethscription_from_input || find_ethscription_from_events
-  end
-  
+  sig { returns(T.nilable(FacetTransaction)) }
   def facet_tx_from_input
     return unless to_address == FACET_INBOX_ADDRESS
     
@@ -90,12 +69,13 @@ class EthTransaction < T::Struct
     )
   end
   
+  sig { returns(T.nilable(FacetTransaction)) }
   def try_facet_tx_from_events
     facet_tx_creation_events.each do |log|
       facet_tx = FacetTransaction.from_payload(
         contract_initiated: true,
-        from_address: log['address'],
-        input: log['data'],
+        from_address: Address20.from_hex(log['address']),
+        input: ByteString.from_hex(log['data']),
         tx_hash: tx_hash,
         block_hash: block_hash
       )
@@ -104,86 +84,21 @@ class EthTransaction < T::Struct
     nil
   end
   
-  def find_ethscription_from_input
-    return unless to_address == Ethscription::REQUIRED_INITIAL_OWNER
-
-    create_potentially_valid_ethscription(
-      creator: from_address,
-      contract_initiated: false,
-      initial_owner: to_address,
-      content_uri: utf8_input
-    )
-  end
-
-  def find_ethscription_from_events
-    ethscription_creation_events.each do |event|
-      ethscription = create_ethscription_from_event(event)
-      return ethscription if ethscription
-    end
-    nil
-  end  
-  
-  def create_ethscription_from_event(event)
-    begin
-      initial_owner = Eth::Abi.decode(['address'], event['topics'].second).first
-      content_uri = HexDataProcessor.clean_utf8(Eth::Abi.decode(['string'], event['data']).first)
-    rescue Eth::Abi::DecodingError
-      return nil
-    end
-    
-    create_potentially_valid_ethscription(
-      creator: event['address'],
-      contract_initiated: true,
-      initial_owner: initial_owner,
-      content_uri: content_uri
-    )
-  end
-  
-  def create_potentially_valid_ethscription(attrs)
-    ethscription = Ethscription.new(**ethscription_attrs(attrs).symbolize_keys)
-    ethscription.valid? ? ethscription : nil
-  end
-
+  sig { returns(T::Boolean) }
   def is_success?
     status == 1
   end
   
-  def ethscription_attrs(to_merge = {})
-    {
-      transaction_hash: tx_hash,
-      block_number: block_number,
-      block_blockhash: block_hash,
-      transaction_index: transaction_index,
-    }.merge(to_merge)
-  end
-  
+  sig { returns(T::Array[T.untyped]) }
   def facet_tx_creation_events
     logs.select do |log|
       !log['removed'] && log['topics'].length == 1 &&
-        FacetLogInboxEventSig == log['topics'].first
+        FacetLogInboxEventSig == ByteString.from_hex(log['topics'].first)
     end.sort_by { |log| log['logIndex'].to_i(16) }
   end
   
-  def ethscription_creation_events
-    logs.select do |log|
-      !log['removed'] && log['topics'].length == 2 &&
-        CreateEthscriptionEventSig == log['topics'].first
-    end.sort_by { |log| log['logIndex'].to_i(16) }
-  end
-  
-  def utf8_input
-    esip7_enabled = ChainIdManager.on_testnet? || block_number >= 19376500  
-    
-    HexDataProcessor.hex_to_utf8(
-      input,
-      support_gzip: esip7_enabled
-    )
-  end
-  
+  sig { returns(Hash32) }
   def facet_tx_source_hash
-    FacetTransaction.compute_source_hash(
-      tx_hash.hex_to_bytes,
-      FacetTransaction::USER_DEPOSIT_SOURCE_DOMAIN,
-    )
+    tx_hash
   end
 end
