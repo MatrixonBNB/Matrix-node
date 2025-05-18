@@ -117,7 +117,6 @@ GEM
     connection_pool (2.4.1)
     crass (1.0.6)
     csv (3.3.0)
-    dalli (3.2.8)
     date (3.3.4)
     debug (1.9.2)
       irb (~> 1.10)
@@ -351,7 +350,6 @@ DEPENDENCIES
   capybara
   clipboard (~> 2.0)
   clockwork (~> 3.0)
-  dalli (~> 3.2)
   debug
   diffy (~> 3.4)
   dotenv-rails (~> 3.1)
