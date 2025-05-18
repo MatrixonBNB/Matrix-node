@@ -2,82 +2,6 @@ module GethDriver
   extend self
   attr_reader :password
   
-  def init_command
-    http_port = ENV.fetch('NON_AUTH_GETH_RPC_URL').split(':').last
-    authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
-    discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
-    
-    genesis_filename = ChainIdManager.on_mainnet? ? "facet-mainnet.json" : "facet-sepolia.json"
-    
-    command = [
-      "./facet-chain/unzip_genesis.sh &&",
-      "make geth &&",
-      "mkdir -p ./datadir &&",
-      "rm -rf ./datadir/* &&",
-      "./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} &&",
-      "./build/bin/geth --datadir ./datadir",
-      "--http",
-      "--http.api 'eth,net,web3,debug'",
-      "--http.vhosts=\"*\"",
-      "--authrpc.jwtsecret /tmp/jwtsecret",
-      "--http.port #{http_port}",
-      '--http.corsdomain="*"',
-      "--authrpc.port #{authrpc_port}",
-      "--discovery.port #{discovery_port}",
-      "--port #{discovery_port}",
-      "--authrpc.addr localhost",
-      "--authrpc.vhosts=\"*\"",
-      "--nodiscover",
-      "--cache 16000",
-      "--rpc.gascap 5000000000",
-      "--rpc.batch-request-limit=10000",
-      "--rpc.batch-response-max-size=100000000",
-      "--cache.preimages",
-      "--maxpeers 0",
-      # "--verbosity 2",
-      "--syncmode full",
-      "--gcmode archive",
-      "--history.state 0",
-      "--history.transactions 0",
-      "--nocompaction",
-      "--rollup.enabletxpooladmission=false",
-      "--rollup.disabletxpoolgossip",
-      "console"
-    ].join(' ')
-
-    puts command
-  end
-  
-  def get_state_dump(geth_dir = ENV.fetch('LOCAL_GETH_DIR'))
-    command = [
-      "#{geth_dir}/build/bin/geth",
-      'dump',
-      "--datadir #{geth_dir}/datadir"
-    ]
-    
-    full_command = command.join(' ')
-    
-    data = `#{full_command}`
-    
-    alloc = {}
-    
-    data.each_line do |line|
-      entry = JSON.parse(line)
-      address = entry['address']
-      
-      next unless address
-      
-      alloc[address] = {
-        'balance' => entry['balance'].to_i(16),
-        'nonce' => entry['nonce'],
-        'code' => entry['code'].presence || "0x",
-        'storage' => entry['storage'].presence || {}
-      }
-    end
-    
-    alloc
-  end
-  
   def client
     @_client ||= GethClient.new(ENV.fetch('GETH_RPC_URL'))
   end
@@ -88,17 +12,6 @@ module GethDriver
   
   def non_authed_rpc_url
     ENV.fetch('NON_AUTH_GETH_RPC_URL')
-  end
-  
-  def trace_transaction(tx_hash)
-    non_auth_client.call("debug_traceTransaction", [tx_hash, {
-      enableMemory: true,
-      disableStack: false,
-      disableStorage: false,
-      enableReturnData: true,
-      debug: true,
-      tracer: "callTracer"
-    }])
   end
   
   def propose_block(
@@ -299,5 +212,92 @@ module GethDriver
     end
 
     filler_blocks.sort_by(&:number)
+  end
+  
+  def init_command
+    http_port = ENV.fetch('NON_AUTH_GETH_RPC_URL').split(':').last
+    authrpc_port = ENV.fetch('GETH_RPC_URL').split(':').last
+    discovery_port = ENV.fetch('GETH_DISCOVERY_PORT')
+    
+    genesis_filename = ChainIdManager.on_mainnet? ? "facet-mainnet.json" : "facet-sepolia.json"
+    
+    command = [
+      "./facet-chain/unzip_genesis.sh &&",
+      "make geth &&",
+      "mkdir -p ./datadir &&",
+      "rm -rf ./datadir/* &&",
+      "./build/bin/geth init --cache.preimages --state.scheme=hash --datadir ./datadir facet-chain/#{genesis_filename} &&",
+      "./build/bin/geth --datadir ./datadir",
+      "--http",
+      "--http.api 'eth,net,web3,debug'",
+      "--http.vhosts=\"*\"",
+      "--authrpc.jwtsecret /tmp/jwtsecret",
+      "--http.port #{http_port}",
+      '--http.corsdomain="*"',
+      "--authrpc.port #{authrpc_port}",
+      "--discovery.port #{discovery_port}",
+      "--port #{discovery_port}",
+      "--authrpc.addr localhost",
+      "--authrpc.vhosts=\"*\"",
+      "--nodiscover",
+      "--cache 16000",
+      "--rpc.gascap 5000000000",
+      "--rpc.batch-request-limit=10000",
+      "--rpc.batch-response-max-size=100000000",
+      "--cache.preimages",
+      "--maxpeers 0",
+      # "--verbosity 2",
+      "--syncmode full",
+      "--gcmode archive",
+      "--history.state 0",
+      "--history.transactions 0",
+      "--nocompaction",
+      "--rollup.enabletxpooladmission=false",
+      "--rollup.disabletxpoolgossip",
+      "console"
+    ].join(' ')
+
+    puts command
+  end
+  
+  def get_state_dump(geth_dir = ENV.fetch('LOCAL_GETH_DIR'))
+    command = [
+      "#{geth_dir}/build/bin/geth",
+      'dump',
+      "--datadir #{geth_dir}/datadir"
+    ]
+    
+    full_command = command.join(' ')
+    
+    data = `#{full_command}`
+    
+    alloc = {}
+    
+    data.each_line do |line|
+      entry = JSON.parse(line)
+      address = entry['address']
+      
+      next unless address
+      
+      alloc[address] = {
+        'balance' => entry['balance'].to_i(16),
+        'nonce' => entry['nonce'],
+        'code' => entry['code'].presence || "0x",
+        'storage' => entry['storage'].presence || {}
+      }
+    end
+    
+    alloc
+  end
+  
+  def trace_transaction(tx_hash)
+    non_auth_client.call("debug_traceTransaction", [tx_hash, {
+      enableMemory: true,
+      disableStack: false,
+      disableStorage: false,
+      enableReturnData: true,
+      debug: true,
+      tracer: "callTracer"
+    }])
   end
 end
