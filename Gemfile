@@ -59,8 +59,6 @@ gem "httparty", "~> 0.22.0"
 
 gem "jwt", "~> 2.8"
 
-gem "activerecord-import", "~> 1.7"
-
 gem "clockwork", "~> 3.0"
 
 gem "airbrake", "~> 13.0"
