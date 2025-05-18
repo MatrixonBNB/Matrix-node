@@ -129,7 +129,7 @@ class EthBlockImporter
         facet_block_cache[l2_candidate] = facet_block
         return [l1_candidate, l2_candidate]
       else
-        logger.info "Mismatch on block #{l2_candidate}: #{l1_hash} != #{l1_attributes[:hash]}, decrementing"
+        logger.info "Mismatch on block #{l2_candidate}: #{l1_hash.to_hex} != #{l1_attributes[:hash].to_hex}, decrementing"
         
         l2_candidate -= 1
         l1_candidate -= 1
