@@ -11,58 +11,64 @@ RSpec.describe FctMintCalculator do
 
   describe '.calculate_historical_total' do
     it 'sums two complete periods and a partial period' do
+      original_period_length = FctMintCalculator::ORIGINAL_ADJUSTMENT_PERIOD_TARGET_LENGTH.to_i
+      
       # Period 1: blocks 0-9999
-      allow(client).to receive(:get_l1_attributes).with(9_999).and_return({
+      allow(client).to receive(:get_l1_attributes).with(original_period_length - 1).and_return({
         fct_mint_period_l1_data_gas: 50_000,
         fct_mint_rate: 2
       })
       
       # Period 2: blocks 10000-19999  
-      allow(client).to receive(:get_l1_attributes).with(19_999).and_return({
+      allow(client).to receive(:get_l1_attributes).with(original_period_length * 2 - 1).and_return({
         fct_mint_period_l1_data_gas: 60_000,
         fct_mint_rate: 3
       })
       
       # Partial period: blocks 20000-24999
-      allow(client).to receive(:get_l1_attributes).with(24_999).and_return({
+      allow(client).to receive(:get_l1_attributes).with(original_period_length * 2.5 - 1).and_return({
         fct_mint_period_l1_data_gas: 20_000,
         fct_mint_rate: 4
       })
       
-      total = described_class.calculate_historical_total(25_000)
+      total = described_class.calculate_historical_total(original_period_length * 2.5)
       expect(total).to eq(50_000 * 2 + 60_000 * 3 + 20_000 * 4) # 360,000
     end
 
     it 'handles missing attributes gracefully' do
-      allow(client).to receive(:get_l1_attributes).with(9_999).and_return({
+      original_period_length = FctMintCalculator::ORIGINAL_ADJUSTMENT_PERIOD_TARGET_LENGTH.to_i
+      
+      allow(client).to receive(:get_l1_attributes).with(original_period_length - 1).and_return({
         fct_mint_period_l1_data_gas: 50_000,
         fct_mint_rate: 2
       })
       
       # Second period returns nil (already stubbed as default)
       
-      allow(client).to receive(:get_l1_attributes).with(24_999).and_return({
+      allow(client).to receive(:get_l1_attributes).with(original_period_length * 2.5 - 1).and_return({
         fct_mint_period_l1_data_gas: 20_000,
         fct_mint_rate: 4
       })
       
-      total = described_class.calculate_historical_total(25_000)
+      total = described_class.calculate_historical_total(original_period_length * 2.5)
       expect(total).to eq(50_000 * 2 + 20_000 * 4) # 180,000
     end
 
     it 'returns correct total when fork is exactly on period boundary' do
+      original_period_length = FctMintCalculator::ORIGINAL_ADJUSTMENT_PERIOD_TARGET_LENGTH.to_i
+      
       # Fork at block 20,000 - exactly 2 complete periods
-      allow(client).to receive(:get_l1_attributes).with(9_999).and_return({
+      allow(client).to receive(:get_l1_attributes).with(original_period_length - 1).and_return({
         fct_mint_period_l1_data_gas: 50_000,
         fct_mint_rate: 2
       })
       
-      allow(client).to receive(:get_l1_attributes).with(19_999).and_return({
+      allow(client).to receive(:get_l1_attributes).with(original_period_length * 2 - 1).and_return({
         fct_mint_period_l1_data_gas: 60_000,
         fct_mint_rate: 3
       })
       
-      total = described_class.calculate_historical_total(20_000)
+      total = described_class.calculate_historical_total(original_period_length * 2)
       expect(total).to eq(50_000 * 2 + 60_000 * 3) # 280,000
     end
   end
@@ -83,13 +89,24 @@ RSpec.describe FctMintCalculator do
       
       expect(total_minted).to eq(140_000_000)
       expect(max_supply).to be_within(1_000_000).of(622_222_222)
-      expect(initial_target).to be_within(1_000).of(118_341)
+      
+      # Calculate expected initial_target using the constants
+      # target_num_periods_in_halving = TARGET_NUM_BLOCKS_IN_HALVING / ADJUSTMENT_PERIOD_TARGET_LENGTH
+      #                               = 2_628_000 / 250 = 10_512
+      # target_supply_in_first_halving = max_supply / 2 = 622_222_222 / 2 = 311_111_111
+      # initial_target = 311_111_111 / 10_512 = 29_595
+      expected_periods = FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING / FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH
+      expected_initial_target = (622_222_222 / 2) / expected_periods
+      expect(initial_target).to be_within(100).of(expected_initial_target)
     end
   end
 
   describe '.issuance_on_pace_delta' do
     before do
-      allow(described_class).to receive(:fork_parameters).and_return([140_000_000, 622_222_222, 118_341])
+      # Calculate correct initial_target using the constants
+      expected_periods = FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING / FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH
+      expected_initial_target = (622_222_222 / 2) / expected_periods
+      allow(described_class).to receive(:fork_parameters).and_return([140_000_000, 622_222_222, expected_initial_target.to_i])
     end
 
     it 'returns positive delta when ahead of schedule' do
