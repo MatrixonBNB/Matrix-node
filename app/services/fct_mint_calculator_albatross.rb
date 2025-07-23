@@ -1,4 +1,4 @@
-module FctMintCalculatorOld
+module FctMintCalculatorAlbatross
   extend SysConfig
   include SysConfig
   extend self

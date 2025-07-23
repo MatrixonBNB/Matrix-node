@@ -112,7 +112,7 @@ module FctMintCalculator
   def assign_mint_amounts(facet_txs, facet_block)
     # Use legacy mint calculator before the Bluebird fork block
     if facet_block.number < SysConfig.bluebird_fork_block_number
-      return FctMintCalculatorOld.assign_mint_amounts(facet_txs, facet_block)
+      return FctMintCalculatorAlbatross.assign_mint_amounts(facet_txs, facet_block)
     end
 
     current_block_num = facet_block.number

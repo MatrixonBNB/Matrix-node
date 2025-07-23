@@ -211,7 +211,7 @@ RSpec.describe FctMintCalculator do
       facet_block = DummyFacetBlock.new(number: legacy_block_num, eth_block_base_fee_per_gas: 1)
       tx = build_tx(0)
 
-      expect(FctMintCalculatorOld).to receive(:assign_mint_amounts).with([tx], facet_block)
+      expect(FctMintCalculatorAlbatross).to receive(:assign_mint_amounts).with([tx], facet_block)
       FctMintCalculator.assign_mint_amounts([tx], facet_block)
     end
 
