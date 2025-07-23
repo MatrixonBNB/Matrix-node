@@ -362,4 +362,6 @@ class FctParameterOptimizer
 end
 
 # Run the optimization
-FctParameterOptimizer.run
+if __FILE__ == $0
+  FctParameterOptimizer.run
+end

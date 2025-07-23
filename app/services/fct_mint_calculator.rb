@@ -86,7 +86,7 @@ module FctMintCalculator
     total_minted = calculate_historical_total(block_number)
     
     # Calculate what percentage through the first halving period we are
-    percent_time_elapsed = Rational(block_number) / target_num_periods_in_halving
+    percent_time_elapsed = Rational(block_number) / TARGET_NUM_BLOCKS_IN_HALVING
     
     # The expected percentage of total supply that should be minted by now
     # (50% of supply should be minted in first halving, so we take 50% * percent_elapsed)
@@ -170,7 +170,7 @@ module FctMintCalculator
     supply_target_first_halving = max_supply.to_r / 2
     actual_fraction = Rational(actual_total, supply_target_first_halving)
 
-    time_fraction = Rational(block_number) / target_num_periods_in_halving
+    time_fraction = Rational(block_number) / TARGET_NUM_BLOCKS_IN_HALVING
     raise "Time fraction is zero" if time_fraction.zero?
 
     ratio = actual_fraction / time_fraction
