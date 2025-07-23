@@ -201,9 +201,18 @@ class FctDataCollector
         
         # Calculate expected minting
         snapshot_target = FctMintCalculator.target_per_period / 1e18
-        expected_mint = snapshot_target * (blocks_elapsed / 1000.0)
-        pace_delta_pct = minted_since_last_ether > 0 ? 
-          ((minted_since_last_ether.to_f / expected_mint) - 1) * 100 : -100
+        period_length = FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH.to_f
+
+        # Calculate expected minting based on the configured adjustment period length
+        expected_mint = snapshot_target * (blocks_elapsed / period_length)
+
+        # Guard against division by zero
+        if expected_mint.positive?
+          pace_delta_pct = minted_since_last_ether > 0 ?
+            ((minted_since_last_ether.to_f / expected_mint) - 1) * 100 : -100
+        else
+          pace_delta_pct = 0
+        end
         
         # Rate change factor
         if prev_snapshot[:mint_rate] > 0
