@@ -1,6 +1,6 @@
 # Simple FCT Mint Simulator - Console only
 # Usage: 
-#   sim = FctMintSimulatorSimple.new
+#   sim = FctMintSimulator.new
 #   sim.simulate_next_block() # Simulate next L2 block
 #   sim.simulate_blocks(100) # Simulate 100 blocks
 
@@ -303,12 +303,12 @@ class FctMintSimulator
       attrs_tx_data = L1AttributesTxCalldata.build(facet_block)
       # attrs_gas = calculate_data_gas(attrs_tx_data.to_bin, facet_block.number)
       # attrs_burn = attrs_gas * facet_block.eth_block_base_fee_per_gas
-      attrs_mint = (attrs_burn * facet_block.fct_mint_rate / 1e18).to_i
+      # attrs_mint = (attrs_burn * facet_block.fct_mint_rate / 1e18).to_i
       
-      puts "\nAttributes transaction:"
+      # puts "\nAttributes transaction:"
       # puts "  Data gas: #{attrs_gas}"
-      puts "  Burn: #{attrs_burn} wei"
-      puts "  Mint: #{attrs_mint} wei FCT"
+      # puts "  Burn: #{attrs_burn} wei"
+      # puts "  Mint: #{attrs_mint} wei FCT"
       
       # Show individual transaction mints
       if facet_txs.any?
@@ -622,7 +622,7 @@ class FctMintSimulator
               snapshot[:total_minted_eth],
               snapshot[:supply_delta_pct],
               snapshot[:pace_delta_pct],
-              snapshot[:mint_rate_eth]
+              snapshot[:mint_rate]
             ]
           else
             row += [nil, nil, nil, nil]
@@ -780,7 +780,7 @@ class FctMintSimulator
       puts "  Mint rate: #{@initial_state[:fct_mint_rate]}" if verbose
       puts "  Pace delta: #{(@initial_state[:pace_delta] * 100).round(2)}%" if verbose && @initial_state[:pace_delta]
     else
-      raise "Initial state required - use FctMintSimulatorSimple.from_fork to start from fork block"
+      raise "Initial state required - use FctMintSimulator.from_fork to start from fork block"
     end
   end
   

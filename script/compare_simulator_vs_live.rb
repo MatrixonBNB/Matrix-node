@@ -11,7 +11,7 @@ class SimulatorComparison
     puts "="*60
     
     # Create simulator from fork
-    sim = FctMintSimulatorSimple.from_fork
+    sim = FctMintSimulator.from_fork
     
     # Track divergences
     divergences = []

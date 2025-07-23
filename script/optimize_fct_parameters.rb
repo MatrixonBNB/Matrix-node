@@ -19,7 +19,7 @@ class FctParameterOptimizer
     # Ensure we have cache
     unless File.exist?('tmp/l1_minimal_cache.ndjson')
       puts "Creating minimal cache for #{BLOCKS_TO_SIMULATE} blocks..."
-      FctMintSimulatorSimple.cache_l1_minimal(BLOCKS_TO_SIMULATE + 10_000)
+      FctMintSimulator.cache_l1_minimal(BLOCKS_TO_SIMULATE + 10_000)
     end
     
     # Define test matrix
@@ -31,7 +31,7 @@ class FctParameterOptimizer
     puts "-" * 80
     
     # Run simulations
-    results = FctMintSimulatorSimple.compare_parameter_snapshots(
+    results = FctMintSimulator.compare_parameter_snapshots(
       parameter_sets,
       blocks_to_simulate: BLOCKS_TO_SIMULATE,
       snap_interval: SNAP_INTERVAL
