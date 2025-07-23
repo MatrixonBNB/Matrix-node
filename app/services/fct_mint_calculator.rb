@@ -6,7 +6,7 @@ module FctMintCalculator
   extend self
   
   ORIGINAL_ADJUSTMENT_PERIOD_TARGET_LENGTH = Rational(10_000)
-  ADJUSTMENT_PERIOD_TARGET_LENGTH = Rational(1_000)
+  ADJUSTMENT_PERIOD_TARGET_LENGTH = Rational(250)
   MAX_MINT_RATE = Rational(((2 ** 128) - 1))
   MIN_MINT_RATE = Rational(1)
   MAX_RATE_ADJUSTMENT_UP_FACTOR = Rational(2)
@@ -14,7 +14,10 @@ module FctMintCalculator
   TARGET_ISSUANCE_FRACTION_FIRST_HALVING = Rational(1, 2)
 
   TARGET_NUM_BLOCKS_IN_HALVING = 2_628_000.to_r
-  TARGET_NUM_PERIODS_IN_HALVING = Rational(TARGET_NUM_BLOCKS_IN_HALVING, ADJUSTMENT_PERIOD_TARGET_LENGTH)
+  
+  def target_num_periods_in_halving
+    Rational(TARGET_NUM_BLOCKS_IN_HALVING, ADJUSTMENT_PERIOD_TARGET_LENGTH)
+  end
   
   def client
     @_client ||= GethDriver.client
@@ -22,6 +25,13 @@ module FctMintCalculator
 
   # We calculate these once every time the node starts. It's a fine trade-off
   def fork_parameters
+    if SysConfig.bluebird_immediate_fork?
+      total_minted   = 0                       # nothing minted pre-fork
+      max_supply     = Integer(ENV.fetch('BLUEBIRD_IMMEDIATE_FORK_MAX_SUPPLY_ETHER')).ether
+      initial_target = (max_supply / 2) / target_num_periods_in_halving
+      return [total_minted, max_supply.to_i, initial_target.to_i]
+    end
+    
     @fork_parameters ||= compute_bluebird_fork_block_params(SysConfig.bluebird_fork_block_number)
   end
 
@@ -71,20 +81,12 @@ module FctMintCalculator
   end
 
   def compute_bluebird_fork_block_params(block_number)
-    # Immediate-fork path (timestamp 0 → block 2)
-    if SysConfig.bluebird_immediate_fork?
-      total_minted   = 0                       # nothing minted pre-fork
-      max_supply     = Integer(ENV.fetch('BLUEBIRD_IMMEDIATE_FORK_MAX_SUPPLY_ETHER')).ether
-      initial_target = (max_supply / 2) / TARGET_NUM_PERIODS_IN_HALVING
-      return [total_minted, max_supply.to_i, initial_target.to_i]
-    end
-
     # Scheduled-fork path (≥ 10 000 and < first halving)
     # Get actual total minted FCT up to fork
     total_minted = calculate_historical_total(block_number)
     
     # Calculate what percentage through the first halving period we are
-    percent_time_elapsed = Rational(block_number) / TARGET_NUM_BLOCKS_IN_HALVING
+    percent_time_elapsed = Rational(block_number) / target_num_periods_in_halving
     
     # The expected percentage of total supply that should be minted by now
     # (50% of supply should be minted in first halving, so we take 50% * percent_elapsed)
@@ -100,7 +102,7 @@ module FctMintCalculator
     
     # Calculate new initial target per period by targeting 50% issuance in first year.
     target_supply_in_first_halving = Rational(new_max_supply, 2)
-    new_initial_target_per_period = (target_supply_in_first_halving / TARGET_NUM_PERIODS_IN_HALVING)
+    new_initial_target_per_period = (target_supply_in_first_halving / target_num_periods_in_halving)
     
     # Convert to integers only for final storage
     [total_minted.to_i, new_max_supply.to_i, new_initial_target_per_period.to_i]
@@ -155,7 +157,7 @@ module FctMintCalculator
     engine
   end
 
-  def issuance_on_pace_delta(block_number)
+  def issuance_on_pace_delta(block_number = EthRpcClient.l2.get_block_number)
     attrs = client.get_l1_attributes(block_number)
 
     actual_total = if attrs && attrs[:fct_total_minted]
@@ -168,7 +170,7 @@ module FctMintCalculator
     supply_target_first_halving = max_supply.to_r / 2
     actual_fraction = Rational(actual_total, supply_target_first_halving)
 
-    time_fraction = Rational(block_number) / TARGET_NUM_BLOCKS_IN_HALVING
+    time_fraction = Rational(block_number) / target_num_periods_in_halving
     raise "Time fraction is zero" if time_fraction.zero?
 
     ratio = actual_fraction / time_fraction
