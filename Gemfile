@@ -72,3 +72,5 @@ gem "net-http-persistent", "~> 4.0"
 
 gem 'benchmark'
 gem 'ostruct'
+
+gem "oj", "~> 3.16"
