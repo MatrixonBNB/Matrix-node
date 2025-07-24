@@ -168,7 +168,7 @@ class EthBlockImporter
   
   def populate_l1_rpc_results(block_numbers)
     next_start_block = block_numbers.last + 1
-    next_block_numbers = (next_start_block...(next_start_block + import_batch_size * 2)).to_a
+    next_block_numbers = (next_start_block...(next_start_block + import_batch_size)).to_a
     
     blocks_to_import = block_numbers
     
@@ -186,7 +186,7 @@ class EthBlockImporter
   def get_blocks_promises(block_numbers)
     block_numbers.map do |block_number|
       block_promise = Concurrent::Promise.execute do
-         ethereum_client.get_block(block_number, true)
+        ethereum_client.get_block(block_number, true)
       end
       
       receipt_promise = Concurrent::Promise.execute do
