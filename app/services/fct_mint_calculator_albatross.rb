@@ -82,6 +82,13 @@ module FctMintCalculatorAlbatross
       fct_mint_period_l1_data_gas: new_cumulative_l1_data_gas
     )
     
-    nil
+    # Return a dummy MintPeriod for compatibility with new calculator
+    MintPeriod.new(
+      block_num: facet_block.number,
+      fct_mint_rate: new_rate,
+      total_minted: 0, # Albatross doesn't track total minted
+      period_minted: 0, # Albatross doesn't track period minted
+      period_start_block: facet_block.number # Albatross doesn't track period start
+    )
   end
 end

@@ -31,7 +31,7 @@ RSpec.describe FctMintCalculator do
         fct_mint_rate: 4
       })
       
-      total = described_class.calculate_historical_total(original_period_length * 2.5)
+      total = described_class.calculate_historical_total((original_period_length * 2.5).to_i)
       expect(total).to eq(50_000 * 2 + 60_000 * 3 + 20_000 * 4) # 360,000
     end
 
@@ -50,7 +50,7 @@ RSpec.describe FctMintCalculator do
         fct_mint_rate: 4
       })
       
-      total = described_class.calculate_historical_total(original_period_length * 2.5)
+      total = described_class.calculate_historical_total((original_period_length * 2.5).to_i)
       expect(total).to eq(50_000 * 2 + 20_000 * 4) # 180,000
     end
 

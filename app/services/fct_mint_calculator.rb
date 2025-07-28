@@ -1,6 +1,4 @@
 module FctMintCalculator
-  # TODO: Add Sorbet type checking.
-  
   extend SysConfig
   include SysConfig
   extend self
@@ -15,15 +13,18 @@ module FctMintCalculator
 
   TARGET_NUM_BLOCKS_IN_HALVING = 2_628_000.to_r
   
+  sig { returns(Rational) }
   def target_num_periods_in_halving
     Rational(TARGET_NUM_BLOCKS_IN_HALVING, ADJUSTMENT_PERIOD_TARGET_LENGTH)
   end
   
+  sig { returns(GethClient) }
   def client
     @_client ||= GethDriver.client
   end
 
   # We calculate these once every time the node starts. It's a fine trade-off
+  sig { returns([Integer, Integer, Integer]) }
   def fork_parameters
     if SysConfig.bluebird_immediate_fork?
       total_minted   = 0                       # nothing minted pre-fork
@@ -35,18 +36,22 @@ module FctMintCalculator
     @fork_parameters ||= compute_bluebird_fork_block_params(SysConfig.bluebird_fork_block_number)
   end
 
+  sig { returns(Integer) }
   def bluebird_fork_block_total_minted
     fork_parameters[0]
   end
 
+  sig { returns(Integer) }
   def max_supply
     fork_parameters[1]
   end
 
+  sig { returns(Integer) }
   def target_per_period
     fork_parameters[2]
   end
   
+  sig { params(block_number: Integer).returns(Integer) }
   def calculate_historical_total(block_number)
     # Only used for the fork block calculation. The fork block will be the first block in a new period.
     # Iterate through all completed periods before the fork block
@@ -80,6 +85,7 @@ module FctMintCalculator
     total
   end
 
+  sig { params(block_number: Integer).returns([Integer, Integer, Integer]) }
   def compute_bluebird_fork_block_params(block_number)
     # Scheduled-fork path (≥ 10 000 and < first halving)
     # Get actual total minted FCT up to fork
@@ -109,6 +115,7 @@ module FctMintCalculator
   end
 
   # --- Core Logic ---
+  sig { params(facet_txs: T::Array[FacetTransaction], facet_block: FacetBlock).returns(MintPeriod) }
   def assign_mint_amounts(facet_txs, facet_block)
     # Use legacy mint calculator before the Bluebird fork block
     if facet_block.number < SysConfig.bluebird_fork_block_number
@@ -157,7 +164,9 @@ module FctMintCalculator
     engine
   end
 
-  def issuance_on_pace_delta(block_number = EthRpcClient.l2.get_block_number)
+  sig { params(block_number: T.nilable(Integer)).returns(Float) }
+  def issuance_on_pace_delta(block_number = nil)
+    block_number ||= EthRpcClient.l2.get_block_number
     attrs = client.get_l1_attributes(block_number)
 
     actual_total = if attrs && attrs[:fct_total_minted]
