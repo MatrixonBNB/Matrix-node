@@ -73,28 +73,27 @@ RSpec.describe FctMintCalculator do
     end
   end
 
-  describe '.compute_bluebird_fork_block_params' do
+  describe 'fork block parameter computation' do
     it 'raises when block_number is 0' do
-      allow(described_class).to receive(:calculate_historical_total).with(0).and_return(0)
+      allow(SysConfig).to receive(:bluebird_fork_block_number).and_return(0)
+      allow(SysConfig).to receive(:bluebird_immediate_fork?).and_return(false)
+      allow(described_class).to receive(:bluebird_fork_block_total_minted).and_return(0)
       
       expect {
-        described_class.compute_bluebird_fork_block_params(0)
+        described_class.compute_max_supply
       }.to raise_error(/expected mint percentage is zero/)
     end
     
     it 'calculates correct parameters for normal case' do
-      allow(described_class).to receive(:calculate_historical_total).with(1_182_600).and_return(140_000_000)
+      allow(SysConfig).to receive(:bluebird_fork_block_number).and_return(1_182_600)
+      allow(SysConfig).to receive(:bluebird_immediate_fork?).and_return(false)
+      allow(described_class).to receive(:bluebird_fork_block_total_minted).and_return(140_000_000)
       
-      total_minted, max_supply, initial_target = described_class.compute_bluebird_fork_block_params(1_182_600)
+      max_supply = described_class.compute_max_supply
+      initial_target = described_class.compute_target_per_period
       
-      expect(total_minted).to eq(140_000_000)
       expect(max_supply).to be_within(1_000_000).of(622_222_222)
       
-      # Calculate expected initial_target using the constants
-      # target_num_periods_in_halving = TARGET_NUM_BLOCKS_IN_HALVING / ADJUSTMENT_PERIOD_TARGET_LENGTH
-      #                               = 2_628_000 / 250 = 10_512
-      # target_supply_in_first_halving = max_supply / 2 = 622_222_222 / 2 = 311_111_111
-      # initial_target = 311_111_111 / 10_512 = 29_595
       expected_periods = FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING / FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH
       expected_initial_target = (622_222_222 / 2) / expected_periods
       expect(initial_target).to be_within(100).of(expected_initial_target)
@@ -106,7 +105,8 @@ RSpec.describe FctMintCalculator do
       # Calculate correct initial_target using the constants
       expected_periods = FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING / FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH
       expected_initial_target = (622_222_222 / 2) / expected_periods
-      allow(described_class).to receive(:fork_parameters).and_return([140_000_000, 622_222_222, expected_initial_target.to_i])
+      allow(described_class).to receive(:compute_max_supply).and_return(622_222_222)
+      allow(described_class).to receive(:compute_target_per_period).and_return(expected_initial_target.to_i)
     end
 
     it 'returns positive delta when ahead of schedule' do

@@ -23,32 +23,44 @@ module FctMintCalculator
     @_client ||= GethDriver.client
   end
 
-  # We calculate these once every time the node starts. It's a fine trade-off
-  sig { returns([Integer, Integer, Integer]) }
-  def fork_parameters
-    if SysConfig.bluebird_immediate_fork?
-      total_minted   = 0                       # nothing minted pre-fork
-      max_supply     = Integer(ENV.fetch('BLUEBIRD_IMMEDIATE_FORK_MAX_SUPPLY_ETHER')).ether
-      initial_target = (max_supply / 2) / target_num_periods_in_halving
-      return [total_minted, max_supply.to_i, initial_target.to_i]
-    end
-    
-    @fork_parameters ||= compute_bluebird_fork_block_params(SysConfig.bluebird_fork_block_number)
-  end
-
   sig { returns(Integer) }
   def bluebird_fork_block_total_minted
-    fork_parameters[0]
+    if SysConfig.bluebird_immediate_fork?
+      0  # nothing minted pre-fork
+    else
+      calculate_historical_total(SysConfig.bluebird_fork_block_number)
+    end
   end
 
   sig { returns(Integer) }
-  def max_supply
-    fork_parameters[1]
+  def compute_max_supply
+    if SysConfig.bluebird_immediate_fork?
+      Integer(ENV.fetch('BLUEBIRD_IMMEDIATE_FORK_MAX_SUPPLY_ETHER')).ether
+    else
+      # Calculate what percentage through the first halving period we are
+      percent_time_elapsed = Rational(SysConfig.bluebird_fork_block_number) / TARGET_NUM_BLOCKS_IN_HALVING
+      
+      # The expected percentage of total supply that should be minted by now
+      # (50% of supply should be minted in first halving, so we take 50% * percent_elapsed)
+      expected_mint_percentage = percent_time_elapsed * TARGET_ISSUANCE_FRACTION_FIRST_HALVING
+      
+      if expected_mint_percentage.zero?
+        raise "Bluebird fork pre-condition failed: expected mint percentage is zero"
+      end
+      
+      # Calculate new max supply based on actual minting rate
+      # If we've minted X tokens and that should be Y% of supply, then max supply = X/Y
+      total_minted = bluebird_fork_block_total_minted
+      new_max_supply = total_minted / expected_mint_percentage
+      
+      new_max_supply.to_i
+    end
   end
-
+  
   sig { returns(Integer) }
-  def target_per_period
-    fork_parameters[2]
+  def compute_target_per_period
+    target_supply_in_first_halving = Rational(compute_max_supply, 2)
+    (target_supply_in_first_halving / target_num_periods_in_halving).to_i
   end
   
   sig { params(block_number: Integer).returns(Integer) }
@@ -85,35 +97,6 @@ module FctMintCalculator
     total
   end
 
-  sig { params(block_number: Integer).returns([Integer, Integer, Integer]) }
-  def compute_bluebird_fork_block_params(block_number)
-    # Scheduled-fork path (≥ 10 000 and < first halving)
-    # Get actual total minted FCT up to fork
-    total_minted = calculate_historical_total(block_number)
-    
-    # Calculate what percentage through the first halving period we are
-    percent_time_elapsed = Rational(block_number) / TARGET_NUM_BLOCKS_IN_HALVING
-    
-    # The expected percentage of total supply that should be minted by now
-    # (50% of supply should be minted in first halving, so we take 50% * percent_elapsed)
-    expected_mint_percentage = percent_time_elapsed * TARGET_ISSUANCE_FRACTION_FIRST_HALVING
-    
-    if expected_mint_percentage.zero?
-      raise "Bluebird fork pre-condition failed: expected mint percentage is zero"
-    end
-    
-    # Calculate new max supply based on actual minting rate
-    # If we've minted X tokens and that should be Y% of supply, then max supply = X/Y
-    new_max_supply = (total_minted / expected_mint_percentage)
-    
-    # Calculate new initial target per period by targeting 50% issuance in first year.
-    target_supply_in_first_halving = Rational(new_max_supply, 2)
-    new_initial_target_per_period = (target_supply_in_first_halving / target_num_periods_in_halving)
-    
-    # Convert to integers only for final storage
-    [total_minted.to_i, new_max_supply.to_i, new_initial_target_per_period.to_i]
-  end
-
   # --- Core Logic ---
   sig { params(facet_txs: T::Array[FacetTransaction], facet_block: FacetBlock).returns(MintPeriod) }
   def assign_mint_amounts(facet_txs, facet_block)
@@ -136,12 +119,20 @@ module FctMintCalculator
       fct_mint_rate = Rational(
         prev_attrs.fetch(:fct_mint_rate),
         prev_attrs.fetch(:base_fee) # NOTE: Base fee is never zero.
-      )
+      ).to_i
+      
+      # Compute max supply and initial target at fork block
+      max_supply_value = compute_max_supply
+      initial_target_value = compute_target_per_period
     else
       total_minted = prev_attrs.fetch(:fct_total_minted)
       period_start_block = prev_attrs.fetch(:fct_period_start_block)
       period_minted = prev_attrs.fetch(:fct_period_minted)
       fct_mint_rate = prev_attrs.fetch(:fct_mint_rate)
+      
+      # Use values from L1 attributes after fork
+      max_supply_value = prev_attrs.fetch(:fct_max_supply)
+      initial_target_value = prev_attrs.fetch(:fct_initial_target_per_period)
     end
     
     engine = MintPeriod.new(
@@ -149,7 +140,9 @@ module FctMintCalculator
       fct_mint_rate: fct_mint_rate,
       total_minted: total_minted,
       period_minted: period_minted,
-      period_start_block: period_start_block
+      period_start_block: period_start_block,
+      max_supply: max_supply_value,
+      target_per_period: initial_target_value
     )
 
     engine.assign_mint_amounts(facet_txs, current_l1_base_fee)
@@ -158,7 +151,9 @@ module FctMintCalculator
       fct_total_minted:      engine.total_minted.to_i,
       fct_mint_rate:         engine.fct_mint_rate.to_i,
       fct_period_start_block: engine.period_start_block,
-      fct_period_minted:     engine.period_minted.to_i
+      fct_period_minted:     engine.period_minted.to_i,
+      fct_max_supply:        max_supply_value,
+      fct_initial_target_per_period: initial_target_value
     )
 
     engine
@@ -176,7 +171,7 @@ module FctMintCalculator
       calculate_historical_total(block_number)
     end
 
-    supply_target_first_halving = max_supply.to_r / 2
+    supply_target_first_halving = compute_max_supply.to_r / 2
     actual_fraction = Rational(actual_total, supply_target_first_halving)
 
     time_fraction = Rational(block_number) / TARGET_NUM_BLOCKS_IN_HALVING

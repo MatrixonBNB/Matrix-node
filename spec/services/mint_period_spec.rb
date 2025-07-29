@@ -8,7 +8,9 @@ RSpec.describe MintPeriod do
         fct_mint_rate: 100,
         total_minted: 0,
         period_minted: 0,
-        period_start_block: 1000
+        period_start_block: 1000,
+        max_supply: 622_222_222,
+        target_per_period: 29_595
       )
     end
 
