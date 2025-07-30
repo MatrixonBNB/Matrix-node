@@ -4,17 +4,21 @@ class MintPeriod
   HALVING_FACTOR = 2.to_r
 
   attr_reader :fct_mint_rate, :period_minted, :total_minted, :period_start_block, 
-              :block_num
+              :block_num, :max_supply, :target_per_period
 
-  def initialize(block_num:, fct_mint_rate:, total_minted:, period_minted:, period_start_block:)
+  sig { params(block_num: Integer, fct_mint_rate: Integer, total_minted: Integer, period_minted: Integer, period_start_block: Integer, max_supply: Integer, target_per_period: Integer).void }
+  def initialize(block_num:, fct_mint_rate:, total_minted:, period_minted:, period_start_block:, max_supply:, target_per_period:)
     @block_num            = block_num
     @fct_mint_rate        = fct_mint_rate
     @total_minted         = total_minted
     @period_minted        = period_minted
     @period_start_block   = period_start_block
+    @max_supply           = max_supply.to_r
+    @target_per_period    = target_per_period
   end
   
   # Consumes an ETH burn amount, returns FCT minted for this tx (Rational)
+  sig { params(eth_burn: Integer).returns(Rational) }
   def consume_eth(eth_burn)
     remaining_eth = eth_burn.to_r
     minted        = 0.to_r
@@ -57,12 +61,8 @@ class MintPeriod
     end
   end
 
-  def max_supply
-    FctMintCalculator.max_supply.to_r
-  end
-  
   def current_target
-    target = FctMintCalculator.target_per_period
+    target = target_per_period
     get_current_halving_level.times { target /= HALVING_FACTOR }
     [target, 1].max.floor.to_r
   end

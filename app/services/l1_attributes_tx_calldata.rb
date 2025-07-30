@@ -38,9 +38,11 @@ module L1AttributesTxCalldata
     # Layout for each 32-byte word (big-endian):
     #   word 1 (offset 160): [fct_mint_period_l1_data_gas(16B)] [fct_mint_rate(16B)]
     #   word 2 (offset 192): [fct_period_start_block(16B)]      [fct_total_minted(16B)]
-    #   word 3 (offset 224): [reserved / 0(16B)]                 [fct_period_minted(16B)]
+    #   word 3 (offset 224): [fct_period_minted(16B)]           [fct_max_supply(16B)]
+    #   word 4 (offset 256): [fct_initial_target_per_period(16B)][reserved / 0(16B)]
     if SysConfig.is_bluebird?(facet_block)
-      %i[fct_total_minted fct_period_start_block fct_period_minted].each do |field|
+      %i[fct_total_minted fct_period_start_block fct_period_minted 
+         fct_max_supply fct_initial_target_per_period].each do |field|
         raise "#{field} required after fork" if facet_block.send(field).nil?
       end
 
@@ -48,8 +50,14 @@ module L1AttributesTxCalldata
       packed_data << Eth::Util.zpad_int(facet_block.fct_period_start_block, 16)
       packed_data << Eth::Util.zpad_int(facet_block.fct_total_minted, 16)
 
-      # word 3 (upper 128 bits reserved as zero for now)
-      packed_data << Eth::Util.zpad_int(facet_block.fct_period_minted, 32)
+      # word 3 (offset 224): [fct_max_supply(16B)] [fct_period_minted(16B)]
+      # Note: In storage, fctPeriodMinted is in lower 128 bits, fctMaxSupply in upper 128 bits
+      # So we pack max_supply first (upper bits), then period_minted (lower bits)
+      packed_data << Eth::Util.zpad_int(facet_block.fct_max_supply, 16)
+      packed_data << Eth::Util.zpad_int(facet_block.fct_period_minted, 16)
+      
+      # word 4 (offset 256): fct_initial_target_per_period padded to 32 bytes
+      packed_data << Eth::Util.zpad_int(facet_block.fct_initial_target_per_period, 32)
     end
     
     ByteString.from_bin(packed_data.join)
@@ -92,8 +100,8 @@ module L1AttributesTxCalldata
     # Only decode fct_total_minted if at or past fork block
     if SysConfig.is_bluebird?(facet_block_number)
       # Pre-fork: 192 bytes (after removing 4-byte selector)
-      # Post-fork: 192 + 64 = 256 bytes (3 new fields: 16+16+32)
-      raise "Expected exactly 256 bytes of calldata after fork, got #{data.length}" unless data.length == 256
+      # Post-fork: 192 + 96 = 288 bytes (4 new words: 32+32+32)
+      raise "Expected exactly 288 bytes of calldata after fork, got #{data.length}" unless data.length == 288
       raise "Invalid data gas" unless fct_mint_period_l1_data_gas.zero?
 
       # word 2 : offsets 192..224 (32 bytes)
@@ -101,7 +109,12 @@ module L1AttributesTxCalldata
       result[:fct_total_minted]  = data[208...224].unpack1('H*').to_i(16)
 
       # word 3 : offsets 224..256 (32 bytes)
+      # Note: max_supply is in upper 128 bits, period_minted in lower 128 bits
+      result[:fct_max_supply] = data[224...240].unpack1('H*').to_i(16)
       result[:fct_period_minted] = data[240...256].unpack1('H*').to_i(16)
+      
+      # word 4 : offsets 256..288 (32 bytes)
+      result[:fct_initial_target_per_period] = data[256...288].unpack1('H*').to_i(16)
     end
 
     result.with_indifferent_access
