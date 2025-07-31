@@ -74,3 +74,5 @@ gem 'benchmark'
 gem 'ostruct'
 
 gem "oj", "~> 3.16"
+
+gem "retriable", "~> 3.1"
