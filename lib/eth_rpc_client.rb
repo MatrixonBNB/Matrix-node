@@ -1,11 +1,11 @@
 class EthRpcClient
   class HttpError < StandardError
-    attr_reader :code, :message
+    attr_reader :code, :http_message
     
-    def initialize(code, message)
+    def initialize(code, http_message)
       @code = code
-      @message = message
-      super("HTTP error: #{code} #{message}")
+      @http_message = http_message
+      super("HTTP error: #{code} #{http_message}")
     end
   end
   class ApiError < StandardError; end
