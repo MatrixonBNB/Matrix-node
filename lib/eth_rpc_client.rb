@@ -123,8 +123,9 @@ class EthRpcClient
     url = base_url
     
     Retriable.retriable(
-      tries: 5,
+      tries: 7,
       base_interval: 1,
+      max_interval: 32,
       multiplier: 2,
       rand_factor: 0.4,
       on: [Net::ReadTimeout, Net::OpenTimeout, HttpError, ApiError],
@@ -141,7 +142,7 @@ class EthRpcClient
       parsed_response = JSON.parse(response.body, max_nesting: false)
       
       if parsed_response['error']
-        raise ApiError, "API error: #{parsed_response['error']['message']}"
+        raise ApiError, "API error: #{parsed_response.dig('error', 'message') || 'Unknown API error'}"
       end
 
       parsed_response['result']
