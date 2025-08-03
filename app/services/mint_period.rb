@@ -6,15 +6,25 @@ class MintPeriod
   attr_reader :fct_mint_rate, :period_minted, :total_minted, :period_start_block, 
               :block_num, :max_supply, :target_per_period
 
-  sig { params(block_num: Integer, fct_mint_rate: Integer, total_minted: Integer, period_minted: Integer, period_start_block: Integer, max_supply: Integer, target_per_period: Integer).void }
+  sig {
+    params(
+      block_num: Integer,
+      fct_mint_rate: Integer,
+      total_minted: Integer,
+      period_minted: Integer,
+      period_start_block: Integer,
+      max_supply: Integer,
+      target_per_period: Integer
+    ).void
+  }
   def initialize(block_num:, fct_mint_rate:, total_minted:, period_minted:, period_start_block:, max_supply:, target_per_period:)
     @block_num            = block_num
-    @fct_mint_rate        = fct_mint_rate
-    @total_minted         = total_minted
-    @period_minted        = period_minted
+    @fct_mint_rate        = fct_mint_rate.to_r
+    @total_minted         = total_minted.to_r
+    @period_minted        = period_minted.to_r
     @period_start_block   = period_start_block
     @max_supply           = max_supply.to_r
-    @target_per_period    = target_per_period
+    @target_per_period    = target_per_period.to_r
   end
   
   # Consumes an ETH burn amount, returns FCT minted for this tx (Rational)
@@ -50,6 +60,7 @@ class MintPeriod
     [max_supply - total_minted, 0].max.floor.to_r
   end
 
+  sig { params(facet_txs: T::Array[FacetTransaction], current_l1_base_fee: Integer).void }
   def assign_mint_amounts(facet_txs, current_l1_base_fee)
     if blocks_elapsed_in_period >= FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH
       start_new_period(:adjust_up)
@@ -61,34 +72,41 @@ class MintPeriod
     end
   end
 
+  sig { returns(Rational) }
   def current_target
     target = target_per_period
     get_current_halving_level.times { target /= HALVING_FACTOR }
     [target, 1].max.floor.to_r
   end
   
+  sig { returns(Integer) }
   def get_current_halving_level
+    return 0 if total_minted >= max_supply
+    
     level = 0
-    threshold = max_supply / HALVING_FACTOR
+    threshold = Rational(max_supply, HALVING_FACTOR)
     
     # Find how many halving thresholds we've crossed
-    while total_minted >= threshold && threshold < max_supply && total_minted < max_supply
+    while total_minted >= threshold && threshold < max_supply
       level += 1
       remaining = max_supply - threshold
-      threshold += (remaining / HALVING_FACTOR) # Add half of the remaining supply
+      threshold += Rational(remaining, HALVING_FACTOR) # Add half of the remaining supply
     end
     
     level
   end
 
+  sig { returns(T::Boolean) }
   def supply_exhausted?
     total_minted >= max_supply
   end
 
+  sig { returns(Integer) }
   def blocks_elapsed_in_period
     block_num - period_start_block
   end
 
+  sig { params(adjustment_type: Symbol).void }
   def start_new_period(adjustment_type)
     raise unless [:adjust_up, :adjust_down].include?(adjustment_type)
     
@@ -99,6 +117,7 @@ class MintPeriod
   end
 
   # --- rate helpers -------------------------------------------------------
+  sig { void }
   def down_adjust_rate
     raw_ratio = Rational(blocks_elapsed_in_period, FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH)
     capped_ratio = [raw_ratio, FctMintCalculator::MAX_RATE_ADJUSTMENT_DOWN_FACTOR].max
@@ -106,6 +125,7 @@ class MintPeriod
     @fct_mint_rate = compute_and_cap_rate(fct_mint_rate, capped_ratio)
   end
   
+  sig { void }
   def up_adjust_rate
     capped_ratio = if period_minted.zero?
                FctMintCalculator::MAX_RATE_ADJUSTMENT_UP_FACTOR
@@ -116,6 +136,7 @@ class MintPeriod
     @fct_mint_rate = compute_and_cap_rate(fct_mint_rate, capped_ratio)
   end
   
+  sig { params(prev_rate: Rational, adjustment_factor: Rational).returns(Rational) }
   def compute_and_cap_rate(prev_rate, adjustment_factor)
     raw_new_rate = prev_rate.to_r * adjustment_factor
     raw_new_rate.clamp(FctMintCalculator::MIN_MINT_RATE, FctMintCalculator::MAX_MINT_RATE)

@@ -678,8 +678,8 @@ RSpec.describe FctMintCalculator do
       expect(max_supply).to be > 600_000_000 # Should be in expected range
       
       # Verify the mathematical relationships
-      block_proportion = Rational(fork_block_num) / 2_628_000
-      expected_mint_proportion = block_proportion * 0.5
+      block_proportion = Rational(fork_block_num) / FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING
+      expected_mint_proportion = block_proportion * FctMintCalculator::TARGET_ISSUANCE_FRACTION_FIRST_HALVING
       expected_max_supply = (140_000_000 / expected_mint_proportion).to_i
       
       expect(max_supply).to eq(expected_max_supply)

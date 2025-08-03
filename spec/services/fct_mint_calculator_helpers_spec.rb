@@ -85,28 +85,47 @@ RSpec.describe FctMintCalculator do
     end
     
     it 'calculates correct parameters for normal case' do
-      allow(SysConfig).to receive(:bluebird_fork_block_number).and_return(1_182_600)
+      fork_block = 1_182_600
+      total_minted_at_fork = 140_000_000
+      
+      allow(SysConfig).to receive(:bluebird_fork_block_number).and_return(fork_block)
       allow(SysConfig).to receive(:bluebird_immediate_fork?).and_return(false)
-      allow(described_class).to receive(:bluebird_fork_block_total_minted).and_return(140_000_000)
+      allow(described_class).to receive(:bluebird_fork_block_total_minted).and_return(total_minted_at_fork)
       
       max_supply = described_class.compute_max_supply
       initial_target = described_class.compute_target_per_period
       
-      expect(max_supply).to be_within(1_000_000).of(622_222_222)
+      # Calculate expected max supply based on the formula in compute_max_supply
+      percent_time_elapsed = Rational(fork_block) / FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING
+      expected_mint_percentage = percent_time_elapsed * FctMintCalculator::TARGET_ISSUANCE_FRACTION_FIRST_HALVING
+      expected_max_supply = (total_minted_at_fork / expected_mint_percentage).to_i
       
+      expect(max_supply).to eq(expected_max_supply)
+      
+      # Calculate expected initial target based on the formula in compute_target_per_period
       expected_periods = FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING / FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH
-      expected_initial_target = (622_222_222 / 2) / expected_periods
-      expect(initial_target).to be_within(100).of(expected_initial_target)
+      expected_initial_target = (expected_max_supply / 2) / expected_periods
+      expect(initial_target).to be_within(1).of(expected_initial_target)
     end
   end
 
   describe '.issuance_on_pace_delta' do
     before do
-      # Calculate correct initial_target using the constants
-      expected_periods = FctMintCalculator::TARGET_NUM_BLOCKS_IN_HALVING / FctMintCalculator::ADJUSTMENT_PERIOD_TARGET_LENGTH
-      expected_initial_target = (622_222_222 / 2) / expected_periods
-      allow(described_class).to receive(:compute_max_supply).and_return(622_222_222)
-      allow(described_class).to receive(:compute_target_per_period).and_return(expected_initial_target.to_i)
+      # Set up a consistent fork scenario for these tests
+      fork_block = 1_182_600
+      total_minted_at_fork = 140_000_000
+      
+      allow(SysConfig).to receive(:bluebird_fork_block_number).and_return(fork_block)
+      allow(SysConfig).to receive(:bluebird_immediate_fork?).and_return(false)
+      allow(described_class).to receive(:bluebird_fork_block_total_minted).and_return(total_minted_at_fork)
+      
+      # Let the actual methods calculate the values based on the setup
+      @max_supply = described_class.compute_max_supply
+      @initial_target = described_class.compute_target_per_period
+      
+      # Now stub them to return these calculated values
+      allow(described_class).to receive(:compute_max_supply).and_return(@max_supply)
+      allow(described_class).to receive(:compute_target_per_period).and_return(@initial_target)
     end
 
     it 'returns positive delta when ahead of schedule' do

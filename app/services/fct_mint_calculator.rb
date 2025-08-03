@@ -11,7 +11,7 @@ module FctMintCalculator
   MAX_RATE_ADJUSTMENT_DOWN_FACTOR = Rational(1, 4)
   TARGET_ISSUANCE_FRACTION_FIRST_HALVING = Rational(1, 2)
 
-  TARGET_NUM_BLOCKS_IN_HALVING = 2_628_000.to_r
+  TARGET_NUM_BLOCKS_IN_HALVING = (2_628_000 * 2).to_r
   
   sig { returns(Rational) }
   def target_num_periods_in_halving
