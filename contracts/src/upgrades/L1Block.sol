@@ -162,9 +162,6 @@ contract L1Block is ISemver, IGasToken {
         uint128 periodMinted;
         uint128 maxSupply;
         uint128 initialTargetPerPeriod;
-        uint256 targetNumBlocksInHalving;
-        uint256 expectedTotalMinted;
-        int256 pacingDelta;
     }
     
     function fctDetails() external view returns (FctDetails memory) {
@@ -174,29 +171,7 @@ contract L1Block is ISemver, IGasToken {
             periodStartBlock: fctPeriodStartBlock,
             periodMinted: fctPeriodMinted,
             maxSupply: fctMaxSupply,
-            initialTargetPerPeriod: fctInitialTargetPerPeriod,
-            targetNumBlocksInHalving: targetNumBlocksInHalving(),
-            expectedTotalMinted: targetTotalMinted(),
-            pacingDelta: pacingDelta()
+            initialTargetPerPeriod: fctInitialTargetPerPeriod
         });
-    }
-
-    function targetNumBlocksInHalving() public pure returns (uint256) {
-        return 2_628_000;
-    }
-    
-    /// @notice Returns the approximate expected total minted at current block based on linear schedule
-    /// @return Expected total minted amount in wei
-    function targetTotalMinted() public view returns (uint256) {
-        uint256 supplyTargetFirstHalving = fctMaxSupply / 2;
-        return (supplyTargetFirstHalving * block.number) / targetNumBlocksInHalving();
-    }
-    
-    /// @notice Returns approximate pacing delta: positive if ahead of schedule, negative if behind
-    /// @return Pacing delta as a percentage (e.g., 0.05e18 = 5% ahead)
-    function pacingDelta() public view returns (int256) {
-        uint256 ratio = (fctTotalMinted * 1e18) / targetTotalMinted();
-        int256 delta = int256(ratio) - 1e18;
-        return delta; 
     }
 }
