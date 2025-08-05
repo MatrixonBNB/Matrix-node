@@ -35,7 +35,7 @@ class SolidityCompiler
       end
       
       foundry_root = Rails.root.join('contracts')
-      build_command = "cd #{foundry_root} && forge build"
+      build_command = "cd #{foundry_root} && forge build && bundle exec rake l1_block:generate_bytecode"
       puts "Running command: #{build_command}"
       
       success = system(build_command)
