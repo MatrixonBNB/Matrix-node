@@ -1,13 +1,13 @@
 services:
   geth:
-    image: ghcr.io/0xfacet/facet-geth:bluebird
+    image: ghcr.io/0xfacet/facet-geth:v2.0.0
     environment:
       JWT_SECRET: ${JWT_SECRET}
       GENESIS_FILE: ${GENESIS_FILE}
       GENESIS_TIMESTAMP: ${GENESIS_TIMESTAMP:-}
       GENESIS_MIX_HASH: ${GENESIS_MIX_HASH:-}
       RPC_GAS_CAP: ${RPC_GAS_CAP:-500000000}
-      BLUEBIRD_TIMESTAMP: ${BLUEBIRD_TIMESTAMP:-}
+      BLUEBIRD_TIMESTAMP: ${BLUEBIRD_TIMESTAMP:-1754484539}
     volumes:
       - geth-data:/root/ethereum
     ports:
@@ -20,7 +20,7 @@ services:
       start_period: 10s
 
   node:
-    image: ghcr.io/0xfacet/facet-node:bluebird
+    image: ghcr.io/0xfacet/facet-node:v2.0.0
     environment:
       JWT_SECRET: ${JWT_SECRET}
       L1_NETWORK: ${L1_NETWORK}
@@ -29,7 +29,7 @@ services:
       L1_RPC_URL: ${L1_RPC_URL}
       L1_GENESIS_BLOCK: ${L1_GENESIS_BLOCK}
       BLOCK_IMPORT_BATCH_SIZE: ${BLOCK_IMPORT_BATCH_SIZE:-5}
-      BLUEBIRD_TIMESTAMP: ${BLUEBIRD_TIMESTAMP:-}
+      BLUEBIRD_TIMESTAMP: ${BLUEBIRD_TIMESTAMP:-1754484539}
     depends_on:
       geth:
         condition: service_healthy
