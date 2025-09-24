@@ -8,7 +8,7 @@ services:
       GENESIS_MIX_HASH: ${GENESIS_MIX_HASH:-}
       RPC_GAS_CAP: ${RPC_GAS_CAP:-500000000}
       BLUEBIRD_TIMESTAMP: ${BLUEBIRD_TIMESTAMP:-1754484539}
-      CACHE_SIZE: ${CACHE_SIZE:-10000}
+      CACHE_SIZE: ${GETH_CACHE_SIZE:-10000}
     volumes:
       - geth-data:/root/ethereum
     ports:
