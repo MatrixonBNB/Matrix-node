@@ -130,7 +130,6 @@ class L1RpcPrefetcher
     client = @eth
 
     Retriable.retriable(tries: 3, base_interval: 1, max_interval: 4) do
-
       block = client.get_block(block_number, true)
 
       # Handle case where block doesn't exist yet (normal when caught up)
