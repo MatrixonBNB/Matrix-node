@@ -9,7 +9,7 @@ class EthBlockImporter
   # Raised when a re-org is detected (parent hash mismatch)
   class ReorgDetectedError < StandardError; end
   
-  attr_accessor :facet_block_cache, :ethereum_client, :eth_block_cache, :geth_driver, :prefetcher
+  attr_accessor :facet_block_cache, :ethereum_client, :eth_block_cache, :geth_driver, :prefetcher, :logger
   
   def initialize
     @facet_block_cache = {}
@@ -18,6 +18,8 @@ class EthBlockImporter
     @ethereum_client ||= EthRpcClient.new(ENV.fetch('L1_RPC_URL'))
     
     @geth_driver = GethDriver
+    
+    @logger = Rails.logger
     
     MemeryExtensions.clear_all_caches!
     
@@ -62,10 +64,6 @@ class EthBlockImporter
     end
 
     logger.info "Populated facet block cache with #{facet_block_cache.size} blocks from #{epochs_found} epochs"
-  end
-  
-  def logger
-    Rails.logger
   end
   
   def blocks_behind
