@@ -9,8 +9,7 @@ class EthBlockImporter
   # Raised when a re-org is detected (parent hash mismatch)
   class ReorgDetectedError < StandardError; end
   
-  attr_accessor :facet_block_cache, :ethereum_client, :eth_block_cache, :geth_driver
-  attr_reader :prefetcher
+  attr_accessor :facet_block_cache, :ethereum_client, :eth_block_cache, :geth_driver, :prefetcher
   
   def initialize
     @facet_block_cache = {}
@@ -26,8 +25,6 @@ class EthBlockImporter
     populate_facet_block_cache
     
     @prefetcher = L1RpcPrefetcher.new(ethereum_client: @ethereum_client)
-    # Only warm cache in production to avoid test slowdown
-    @prefetcher.ensure_prefetched(current_max_eth_block_number + 1) unless Rails.env.test?
   end
   
   def current_max_facet_block_number
