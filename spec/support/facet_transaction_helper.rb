@@ -81,7 +81,7 @@ module FacetTransactionHelper
 
     res
   ensure
-    importer.prefetcher = old_prefetcher if defined?(old_prefetcher)
+    importer.prefetcher = old_prefetcher
   end
 
   # Keep the original method for backwards compatibility
