@@ -44,6 +44,11 @@ module FacetTransactionHelper
         eth_tx.facet_tx_source_hash == Hash32.from_hex(tx['sourceHash'])
       end
       
+      if tx_in_geth.nil?
+        puts "Could not find transaction with sourceHash: #{eth_tx.facet_tx_source_hash.to_hex}"
+        puts "Available transactions: #{latest_l2_block['transactions'].map { |tx| tx['sourceHash'] }}"
+      end
+      
       next nil if tx_in_geth.nil?
       
       receipt_in_geth = EthRpcClient.l2.get_transaction_receipt(tx_in_geth['hash'])
