@@ -15,8 +15,11 @@ class EthTransaction < T::Struct
   const :eth_block, T.nilable(EthBlock)
   const :facet_transactions, T::Array[FacetTransaction], default: []
   
-  FACET_INBOX_ADDRESS = Address20.from_hex("0x00000000000000000000000000000000000face7")
-  FacetLogInboxEventSig = ByteString.from_hex("0x00000000000000000000000000000000000000000000000000000000000face7")
+  FACET_INBOX_ADDRESS = Address20.from_hex(ENV.fetch('INBOX_ADDRESS'))
+  REQUIRE_INBOX_PAYMENT = (ENV.fetch('REQUIRE_INBOX_PAYMENT', 'false') == 'true')
+  PRICE_WEI = Integer(ENV.fetch('PRICE_WEI', '0'))
+  COMPUTE_PAID_EVENT_SIG = ByteString.from_bin(Eth::Util.keccak256('ComputePaid(address,uint256)'))
+  FacetLogInboxEventSig = ByteString.from_hex("0x00000000000000000000000000000000000000000000000000000000000bbbbb") #This needs to be modified.
 
   sig { params(block_result: T.untyped, receipt_result: T.untyped).returns(T::Array[EthTransaction]) }
   def self.from_rpc_result(block_result, receipt_result)
@@ -71,6 +74,9 @@ class EthTransaction < T::Struct
   
   sig { returns(T.nilable(FacetTransaction)) }
   def try_facet_tx_from_events
+    if REQUIRE_INBOX_PAYMENT && !inbox_payment_present?
+      return nil
+    end
     facet_tx_creation_events.each do |log|
       facet_tx = FacetTransaction.from_payload(
         contract_initiated: true,
@@ -84,6 +90,26 @@ class EthTransaction < T::Struct
   end
   
   sig { returns(T::Boolean) }
+  def inbox_payment_present?
+    logs.any? do |log|
+      begin
+        next false if log['removed']
+        # Must come from Inbox
+        addr = log['address']&.downcase
+        next false unless addr && addr == FACET_INBOX_ADDRESS.to_hex.downcase
+        # topic0 must be ComputePaid(address,uint256)
+        topics = log['topics'] || []
+        next false unless topics.first && ByteString.from_hex(topics.first) == COMPUTE_PAID_EVENT_SIG
+        # The amount in data (payer is indexed).
+        data_hex = log['data']
+        next false unless data_hex.is_a?(String) && data_hex.start_with?('0x')
+        amount = data_hex[2..].to_i(16) 
+        amount == PRICE_WEI
+      rescue StandardError
+        false
+      end
+    end
+  end
   def is_success?
     status == 1
   end
