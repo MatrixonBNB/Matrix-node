@@ -23,10 +23,10 @@ abstract contract FacetEIP712 is EIP712 {
         uint256 newChainId = block.chainid;
         uint256 oldChainId;
         
-        if (newChainId == 0xface7) {
-            oldChainId = 1;
-        } else if (newChainId == 0xface7a) {
-            oldChainId = 11155111;
+        if (newChainId == 0xbbbb1) {
+            oldChainId = 56;
+        } else if (newChainId == 0xbbbb2) {
+            oldChainId = 97;
         }
         
         bytes32 oldTypedDataHash = _hashTypedData(keccak256(message), oldChainId, verifyingAddress);

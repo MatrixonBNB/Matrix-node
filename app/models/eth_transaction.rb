@@ -15,8 +15,8 @@ class EthTransaction < T::Struct
   const :eth_block, T.nilable(EthBlock)
   const :facet_transactions, T::Array[FacetTransaction], default: []
   
-  FACET_INBOX_ADDRESS = Address20.from_hex("0x00000000000000000000000000000000000face7")
-  FacetLogInboxEventSig = ByteString.from_hex("0x00000000000000000000000000000000000000000000000000000000000face7")
+  FACET_INBOX_ADDRESS = Address20.from_hex("0x00000000000000000000000000000000000bbbb1")
+  FacetLogInboxEventSig = ByteString.from_hex("0x00000000000000000000000000000000000000000000000000000000000bbbb1")
 
   sig { params(block_result: T.untyped, receipt_result: T.untyped).returns(T::Array[EthTransaction]) }
   def self.from_rpc_result(block_result, receipt_result)
