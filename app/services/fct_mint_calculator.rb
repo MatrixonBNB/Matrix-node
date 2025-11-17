@@ -100,63 +100,7 @@ module FctMintCalculator
   # --- Core Logic ---
   sig { params(facet_txs: T::Array[FacetTransaction], facet_block: FacetBlock).returns(MintPeriod) }
   def assign_mint_amounts(facet_txs, facet_block)
-    # Use legacy mint calculator before the Bluebird fork block
-    if facet_block.number < SysConfig.bluebird_fork_block_number
-      return FctMintCalculatorAlbatross.assign_mint_amounts(facet_txs, facet_block)
-    end
-
-    current_block_num = facet_block.number
-    
-    # Retrieve state from previous block (N-1)
-    prev_attrs = client.get_l1_attributes(current_block_num - 1)
-    current_l1_base_fee = facet_block.eth_block_base_fee_per_gas
-
-    if current_block_num == SysConfig.bluebird_fork_block_number
-      total_minted = bluebird_fork_block_total_minted
-      period_start_block = current_block_num
-      period_minted = 0
-      
-      fct_mint_rate = Rational(
-        prev_attrs.fetch(:fct_mint_rate),
-        prev_attrs.fetch(:base_fee) # NOTE: Base fee is never zero.
-      ).to_i
-      
-      # Compute max supply and initial target at fork block
-      max_supply_value = compute_max_supply
-      initial_target_value = compute_target_per_period
-    else
-      total_minted = prev_attrs.fetch(:fct_total_minted)
-      period_start_block = prev_attrs.fetch(:fct_period_start_block)
-      period_minted = prev_attrs.fetch(:fct_period_minted)
-      fct_mint_rate = prev_attrs.fetch(:fct_mint_rate)
-      
-      # Use values from L1 attributes after fork
-      max_supply_value = prev_attrs.fetch(:fct_max_supply)
-      initial_target_value = prev_attrs.fetch(:fct_initial_target_per_period)
-    end
-    
-    engine = MintPeriod.new(
-      block_num: current_block_num,
-      fct_mint_rate: fct_mint_rate,
-      total_minted: total_minted,
-      period_minted: period_minted,
-      period_start_block: period_start_block,
-      max_supply: max_supply_value,
-      target_per_period: initial_target_value
-    )
-
-    engine.assign_mint_amounts(facet_txs, current_l1_base_fee)
-
-    facet_block.assign_attributes(
-      fct_total_minted:      engine.total_minted.to_i,
-      fct_mint_rate:         engine.fct_mint_rate.to_i,
-      fct_period_start_block: engine.period_start_block,
-      fct_period_minted:     engine.period_minted.to_i,
-      fct_max_supply:        max_supply_value,
-      fct_initial_target_per_period: initial_target_value
-    )
-
-    engine
+    FctMintCalculatorAlbatross.assign_mint_amounts(facet_txs, facet_block)
   end
 
   sig { params(block_number: T.nilable(Integer)).returns(Float) }
