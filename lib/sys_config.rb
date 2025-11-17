@@ -2,7 +2,7 @@ module SysConfig
   extend self
   
   L2_BLOCK_GAS_LIMIT = Integer(ENV.fetch('L2_BLOCK_GAS_LIMIT', 200_000_000))
-  L2_BLOCK_TIME = 12
+  L2_BLOCK_TIME = 0.75
   
   def block_gas_limit(block)
     if block.number == 1

@@ -70,7 +70,7 @@ class FacetBlock < T::Struct
       eth_block_base_fee_per_gas: facet_block.eth_block_base_fee_per_gas,
       parent_beacon_block_root: facet_block.parent_beacon_block_root,
       number: facet_block.number + 1,
-      timestamp: facet_block.timestamp + 12,
+      timestamp: facet_block.timestamp + 0.75,
       sequence_number: facet_block.sequence_number + 1
     )
   end

@@ -182,7 +182,7 @@ module GethDriver
     finalized_block:
   )
     max_filler_blocks = 100
-    block_interval = 12
+    block_interval = 0.75
     last_block = head_block
     filler_blocks = []
 
