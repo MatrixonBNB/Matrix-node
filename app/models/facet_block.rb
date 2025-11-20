@@ -62,6 +62,10 @@ class FacetBlock < T::Struct
   end
   
   def self.next_in_sequence_from_facet_block(facet_block)
+    next_timestamp = BlockTime.next_after(
+      facet_block.timestamp,
+      proposed_timestamp: facet_block.timestamp + BlockTime.interval_seconds
+    )
     FacetBlock.new(
       eth_block_hash: facet_block.eth_block_hash,
       eth_block_number: facet_block.eth_block_number,
@@ -70,7 +74,7 @@ class FacetBlock < T::Struct
       eth_block_base_fee_per_gas: facet_block.eth_block_base_fee_per_gas,
       parent_beacon_block_root: facet_block.parent_beacon_block_root,
       number: facet_block.number + 1,
-      timestamp: facet_block.timestamp + 0.75,
+      timestamp: next_timestamp,
       sequence_number: facet_block.sequence_number + 1
     )
   end

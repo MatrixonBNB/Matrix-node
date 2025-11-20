@@ -21,6 +21,11 @@ module GethDriver
     safe_block:,
     finalized_block:
   )
+    new_facet_block.timestamp = normalize_block_timestamp(
+      parent_block: head_block,
+      proposed_timestamp: new_facet_block.timestamp
+    )
+
     # Create filler blocks if necessary and update head_block
     filler_blocks = create_filler_blocks(
       head_block: head_block,
@@ -182,7 +187,7 @@ module GethDriver
     finalized_block:
   )
     max_filler_blocks = 100
-    block_interval = 0.75
+    block_interval = BlockTime.interval_seconds
     last_block = head_block
     filler_blocks = []
 
@@ -214,6 +219,13 @@ module GethDriver
     end
 
     filler_blocks.sort_by(&:number)
+  end
+
+  def normalize_block_timestamp(parent_block:, proposed_timestamp: nil)
+    BlockTime.next_after(
+      parent_block.timestamp,
+      proposed_timestamp: proposed_timestamp,
+    )
   end
   
   def init_command
