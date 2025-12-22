@@ -24,7 +24,7 @@ module FctMintCalculatorAlbatross
   end
   
   def halving_factor(l2_block)
-    1
+    2 ** halving_periods_passed(l2_block)
   end
   
   def is_first_block_in_period?(l2_block)
